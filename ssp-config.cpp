@@ -323,9 +323,9 @@ namespace ssp {
                 read_xml(is, pt);
                 
                 /* logging configuration  */
-                m_syslogAddress = pt.get<string>("ssp.syslog.address", "localhost") ;
-                m_sysLogPort = pt.get<unsigned int>("ssp.syslog.address", 516) ;
-                m_syslogFacility = pt.get<string>("ssp.syslog.facility","local7") ;
+                m_syslogAddress = pt.get<string>("ssp.logging.syslog.address", "localhost") ;
+                m_sysLogPort = pt.get<unsigned int>("ssp.logging.syslog.address", 516) ;
+                m_syslogFacility = pt.get<string>("ssp.logging.syslog.facility","local7") ;
                 
                 string ibStrategy = pt.get<string>("ssp.routing.inbound.<xmlattr>.strategy", "") ;
                 string ibTarget = pt.get<string>("ssp.routing.inbound.<xmlattr>.target", "") ;
@@ -624,6 +624,8 @@ namespace ssp {
         
         bool getSyslogFacility( sinks::syslog::facility& facility ) const {
         
+	    std::cout << "syslog facility " << m_syslogFacility << endl ;
+
             if( m_syslogFacility.empty() ) return false ;
             
             if( m_syslogFacility == "local0" ) facility = sinks::syslog::local0 ;

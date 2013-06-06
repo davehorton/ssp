@@ -274,6 +274,8 @@ namespace ssp {
             logging::core::get()->add_sink(sink);
             
             m_bLoggingInitialized = true ;
+
+	    std::cout << "Created logger" << endl ;
             
         }
         catch (std::exception& e) {
@@ -283,6 +285,7 @@ namespace ssp {
     }
     
     void SipLbController::run() {
+	SSP_LOG(log_notice) << "Starting" << endl ;
         if( !m_bNoDaemonize ) {
             daemonize() ;
         }

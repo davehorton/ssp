@@ -8,8 +8,8 @@
     <logging>
         <syslog>
             <address>localhost</address>
-            <!-- <port>516</port> -->
-            <facility>local7</facility>
+            <port>514</port>
+            <facility>local6</facility>
         </syslog>
     </logging>
     

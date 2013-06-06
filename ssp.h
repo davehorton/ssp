@@ -44,7 +44,7 @@ namespace ssp {
     class SipLbController ;
     
     
-	typedef enum severity_levels {
+	enum severity_levels {
 		log_notice,
 		log_error,
 		log_warning,
@@ -52,7 +52,7 @@ namespace ssp {
 	    log_debug
 	};
     
-    typedef enum routing_error {
+    enum routing_error {
         invalid_sender,
         dnis_not_provisioned,
         no_available_server,
@@ -60,7 +60,7 @@ namespace ssp {
     } ;
     const std::string& RoutingError2String( routing_error error ) ;
     
-    typedef enum routing_strategy {
+    enum routing_strategy {
         unknown_routing_strategy,
         round_robin,
         least_loaded,
@@ -72,14 +72,14 @@ namespace ssp {
     } ;
     routing_strategy String2RoutingStrategy( const std::string& s) ;
     
-    typedef enum route_selector {
+    enum route_selector {
         unknown_route_selector,
         ani_selector,
         customer_selector
     } ;
     route_selector String2RouteSelector( const std::string& s) ;
     
-    typedef enum peer_type {
+    enum peer_type {
         unknown_peer,
         internal_peer,
         external_peer
