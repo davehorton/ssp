@@ -327,6 +327,9 @@ namespace ssp {
                 m_sysLogPort = pt.get<unsigned int>("ssp.logging.syslog.address", 516) ;
                 m_syslogFacility = pt.get<string>("ssp.logging.syslog.facility","local7") ;
                 
+                m_sipAddress = pt.get<string>("ssp.sip.address", "*") ;
+                m_sipPort = pt.get<unsigned int>("ssp.sip.port", 5060) ;
+                
                 string ibStrategy = pt.get<string>("ssp.routing.inbound.<xmlattr>.strategy", "") ;
                 string ibTarget = pt.get<string>("ssp.routing.inbound.<xmlattr>.target", "") ;
                 string obStrategy = pt.get<string>("ssp.routing.outbound.<xmlattr>.strategy", "") ;
@@ -518,6 +521,9 @@ namespace ssp {
         const string& getSyslogAddress() const { return m_syslogAddress; }
         unsigned int getSyslogPort() const { return m_sysLogPort ; }
         
+        const string& getSipAddress() const { return m_sipAddress; }
+        unsigned int getSipPort() const { return m_sipPort ; }
+        
         bool getSyslogTarget( std::string& address, unsigned int& port ) const {
             address = m_syslogAddress ;
             port = m_sysLogPort  ;
@@ -698,6 +704,9 @@ namespace ssp {
         string m_syslogAddress ;
         unsigned int m_sysLogPort ;
         string m_syslogFacility ;
+        
+        string m_sipAddress ;
+        unsigned int m_sipPort ;
 
         CustomerDnisMap_t m_mapCustomerDnis ;
         CarrierServerMap_t m_mapInboundCarrier ;
@@ -719,6 +728,10 @@ namespace ssp {
     bool SspConfig::isValid() {
         return m_pimpl->isValid() ;
     }
+    
+    bool SspConfig::getSipAddress( std::string& sipAddress ) const ;
+    bool SspConfig::getSipPort( unsigned int& sipPort ) const ;
+    
    
     bool SspConfig::getSyslogTarget( std::string& address, unsigned int& port ) const {
         return m_pimpl->getSyslogTarget( address, port ) ;

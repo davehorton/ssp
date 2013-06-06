@@ -24,7 +24,7 @@ namespace ssp {
 
 #include "ssp-controller.h"
 
-#define DEFAULT_CONFIG_FILENAME "/etc/ssp.conf"
+#define DEFAULT_CONFIG_FILENAME "/etc/ssp.conf.xml"
 
 #define MAXLOGLEN (8192)
 

@@ -5,6 +5,11 @@
     If no other configuration is supplied, inbound routing is round-robin and outbound routing is same-in-same-out-ip-address
     -->
     
+    <sip>
+        <address>*</address>
+        <port>5060</port>
+    </sip>
+    
     <logging>
         <syslog>
             <address>localhost</address>
