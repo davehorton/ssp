@@ -1,0 +1,3 @@
+ssp-sip-server.o ssp-sip-server.o: ../sip-server.cpp ../sip-server.h
+
+../sip-server.h:

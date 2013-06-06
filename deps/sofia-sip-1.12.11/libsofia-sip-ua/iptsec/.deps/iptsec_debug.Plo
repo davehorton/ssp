@@ -1,0 +1,22 @@
+iptsec_debug.lo iptsec_debug.o: iptsec_debug.c ../../config.h \
+  /usr/llvm-gcc-4.2/bin/../lib/gcc/i686-apple-darwin11/4.2.1/include/stddef.h \
+  iptsec_debug.h ../su/sofia-sip/su_log.h \
+  /usr/llvm-gcc-4.2/bin/../lib/gcc/i686-apple-darwin11/4.2.1/include/stdarg.h \
+  ../su/sofia-sip/su_config.h ../su/sofia-sip/su_configure.h \
+  ../su/sofia-sip/su_debug.h
+
+../../config.h:
+
+/usr/llvm-gcc-4.2/bin/../lib/gcc/i686-apple-darwin11/4.2.1/include/stddef.h:
+
+iptsec_debug.h:
+
+../su/sofia-sip/su_log.h:
+
+/usr/llvm-gcc-4.2/bin/../lib/gcc/i686-apple-darwin11/4.2.1/include/stdarg.h:
+
+../su/sofia-sip/su_config.h:
+
+../su/sofia-sip/su_configure.h:
+
+../su/sofia-sip/su_debug.h:

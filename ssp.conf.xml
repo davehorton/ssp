@@ -1,0 +1,73 @@
+<ssp>
+
+    <!-- 
+    Note: all configuration information is optional, with the exception that there must be at least one 'appserver' element
+    If no other configuration is supplied, inbound routing is round-robin and outbound routing is same-in-same-out-ip-address
+    -->
+    
+    <logging>
+        <syslog>
+            <address>localhost</address>
+            <!-- <port>516</port> -->
+            <facility>local7</facility>
+        </syslog>
+    </logging>
+    
+    <!-- grouping of DNISs into customers -->
+    <dnis-list name="apple">
+        <dnis>1001</dnis>
+        <dnis-block>
+            <first>6172370000</first>
+            <last>6172379999</last>
+        </dnis-block>
+    </dnis-list>
+
+    <!-- grouping of external sip endpoints into carriers/service providers -->
+    <carrier name="level3">
+        <inbound>
+            <address>192.168.1.54</address>
+            <address>192.168.1.59</address>
+            <address netmask="255.255.255.0">172.20.3.0</address>
+        </inbound>
+        <outbound>
+            <address>172.21.3.96</address>
+            <address port="5061">172.21.3.97</address>
+        </outbound>
+    </carrier>
+    
+    <!-- internal app servers that we distribute calls across -->
+    <appserver name="staging-server">209.251.49.131</appserver>
+    <appserver ping-interval="60" max-sessions="100">10.10.1.101</appserver>
+    <appserver>10.10.1.102</appserver>
+    
+    <appserver-group name="staging">
+        <appserver>staging-server</appserver>
+    </appserver-group>
+    <appserver-group name="production">
+        <appserver>10.10.1.101</appserver>
+    </appserver-group>
+        
+
+    
+    <!-- routing rules -->
+    <routing>
+        <inbound strategy="round-robin" target="staging">
+            <route selector="ani" target="staging" strategy="least-loaded">
+                <item>6172375089</item>
+            </route>
+            <route selector="customer" target="staging">
+                <item>apple</item>
+            </route>
+        </inbound>
+        
+        <outbound strategy="same-in-same-out-ip-address">
+            <route selector="ani" target="level3" strategy="selected-carrier">
+                <item>6172375089</item>
+            </route>
+            <route selector="customer" target="10.103.22.8" strategy="selected-server">
+                <item>apple</item>
+            </route>
+        </outbound>
+    </routing>
+	
+</ssp>

@@ -1,0 +1,83 @@
+#! /bin/sh
+
+# init file for sofia-rs
+
+### BEGIN INIT INFO
+# Provides: sofia-rs
+# Short-Description: Sofia-based redirect and routing server
+# Description: The sofia-rs daemon provides a call routing service across SipX acd instances 
+# chkconfig: 345 13 87
+### END INIT INFO
+
+SOFIA_RS_BIN=/usr/local/bin/sofia-rs
+SOFIA_RS_CONF=/etc/sofia-rs.conf
+
+# Source function library
+. /etc/rc.d/init.d/functions
+
+if [ -f /etc/sysconfig/sofia-rs ]; then
+        . /etc/sysconfig/sofia-rs
+fi
+
+RETVAL=0
+prog=sofia-rs
+pidfile=/var/run/sofia-rs.pid
+
+start()
+{
+	echo -n $"Starting $prog: "
+	if [ -f $pidfile ]; then
+		echo sofia-rs is already running
+		exit 2;
+	fi
+	daemon $SOFIA_RS_BIN  -f $SOFIA_RS_CONF
+	RETVAL=$?
+	echo
+	[ $RETVAL = 0 ] && touch $pidfile
+	return $RETVAL
+}
+
+stop()
+{
+	echo -n $"Shutting down $prog: "
+	killproc $SOFIA_RS_BIN
+	RETVAL=$?
+	echo
+	rm -f $pidfile
+	return $RETVAL
+}
+
+reload()
+{
+	echo -n $"Reloading $prog daemon configuration: "
+	killproc $SOFIA_RS_BIN -HUP
+	RETVAL=$?
+	echo
+	return $RETVAL
+}
+
+case "$1" in
+	start)
+		start
+		;;
+	stop)
+		stop
+		;;
+	reload)
+		reload
+		;;
+	restart)
+		stop
+		start
+		;;
+	status)
+		status $prog
+		RETVAL=$?
+		;;
+	*)
+		echo $"Usage: $0 {start|stop|reload|status}"
+		RETVAL=3
+esac
+
+exit $RETVAL
+

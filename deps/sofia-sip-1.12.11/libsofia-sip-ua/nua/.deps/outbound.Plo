@@ -1,0 +1,304 @@
+outbound.lo outbound.o: outbound.c ../../config.h outbound.h \
+  ../../libsofia-sip-ua/su/sofia-sip/su_config.h \
+  ../../libsofia-sip-ua/su/sofia-sip/su_configure.h \
+  ../../libsofia-sip-ua/nta/sofia-sip/nta.h \
+  ../../libsofia-sip-ua/su/sofia-sip/su_wait.h \
+  ../../libsofia-sip-ua/su/sofia-sip/su.h \
+  ../../libsofia-sip-ua/su/sofia-sip/su_types.h /usr/include/stdint.h \
+  /usr/include/sys/types.h /usr/include/sys/appleapiopts.h \
+  /usr/include/sys/cdefs.h /usr/include/sys/_symbol_aliasing.h \
+  /usr/include/sys/_posix_availability.h /usr/include/machine/types.h \
+  /usr/include/i386/types.h /usr/include/i386/_types.h \
+  /usr/include/sys/_types.h /usr/include/machine/_types.h \
+  /usr/include/machine/endian.h /usr/include/i386/endian.h \
+  /usr/include/sys/_endian.h /usr/include/libkern/_OSByteOrder.h \
+  /usr/include/libkern/i386/_OSByteOrder.h /usr/include/sys/_structs.h \
+  /usr/llvm-gcc-4.2/bin/../lib/gcc/i686-apple-darwin11/4.2.1/include/stddef.h \
+  ../../libsofia-sip-ua/su/sofia-sip/su_errno.h /usr/include/errno.h \
+  /usr/include/sys/errno.h /usr/include/stdio.h \
+  /usr/include/Availability.h /usr/include/AvailabilityInternal.h \
+  /usr/include/_types.h /usr/include/secure/_stdio.h \
+  /usr/include/secure/_common.h \
+  /usr/llvm-gcc-4.2/bin/../lib/gcc/i686-apple-darwin11/4.2.1/include/limits.h \
+  /usr/llvm-gcc-4.2/bin/../lib/gcc/i686-apple-darwin11/4.2.1/include/syslimits.h \
+  /Applications/Xcode.app/Contents/Developer/usr/llvm-gcc-4.2/lib/gcc/i686-apple-darwin11/4.2.1/include/limits.h \
+  /Applications/Xcode.app/Contents/Developer/usr/llvm-gcc-4.2/lib/gcc/i686-apple-darwin11/4.2.1/include/syslimits.h \
+  /usr/include/limits.h /usr/include/machine/limits.h \
+  /usr/include/i386/limits.h /usr/include/i386/_limits.h \
+  /usr/include/sys/syslimits.h /usr/include/unistd.h \
+  /usr/include/sys/unistd.h /usr/include/sys/select.h \
+  /usr/include/sys/_select.h /usr/include/fcntl.h \
+  /usr/include/sys/fcntl.h /usr/include/sys/socket.h \
+  /usr/include/machine/_param.h /usr/include/i386/_param.h \
+  /usr/include/sys/ioctl.h /usr/include/sys/ttycom.h \
+  /usr/include/sys/ioccom.h /usr/include/sys/filio.h \
+  /usr/include/sys/sockio.h /usr/include/netinet/in.h \
+  /usr/include/netinet6/in6.h /usr/include/arpa/inet.h \
+  /usr/include/netdb.h ../../libsofia-sip-ua/su/sofia-sip/su_addrinfo.h \
+  ../../libsofia-sip-ua/su/sofia-sip/su_time.h /usr/include/sys/poll.h \
+  ../../libsofia-sip-ua/sip/sofia-sip/sip.h \
+  ../../libsofia-sip-ua/msg/sofia-sip/msg_types.h \
+  ../../libsofia-sip-ua/msg/sofia-sip/msg_mime.h \
+  ../../libsofia-sip-ua/url/sofia-sip/url.h \
+  ../../libsofia-sip-ua/su/sofia-sip/su_alloc.h \
+  /usr/llvm-gcc-4.2/bin/../lib/gcc/i686-apple-darwin11/4.2.1/include/stdarg.h \
+  ../../libsofia-sip-ua/nta/sofia-sip/nta_tag.h \
+  ../../libsofia-sip-ua/su/sofia-sip/su_tag.h \
+  ../../libsofia-sip-ua/sip/sofia-sip/sip_tag.h \
+  ../../libsofia-sip-ua/su/sofia-sip/su_tag_class.h \
+  ../../libsofia-sip-ua/url/sofia-sip/url_tag.h \
+  ../../libsofia-sip-ua/iptsec/sofia-sip/auth_client.h \
+  ../../libsofia-sip-ua/bnf/sofia-sip/hostdomain.h \
+  ../../libsofia-sip-ua/sip/sofia-sip/sip_protos.h \
+  ../../libsofia-sip-ua/sip/sofia-sip/sip_header.h \
+  ../../libsofia-sip-ua/msg/sofia-sip/msg_header.h /usr/include/string.h \
+  /usr/include/strings.h /usr/include/secure/_string.h \
+  ../../libsofia-sip-ua/msg/sofia-sip/msg.h \
+  ../../libsofia-sip-ua/msg/sofia-sip/msg_protos.h \
+  ../../libsofia-sip-ua/sip/sofia-sip/sip_hclasses.h \
+  ../../libsofia-sip-ua/sip/sofia-sip/sip_util.h \
+  ../../libsofia-sip-ua/su/sofia-sip/string0.h \
+  ../../libsofia-sip-ua/su/sofia-sip/su_string.h \
+  ../../libsofia-sip-ua/sip/sofia-sip/sip_status.h \
+  ../../libsofia-sip-ua/su/sofia-sip/su_tagarg.h \
+  ../../libsofia-sip-ua/tport/sofia-sip/tport.h \
+  ../../libsofia-sip-ua/su/sofia-sip/su_strlst.h \
+  ../../libsofia-sip-ua/tport/sofia-sip/tport_tag.h \
+  ../../libsofia-sip-ua/nta/sofia-sip/nta_tport.h \
+  ../../libsofia-sip-ua/su/sofia-sip/su_md5.h \
+  ../../libsofia-sip-ua/su/sofia-sip/su_uniqueid.h \
+  ../../libsofia-sip-ua/ipt/sofia-sip/token64.h \
+  ../../libsofia-sip-ua/su/sofia-sip/su_debug.h \
+  ../../libsofia-sip-ua/su/sofia-sip/su_log.h /usr/include/stdlib.h \
+  /usr/include/sys/wait.h /usr/include/sys/signal.h \
+  /usr/include/machine/signal.h /usr/include/i386/signal.h \
+  /usr/include/i386/_structs.h /usr/include/machine/_structs.h \
+  /usr/include/mach/i386/_structs.h /usr/include/sys/resource.h \
+  /usr/include/alloca.h /usr/include/assert.h \
+  ../../libsofia-sip-ua/bnf/sofia-sip/bnf.h
+
+../../config.h:
+
+outbound.h:
+
+../../libsofia-sip-ua/su/sofia-sip/su_config.h:
+
+../../libsofia-sip-ua/su/sofia-sip/su_configure.h:
+
+../../libsofia-sip-ua/nta/sofia-sip/nta.h:
+
+../../libsofia-sip-ua/su/sofia-sip/su_wait.h:
+
+../../libsofia-sip-ua/su/sofia-sip/su.h:
+
+../../libsofia-sip-ua/su/sofia-sip/su_types.h:
+
+/usr/include/stdint.h:
+
+/usr/include/sys/types.h:
+
+/usr/include/sys/appleapiopts.h:
+
+/usr/include/sys/cdefs.h:
+
+/usr/include/sys/_symbol_aliasing.h:
+
+/usr/include/sys/_posix_availability.h:
+
+/usr/include/machine/types.h:
+
+/usr/include/i386/types.h:
+
+/usr/include/i386/_types.h:
+
+/usr/include/sys/_types.h:
+
+/usr/include/machine/_types.h:
+
+/usr/include/machine/endian.h:
+
+/usr/include/i386/endian.h:
+
+/usr/include/sys/_endian.h:
+
+/usr/include/libkern/_OSByteOrder.h:
+
+/usr/include/libkern/i386/_OSByteOrder.h:
+
+/usr/include/sys/_structs.h:
+
+/usr/llvm-gcc-4.2/bin/../lib/gcc/i686-apple-darwin11/4.2.1/include/stddef.h:
+
+../../libsofia-sip-ua/su/sofia-sip/su_errno.h:
+
+/usr/include/errno.h:
+
+/usr/include/sys/errno.h:
+
+/usr/include/stdio.h:
+
+/usr/include/Availability.h:
+
+/usr/include/AvailabilityInternal.h:
+
+/usr/include/_types.h:
+
+/usr/include/secure/_stdio.h:
+
+/usr/include/secure/_common.h:
+
+/usr/llvm-gcc-4.2/bin/../lib/gcc/i686-apple-darwin11/4.2.1/include/limits.h:
+
+/usr/llvm-gcc-4.2/bin/../lib/gcc/i686-apple-darwin11/4.2.1/include/syslimits.h:
+
+/Applications/Xcode.app/Contents/Developer/usr/llvm-gcc-4.2/lib/gcc/i686-apple-darwin11/4.2.1/include/limits.h:
+
+/Applications/Xcode.app/Contents/Developer/usr/llvm-gcc-4.2/lib/gcc/i686-apple-darwin11/4.2.1/include/syslimits.h:
+
+/usr/include/limits.h:
+
+/usr/include/machine/limits.h:
+
+/usr/include/i386/limits.h:
+
+/usr/include/i386/_limits.h:
+
+/usr/include/sys/syslimits.h:
+
+/usr/include/unistd.h:
+
+/usr/include/sys/unistd.h:
+
+/usr/include/sys/select.h:
+
+/usr/include/sys/_select.h:
+
+/usr/include/fcntl.h:
+
+/usr/include/sys/fcntl.h:
+
+/usr/include/sys/socket.h:
+
+/usr/include/machine/_param.h:
+
+/usr/include/i386/_param.h:
+
+/usr/include/sys/ioctl.h:
+
+/usr/include/sys/ttycom.h:
+
+/usr/include/sys/ioccom.h:
+
+/usr/include/sys/filio.h:
+
+/usr/include/sys/sockio.h:
+
+/usr/include/netinet/in.h:
+
+/usr/include/netinet6/in6.h:
+
+/usr/include/arpa/inet.h:
+
+/usr/include/netdb.h:
+
+../../libsofia-sip-ua/su/sofia-sip/su_addrinfo.h:
+
+../../libsofia-sip-ua/su/sofia-sip/su_time.h:
+
+/usr/include/sys/poll.h:
+
+../../libsofia-sip-ua/sip/sofia-sip/sip.h:
+
+../../libsofia-sip-ua/msg/sofia-sip/msg_types.h:
+
+../../libsofia-sip-ua/msg/sofia-sip/msg_mime.h:
+
+../../libsofia-sip-ua/url/sofia-sip/url.h:
+
+../../libsofia-sip-ua/su/sofia-sip/su_alloc.h:
+
+/usr/llvm-gcc-4.2/bin/../lib/gcc/i686-apple-darwin11/4.2.1/include/stdarg.h:
+
+../../libsofia-sip-ua/nta/sofia-sip/nta_tag.h:
+
+../../libsofia-sip-ua/su/sofia-sip/su_tag.h:
+
+../../libsofia-sip-ua/sip/sofia-sip/sip_tag.h:
+
+../../libsofia-sip-ua/su/sofia-sip/su_tag_class.h:
+
+../../libsofia-sip-ua/url/sofia-sip/url_tag.h:
+
+../../libsofia-sip-ua/iptsec/sofia-sip/auth_client.h:
+
+../../libsofia-sip-ua/bnf/sofia-sip/hostdomain.h:
+
+../../libsofia-sip-ua/sip/sofia-sip/sip_protos.h:
+
+../../libsofia-sip-ua/sip/sofia-sip/sip_header.h:
+
+../../libsofia-sip-ua/msg/sofia-sip/msg_header.h:
+
+/usr/include/string.h:
+
+/usr/include/strings.h:
+
+/usr/include/secure/_string.h:
+
+../../libsofia-sip-ua/msg/sofia-sip/msg.h:
+
+../../libsofia-sip-ua/msg/sofia-sip/msg_protos.h:
+
+../../libsofia-sip-ua/sip/sofia-sip/sip_hclasses.h:
+
+../../libsofia-sip-ua/sip/sofia-sip/sip_util.h:
+
+../../libsofia-sip-ua/su/sofia-sip/string0.h:
+
+../../libsofia-sip-ua/su/sofia-sip/su_string.h:
+
+../../libsofia-sip-ua/sip/sofia-sip/sip_status.h:
+
+../../libsofia-sip-ua/su/sofia-sip/su_tagarg.h:
+
+../../libsofia-sip-ua/tport/sofia-sip/tport.h:
+
+../../libsofia-sip-ua/su/sofia-sip/su_strlst.h:
+
+../../libsofia-sip-ua/tport/sofia-sip/tport_tag.h:
+
+../../libsofia-sip-ua/nta/sofia-sip/nta_tport.h:
+
+../../libsofia-sip-ua/su/sofia-sip/su_md5.h:
+
+../../libsofia-sip-ua/su/sofia-sip/su_uniqueid.h:
+
+../../libsofia-sip-ua/ipt/sofia-sip/token64.h:
+
+../../libsofia-sip-ua/su/sofia-sip/su_debug.h:
+
+../../libsofia-sip-ua/su/sofia-sip/su_log.h:
+
+/usr/include/stdlib.h:
+
+/usr/include/sys/wait.h:
+
+/usr/include/sys/signal.h:
+
+/usr/include/machine/signal.h:
+
+/usr/include/i386/signal.h:
+
+/usr/include/i386/_structs.h:
+
+/usr/include/machine/_structs.h:
+
+/usr/include/mach/i386/_structs.h:
+
+/usr/include/sys/resource.h:
+
+/usr/include/alloca.h:
+
+/usr/include/assert.h:
+
+../../libsofia-sip-ua/bnf/sofia-sip/bnf.h:

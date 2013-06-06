@@ -1,0 +1,14 @@
+http_status.lo http_status.o: http_status.c ../../config.h \
+  /usr/llvm-gcc-4.2/bin/../lib/gcc/i686-apple-darwin11/4.2.1/include/stddef.h \
+  sofia-sip/http_status.h ../su/sofia-sip/su_config.h \
+  ../su/sofia-sip/su_configure.h
+
+../../config.h:
+
+/usr/llvm-gcc-4.2/bin/../lib/gcc/i686-apple-darwin11/4.2.1/include/stddef.h:
+
+sofia-sip/http_status.h:
+
+../su/sofia-sip/su_config.h:
+
+../su/sofia-sip/su_configure.h:

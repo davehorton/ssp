@@ -1,0 +1,19 @@
+nea_debug.lo nea_debug.o: nea_debug.c \
+  /usr/llvm-gcc-4.2/bin/../lib/gcc/i686-apple-darwin11/4.2.1/include/stddef.h \
+  nea_debug.h ../su/sofia-sip/su_debug.h ../su/sofia-sip/su_log.h \
+  /usr/llvm-gcc-4.2/bin/../lib/gcc/i686-apple-darwin11/4.2.1/include/stdarg.h \
+  ../su/sofia-sip/su_config.h ../su/sofia-sip/su_configure.h
+
+/usr/llvm-gcc-4.2/bin/../lib/gcc/i686-apple-darwin11/4.2.1/include/stddef.h:
+
+nea_debug.h:
+
+../su/sofia-sip/su_debug.h:
+
+../su/sofia-sip/su_log.h:
+
+/usr/llvm-gcc-4.2/bin/../lib/gcc/i686-apple-darwin11/4.2.1/include/stdarg.h:
+
+../su/sofia-sip/su_config.h:
+
+../su/sofia-sip/su_configure.h:

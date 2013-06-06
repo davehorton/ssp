@@ -1,0 +1,8 @@
+test_inlined.o test_inlined.o: test_inlined.c ../../config.h \
+  ../su/sofia-sip/su_config.h ../su/sofia-sip/su_configure.h
+
+../../config.h:
+
+../su/sofia-sip/su_config.h:
+
+../su/sofia-sip/su_configure.h:

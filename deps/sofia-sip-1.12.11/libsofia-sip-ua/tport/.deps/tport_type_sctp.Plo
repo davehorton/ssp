@@ -1,0 +1,3 @@
+tport_type_sctp.lo tport_type_sctp.o: tport_type_sctp.c ../../config.h
+
+../../config.h:

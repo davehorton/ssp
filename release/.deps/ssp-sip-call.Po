@@ -1,0 +1,3 @@
+ssp-sip-call.o ssp-sip-call.o: ../sip-call.cpp ../sip-call.h
+
+../sip-call.h:
