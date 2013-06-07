@@ -5,6 +5,7 @@
 #include <boost/property_tree/xml_parser.hpp>
 #include <boost/property_tree/ptree.hpp>
 #include <boost/foreach.hpp>
+#include <boost/thread.hpp>
 
 
 namespace ssp {
@@ -112,9 +113,12 @@ namespace {
 
 namespace ssp {
 
-    SipLbController::SipLbController( int argc, char* argv[] ) : m_bNoDaemonize(true), m_bLoggingInitialized(false), m_configFilename(DEFAULT_CONFIG_FILENAME) {
+    SipLbController::SipLbController( int argc, char* argv[] ) : m_bDaemonize(false), m_bLoggingInitialized(false), m_configFilename(DEFAULT_CONFIG_FILENAME) {
         
-        parseCmdArgs( argc, argv ) ;
+        if( !parseCmdArgs( argc, argv ) ) {
+            usage() ;
+            exit(-1) ;
+        }
         
         m_Config.reset( new SspConfig( m_configFilename.c_str() ) ) ;
         if( !m_Config->isValid() ) {
@@ -124,7 +128,6 @@ namespace ssp {
         /* now we can initialize logging */
         m_logger.reset( this->createLogger() ) ;
         
-            
     }
 
     SipLbController::~SipLbController() {
@@ -142,7 +145,9 @@ namespace ssp {
             static struct option long_options[] =
             {
                 /* These options set a flag. */
-                {"nd", no_argument,       &m_bNoDaemonize, true},
+                {"nc", no_argument,       &m_bDaemonize, true},
+                {"inbound", no_argument,       &m_bInbound, true},
+                {"outbound", no_argument,       &m_bOutbound, true},
                 
                 /* These options don't set a flag.
                  We distinguish them by their indices. */
@@ -165,10 +170,10 @@ namespace ssp {
                     /* If this option set a flag, do nothing else now. */
                     if (long_options[option_index].flag != 0)
                         break;
-                    printf ("option %s", long_options[option_index].name);
+                    cout << "option " << long_options[option_index].name << endl;
                     if (optarg)
-                        printf (" with arg %s", optarg);
-                    printf ("\n");
+                        cout << " with arg " << optarg;
+                    cout << endl ;
                     break;
                                         
                 case 'f':
@@ -186,15 +191,25 @@ namespace ssp {
         /* Print any remaining command line arguments (not options). */
         if (optind < argc)
         {
-            printf ("non-option ARGV-elements: ");
+            cout << "non-option ARGV-elements: ";
             while (optind < argc)
-                printf ("%s ", argv[optind++]);
-            putchar ('\n');
+                cout << argv[optind++] << endl;
         }
+        
+        if( !m_bInbound && !m_bOutbound ) {
+            cout << "Must specify either inbound or outbound processing" << endl ;
+            return false ;
+        }
+        if( m_bInbound && m_bOutbound ) {
+            cout << "Must specify only one of inbound or outbound processing" << endl ;
+            return false ;
+        }
+        
+        return true ;
     }
 
     void SipLbController::usage() {
-        std::cout << "ssp -f <filename> -d" << std::endl ;
+        cout << "ssp -f <filename> [-inbound|-outbound] [-nc]" << endl ;
     }
 
     void SipLbController::daemonize() {
@@ -286,7 +301,7 @@ namespace ssp {
     
     void SipLbController::run() {
 	SSP_LOG(log_notice) << "Starting" << endl ;
-        if( !m_bNoDaemonize ) {
+        if( m_bDaemonize ) {
             daemonize() ;
         }
         

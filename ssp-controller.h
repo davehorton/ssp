@@ -84,7 +84,9 @@ namespace ssp {
 		string m_configFilename ;
         
         scoped_ptr<SspConfig> m_Config ;
-        int m_bNoDaemonize ;
+        int m_bDaemonize ;
+        int m_bInbound ;
+        int m_bOutbound ;
         
         su_home_t* 	m_home ;
         su_root_t* 	m_root ;
