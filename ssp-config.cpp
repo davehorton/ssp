@@ -626,7 +626,9 @@ namespace ssp {
                 Appserver_t& as = it->second ;
                 string s = as.getAddress() ;
                 s += ":" ;
-                s += as.getEventSocketPort() ;
+                ostringstream convert ;
+                convert << as.getEventSocketPort() ;
+                s += convert.str() ;
                 servers.push_back( s ) ;
             }
         }
