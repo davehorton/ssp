@@ -6,8 +6,7 @@
     -->
     
     <sip>
-        <address>*</address>
-        <port>5060</port>
+        <contact>sip:209.251.49.135</contact>
     </sip>
     
     <logging>

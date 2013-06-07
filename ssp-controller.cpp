@@ -317,8 +317,12 @@ namespace ssp {
         
         
         /* create our agent */
+	string url ;
+	m_Config->getSipUrl( url ) ;
+
+	SSP_LOG(log_notice) << "starting sip stack with contact address " << url << endl ;
         m_nta = nta_agent_create( m_root,
-                                 URL_STRING_MAKE("sip:*"),               /* bind to all addresses */
+                                 URL_STRING_MAKE(url.c_str()),               /* our contact address */
                                  NULL,         /* callback function */
                                  NULL,                  /* magic passed to callback */
                                  TAG_NULL(),

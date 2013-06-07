@@ -327,8 +327,7 @@ namespace ssp {
                 m_sysLogPort = pt.get<unsigned int>("ssp.logging.syslog.address", 516) ;
                 m_syslogFacility = pt.get<string>("ssp.logging.syslog.facility","local7") ;
                 
-                m_sipAddress = pt.get<string>("ssp.sip.address", "*") ;
-                m_sipPort = pt.get<unsigned int>("ssp.sip.port", 5060) ;
+                m_sipUrl = pt.get<string>("ssp.sip.contact", "sip:*") ;
                 
                 string ibStrategy = pt.get<string>("ssp.routing.inbound.<xmlattr>.strategy", "") ;
                 string ibTarget = pt.get<string>("ssp.routing.inbound.<xmlattr>.target", "") ;
@@ -521,8 +520,7 @@ namespace ssp {
         const string& getSyslogAddress() const { return m_syslogAddress; }
         unsigned int getSyslogPort() const { return m_sysLogPort ; }
         
-        const string& getSipAddress() const { return m_sipAddress; }
-        unsigned int getSipPort() const { return m_sipPort ; }
+        const string& getSipUrl() const { return m_sipUrl; }
         
         bool getSyslogTarget( std::string& address, unsigned int& port ) const {
             address = m_syslogAddress ;
@@ -704,10 +702,7 @@ namespace ssp {
         string m_syslogAddress ;
         unsigned int m_sysLogPort ;
         string m_syslogFacility ;
-        
-        string m_sipAddress ;
-        unsigned int m_sipPort ;
-
+        string m_sipUrl ;
         CustomerDnisMap_t m_mapCustomerDnis ;
         CarrierServerMap_t m_mapInboundCarrier ;
         CarrierServerMap_t m_mapOutboundCarrier ;
@@ -729,9 +724,10 @@ namespace ssp {
         return m_pimpl->isValid() ;
     }
     
-    bool SspConfig::getSipAddress( std::string& sipAddress ) const ;
-    bool SspConfig::getSipPort( unsigned int& sipPort ) const ;
-    
+    bool SspConfig::getSipUrl( std::string& sipUrl ) const {
+	sipUrl = m_pimpl->getSipUrl() ;
+	return true ; 
+    }
    
     bool SspConfig::getSyslogTarget( std::string& address, unsigned int& port ) const {
         return m_pimpl->getSyslogTarget( address, port ) ;

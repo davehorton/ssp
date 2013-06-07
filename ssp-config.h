@@ -23,6 +23,7 @@ namespace ssp {
         
         bool isValid() ;
 
+	bool getSipUrl( std::string& sipUrl ) const ;
         bool getSyslogTarget( std::string& address, unsigned int& port ) const ;
         bool getSyslogFacility( sinks::syslog::facility& facility ) const ;
         bool getSipConfiguration( std::string& address, unsigned int& port ) const ;
