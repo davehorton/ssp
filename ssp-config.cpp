@@ -128,20 +128,15 @@ namespace ssp {
  
     class Appserver_t {
     public:
-        Appserver_t( const string& address, unsigned int port = 5060 ) : m_address( address ), m_port(port) {
+        Appserver_t( const string& address, unsigned int eventSocketPort = 8021 ) : m_address( address ), m_eventSocketPort(eventSocketPort) {
         }
         
         bool operator==(const Appserver_t& other) const {
-            return m_address == other.m_address && m_port == other.m_port ;
+            return m_address == other.m_address && m_eventSocketPort == other.m_eventSocketPort ;
         }
         
         const string& getAddress() const { return m_address ; }
-        unsigned int getPort() const { return m_port ; }
-        unsigned int getPingInterval() const { return m_pingInterval ; }
-        unsigned int getMaxSessions() const { return m_maxSessions; }
-        
-        Appserver_t& setPingInterval( unsigned int i ) { m_pingInterval = i; return *this; }
-        Appserver_t& setMaxSessions( unsigned int i ) { m_maxSessions = i; return *this; }
+        unsigned int getEventSocketPort() const { return m_eventSocketPort; }
         
         
     private:
@@ -149,15 +144,13 @@ namespace ssp {
         
         string m_name ;
         string m_address ;
-        unsigned int m_port ;
-        unsigned int m_pingInterval ;
-        unsigned int m_maxSessions;
+        unsigned int m_eventSocketPort ;
     } ;
     /* needed to be able to live in a boost unordered container */
     size_t hash_value( const Appserver_t& a) {
         std::size_t seed = 0;
         boost::hash_combine(seed, a.getAddress());
-        boost::hash_combine(seed, a.getPort());
+        boost::hash_combine(seed, a.getEventSocketPort());
         return seed;
     }
     typedef boost::unordered_map< string, Appserver_t > AppserverMap_t ;
@@ -333,13 +326,7 @@ namespace ssp {
                 string ibTarget = pt.get<string>("ssp.routing.inbound.<xmlattr>.target", "") ;
                 string obStrategy = pt.get<string>("ssp.routing.outbound.<xmlattr>.strategy", "") ;
                 string obTarget = pt.get<string>("ssp.routing.outbound.<xmlattr>.route", "") ;
-                
-                if( ibTarget.empty() ) {
-                    cerr << "Configuration error: no default inbound routing target was provided" ;
-                    return ;
-                }
-                
-                AppserverMap_t mapAppserver;
+                                
                 BOOST_FOREACH( ptree::value_type const& v, pt.get_child("ssp") ) {
 
                     /* customer/dnis configuration */
@@ -405,17 +392,9 @@ namespace ssp {
                         }
 
                         
-                        Appserver_t as( v.second.data(), v.second.get("port", 5060) ) ;
-                        try {
-                            unsigned int pingInterval = v.second.get<unsigned int>("ping-interval") ;
-                            as.setPingInterval( pingInterval ) ;
-                        } catch( const ptree_error& err ) {}
-                        try {
-                            unsigned int maxSessions = v.second.get<unsigned int>("max-sessions") ;
-                            as.setMaxSessions( maxSessions ) ;
-                        } catch( const ptree_error& err ) {}
+                        Appserver_t as( v.second.data(), v.second.get("event-socket-port", 8021) ) ;
                         
-                        pair<AppserverMap_t::iterator, bool> ret = mapAppserver.insert( AppserverMap_t::value_type( appserverName, as ) ) ;
+                        pair<AppserverMap_t::iterator, bool> ret = m_mapAppserver.insert( AppserverMap_t::value_type( appserverName, as ) ) ;
                         if( !ret.second ) {
                             cerr << "Multiple appserver elements have duplicate name attribute values or ip addresses" << endl ;
                             return ;
@@ -433,8 +412,8 @@ namespace ssp {
                          BOOST_FOREACH( ptree::value_type const& v2, v.second ) {
                              if( v2.first == "appserver") {
                                 string asName = v2.second.data() ;
-                                AppserverMap_t::iterator it = mapAppserver.find( asName )  ;
-                                if( mapAppserver.end() == it ) {
+                                AppserverMap_t::iterator it = m_mapAppserver.find( asName )  ;
+                                if( m_mapAppserver.end() == it ) {
                                     cerr << "Unable to find appserver element with name: " << asName << endl ;
                                     return ;
                                 }
@@ -500,14 +479,11 @@ namespace ssp {
                 }
                 fb.close() ;
                 
-                /* resolve default inbound target */
-                AppserverGroup_t group ;
-                if( !getAppserverGroup( ibTarget, group ) ) {
-                    cerr << "Default inbound appserver group not found: " << ibTarget << endl ;
+                if( 0 == m_mapAppserver.size() ) {
+                    cerr << "Must have at least one appserver defined in the configuration file" << endl ;
                     return ;
                 }
-                m_routing.setInboundAppserverGroup( group ) ;
-                
+                                
                 m_bIsValid = true ;
             } catch( exception& e ) {
                 cerr << "Error reading configuration file: " << e.what() << endl ;
@@ -689,7 +665,6 @@ namespace ssp {
                 key.append( attrName ) ;
                 value = v.second.get<string>( key ) ;
             } catch( const ptree_error& err ) {
-                cerr << "missing attribute " << attrName << endl ;
                 return false ;
             }
             if( value.empty() ) return false ;
@@ -706,6 +681,7 @@ namespace ssp {
         CustomerDnisMap_t m_mapCustomerDnis ;
         CarrierServerMap_t m_mapInboundCarrier ;
         CarrierServerMap_t m_mapOutboundCarrier ;
+        AppserverMap_t m_mapAppserver;
         AppserverGroupMap_t m_mapAppserverGroup ;
         Routing_t m_routing ;
     } ;

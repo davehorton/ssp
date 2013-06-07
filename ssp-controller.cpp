@@ -5,8 +5,6 @@
 #include <boost/property_tree/xml_parser.hpp>
 #include <boost/property_tree/ptree.hpp>
 #include <boost/foreach.hpp>
-#include <boost/thread.hpp>
-
 
 namespace ssp {
     class SipLbController ;
@@ -113,7 +111,8 @@ namespace {
 
 namespace ssp {
 
-    SipLbController::SipLbController( int argc, char* argv[] ) : m_bDaemonize(false), m_bLoggingInitialized(false), m_configFilename(DEFAULT_CONFIG_FILENAME) {
+    SipLbController::SipLbController( int argc, char* argv[] ) : m_bDaemonize(false), m_bLoggingInitialized(false),
+        m_configFilename(DEFAULT_CONFIG_FILENAME) {
         
         if( !parseCmdArgs( argc, argv ) ) {
             usage() ;
@@ -300,10 +299,12 @@ namespace ssp {
     }
     
     void SipLbController::run() {
-	SSP_LOG(log_notice) << "Starting" << endl ;
+        SSP_LOG(log_notice) << "Starting" << endl ;
         if( m_bDaemonize ) {
             daemonize() ;
         }
+        
+        m_fsMonitor.run() ;
         
         int rv = su_init() ;
         if( rv < 0 ) {
@@ -332,10 +333,10 @@ namespace ssp {
         
         
         /* create our agent */
-	string url ;
-	m_Config->getSipUrl( url ) ;
+        string url ;
+        m_Config->getSipUrl( url ) ;
 
-	SSP_LOG(log_notice) << "starting sip stack with contact address " << url << endl ;
+        SSP_LOG(log_notice) << "starting sip stack with contact address " << url << endl ;
         m_nta = nta_agent_create( m_root,
                                  URL_STRING_MAKE(url.c_str()),               /* our contact address */
                                  NULL,         /* callback function */

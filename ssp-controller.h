@@ -32,6 +32,7 @@
 #include "ssp.h"
 #include "ssp-config.h"
 #include "sip-b2b-call.h"
+#include "fs-monitor.h"
 
 using namespace std ;
 
@@ -97,6 +98,8 @@ namespace ssp {
         dialog_map_t m_mapDialog ;
         
         boost::unordered_set< shared_ptr<SipB2bCall> > m_setDiscardedDialogs ;
+        
+        FsMonitor       m_fsMonitor ;
         
         
         

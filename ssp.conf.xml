@@ -40,38 +40,6 @@
     </carrier>
     
     <!-- internal app servers that we distribute calls across -->
-    <appserver name="staging-server">209.251.49.131</appserver>
-    <appserver ping-interval="60" max-sessions="100">10.10.1.101</appserver>
-    <appserver>10.10.1.102</appserver>
+    <appserver event-socket-port="8021">209.251.49.135</appserver>
     
-    <appserver-group name="staging">
-        <appserver>staging-server</appserver>
-    </appserver-group>
-    <appserver-group name="production">
-        <appserver>10.10.1.101</appserver>
-    </appserver-group>
-        
-
-    
-    <!-- routing rules -->
-    <routing>
-        <inbound strategy="round-robin" target="staging">
-            <route selector="ani" target="staging" strategy="least-loaded">
-                <item>6172375089</item>
-            </route>
-            <route selector="customer" target="staging">
-                <item>apple</item>
-            </route>
-        </inbound>
-        
-        <outbound strategy="same-in-same-out-ip-address">
-            <route selector="ani" target="level3" strategy="selected-carrier">
-                <item>6172375089</item>
-            </route>
-            <route selector="customer" target="10.103.22.8" strategy="selected-server">
-                <item>apple</item>
-            </route>
-        </outbound>
-    </routing>
-	
 </ssp>
