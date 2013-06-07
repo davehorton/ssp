@@ -9,10 +9,13 @@
 #ifndef __ssp__ssp_config__
 #define __ssp__ssp_config__
 
+#include <iostream>
 #include <boost/property_tree/ptree.hpp>
 #include <boost/noncopyable.hpp>
 
 #include "ssp.h"
+
+using namespace std ;
 
 namespace ssp {
     
@@ -23,7 +26,7 @@ namespace ssp {
         
         bool isValid() ;
 
-	bool getSipUrl( std::string& sipUrl ) const ;
+        bool getSipUrl( std::string& sipUrl ) const ;
         bool getSyslogTarget( std::string& address, unsigned int& port ) const ;
         bool getSyslogFacility( sinks::syslog::facility& facility ) const ;
         bool getSipConfiguration( std::string& address, unsigned int& port ) const ;
@@ -32,8 +35,9 @@ namespace ssp {
         bool getInboundRoutes( const std::string& sourceAddress, const std::string& dnis, const std::string& ani, std::vector<std::string>& routes, routing_strategy& strategy, routing_error& error ) const ;
         bool getOutboundRoutes( const std::string& dnis, const std::string& ani, std::vector<std::string>& routes, routing_strategy& strategy, routing_error& error ) const ;
         
+        void getAppservers( deque<string>& servers) ;
         
-        peer_type queryPeerType( const std::string& strAddress ) ;
+        peer_type queryPeerType( const string& strAddress ) ;
 
         void Log() const ;
         

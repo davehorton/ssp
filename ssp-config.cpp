@@ -621,6 +621,16 @@ namespace ssp {
             return true ;
         }
         
+        void getAppservers( deque<string>& servers) {
+            for( AppserverMap_t::iterator it = m_mapAppserver.begin(); it != m_mapAppserver.end(); ++it ) {
+                Appserver_t& as = it->second ;
+                string s = as.getAddress() ;
+                s += ":" ;
+                s += as.getEventSocketPort() ;
+                servers.push_back( s ) ;
+            }
+        }
+        
         peer_type queryPeerType( const string& host ) {
             CarrierAddressSpace_t c( host ) ;
             
@@ -727,6 +737,11 @@ namespace ssp {
     peer_type SspConfig::queryPeerType( const std::string& strAddress ) {
         return m_pimpl->queryPeerType( strAddress ) ;
     }
+    
+    void SspConfig::getAppservers( deque<string>& servers) {
+        return m_pimpl->getAppservers(servers) ;
+    }
+    
 
     void SspConfig::Log() const {
         SSP_LOG(log_notice) << "Configuration:" << endl ;

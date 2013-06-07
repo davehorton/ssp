@@ -11,11 +11,13 @@
 
 #include <iostream>
 #include <boost/thread.hpp>
+#include <boost/asio.hpp>
 
 #include "ssp.h"
 #include "fs-instance.h"
 
 using namespace std ;
+using boost::asio::ip::tcp ;
 
 namespace ssp {
     
@@ -27,7 +29,7 @@ namespace ssp {
         void run() ;
         void stop() ;
         
-        void reset( const vector<FsInstance>& instances ) ;
+        void reset( const deque<string>& servers ) ;
         
         
     protected:
@@ -35,8 +37,10 @@ namespace ssp {
         
         
     private:
-        
-        boost::thread   m_thread ;
+        deque< boost::shared_ptr<FsInstance> >  m_servers ;
+        boost::thread               m_thread ;
+        boost::mutex                m_mutex ;
+        boost::asio::io_service     m_ioService ;
         
     } ;
     

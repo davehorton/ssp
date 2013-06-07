@@ -304,6 +304,10 @@ namespace ssp {
             daemonize() ;
         }
         
+        deque<string> servers ;
+        
+        m_Config->getAppservers(servers) ;
+        m_fsMonitor.reset(servers) ;
         m_fsMonitor.run() ;
         
         int rv = su_init() ;
