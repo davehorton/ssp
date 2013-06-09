@@ -113,7 +113,7 @@ namespace ssp {
             if( 0 == (*it2).compare( profile ) ) {
                 advance( it2, 2 ) ;
                 const string& contact = *it2 ;
-                SSP_LOG(log_debug) << "contact: " << contact << endl l
+                SSP_LOG(log_debug) << "contact: " << contact << endl ;
                 tokenizer tok3( *it2,  boost::char_separator<char>("@:")) ;
                 tokenizer::iterator it3 = tok3.begin() ;
                 advance(it3, 2) ;
