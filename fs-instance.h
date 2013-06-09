@@ -28,6 +28,8 @@ namespace ssp {
         ~FsInstance() ;
         bool operator==(FsInstance& other) { return m_strAddress == other.m_strAddress && m_nEventSocketPort == other.m_nEventSocketPort ; }
         
+        void start() ;
+        
         /* getters / setters */
         const string& getAddress() const { return m_strAddress; }
         const string& getSipAddress() const { return m_strSipAddress; }

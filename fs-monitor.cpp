@@ -48,6 +48,7 @@ namespace ssp {
                 i++ ;
             }
             boost::shared_ptr<FsInstance> ptr( new FsInstance( m_ioService, strAddress, nPort ) )  ;
+            ptr->start() ;
             m_servers.push_back( ptr ) ;
         }
     }
@@ -61,14 +62,15 @@ namespace ssp {
         
         for(;;) {
             
-            //try {
+            try {
                 m_ioService.run() ;
+                SSP_LOG(log_notice) << "FsMonitor: io_service run loop ended" << endl ;
                 break ;
-            //}
-            //catch( my_exception& e) {
-           //     SSP_LOG(log_error) << "Error in event thread: " << e << endl ;
-            //    break ;
-            //}
+            }
+            catch( exception& e) {
+                SSP_LOG(log_error) << "Error in event thread: " << e.what() << endl ;
+                break ;
+            }
         }
         
     }

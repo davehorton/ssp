@@ -20,17 +20,20 @@ namespace ssp {
         m_strAddress(address), m_nEventSocketPort(port), m_lastCheck(0), m_nSipPort(0),
         m_bConnected(false), m_nMaxSessions(0), m_nCurrentSessions(0), m_bBusyOut(busyOut), m_state(starting) {
             
-        /* attempt to connect to the freeswitch server on the event socket */
-        ostringstream convert ;
-        convert << m_nEventSocketPort ;
-        boost::asio::ip::tcp::resolver resolver(ioService) ;
-        boost::asio::ip::tcp::resolver::query query( m_strAddress, convert.str()) ;
-        resolver.async_resolve(query, boost::bind(&FsInstance::resolve_handler, shared_from_this(), boost::asio::placeholders::error,  boost::asio::placeholders::iterator) ) ;
-            
-        m_state = resolving ;
     }
     
     FsInstance::~FsInstance() {
+        
+    }
+    
+    void FsInstance::start() {
+        m_state = resolving ;
+        
+        ostringstream convert ;
+        convert << m_nEventSocketPort ;
+        boost::asio::ip::tcp::resolver resolver(m_ioService) ;
+        boost::asio::ip::tcp::resolver::query query( m_strAddress, convert.str()) ;
+        resolver.async_resolve(query, boost::bind(&FsInstance::resolve_handler, shared_from_this(), boost::asio::placeholders::error,  boost::asio::placeholders::iterator) ) ;
         
     }
 
