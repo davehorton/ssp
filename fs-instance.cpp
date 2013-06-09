@@ -99,7 +99,11 @@ namespace ssp {
             }
             
             bool bComplete = m_fsMsg.append( data ) ;
-            if( !bComplete ) return ;
+            if( !bComplete ) {
+                m_socket.async_read_some(boost::asio::buffer(m_buffer),
+                                         boost::bind( &FsInstance::read_handler, shared_from_this(), boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred ) ) ;
+                return ;
+            } ;
             
             switch( m_state ) {
                 case waiting_for_greeting:
