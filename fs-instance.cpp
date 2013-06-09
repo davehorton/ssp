@@ -12,6 +12,9 @@
 #include "fs-message.h"
 #include "ssp-controller.h"
 
+#define MY_COORDS   m_strAddress << ":" << m_nEventSocketPort << " - "
+#define MY_SIP_COORDS   m_strSipAddress << ":" << m_nSipPort << " - "
+
 namespace ssp {
  
  
@@ -23,7 +26,7 @@ namespace ssp {
     }
     
     FsInstance::~FsInstance() {
-        
+
     }
     
     void FsInstance::start() {
@@ -39,7 +42,7 @@ namespace ssp {
     void FsInstance::resolve_handler( const boost::system::error_code& ec, boost::asio::ip::tcp::resolver::iterator it) {
  
         if( !ec ) {
-            SSP_LOG(log_debug) << "Successfully resolved FS server at " << m_strAddress << ":" << m_nEventSocketPort ;
+            SSP_LOG(log_debug) << MY_COORDS << "Successfully resolved FS server at " << m_strAddress << ":" << m_nEventSocketPort ;
             
             m_state = connecting ;
             
@@ -51,7 +54,7 @@ namespace ssp {
             m_socket.async_connect( endpoint, boost::bind(&FsInstance::connect_handler, shared_from_this(), boost::asio::placeholders::error, ++it) ) ;
         }
         else {
-            SSP_LOG(log_error) << "Unable to resolve FS at " << m_strAddress << ":" << m_nEventSocketPort << " --> " << ec.message() << endl;
+            SSP_LOG(log_error) << MY_COORDS << "Unable to resolve FS at " << m_strAddress << ":" << m_nEventSocketPort << " --> " << ec.message() << endl;
             
             m_state = resolve_failed ;
             start_timer( 5 ) ;
@@ -60,7 +63,7 @@ namespace ssp {
     
     void FsInstance::connect_handler( const boost::system::error_code& ec, tcp::resolver::iterator it ) {
         if( !ec ) {
-            SSP_LOG(log_debug) << "Successfully connected to FS server at " << m_strAddress << ":" << m_nEventSocketPort << " --> " << ec << endl;
+            SSP_LOG(log_debug) << MY_COORDS << "Successfully connected to FS server at " << m_strAddress << ":" << m_nEventSocketPort << endl;
             
             m_state = waiting_for_greeting ;
             
@@ -74,7 +77,7 @@ namespace ssp {
             m_socket.async_connect( endpoint, boost::bind(&FsInstance::connect_handler, shared_from_this(), boost::asio::placeholders::error, ++it) ) ;         
         }
         else {
-            SSP_LOG(log_error) << "Unable to connect to FS at " << m_strAddress << ":" << m_nEventSocketPort << " --> " << ec.message() << endl;
+            SSP_LOG(log_error) << MY_COORDS << "Unable to connect to FS at " << m_strAddress << ":" << m_nEventSocketPort << " --> " << ec.message() << endl;
     
             m_state = connect_failed ;
             start_timer( 5 ) ;
@@ -86,18 +89,21 @@ namespace ssp {
             bool bSetTimer = false ;
             bool bReadAgain = false ;
             string msg( m_buffer.data(), bytes_transferred ) ;
-            SSP_LOG(log_debug)  << "Read: " << msg << endl ;
+            string out ;
+            if( m_strSipAddress.length() > 0 )  SSP_LOG(log_debug) <<  MY_SIP_COORDS  << "Read: " << bytes_transferred << " bytes" << endl << msg << endl ;
+            else SSP_LOG(log_debug) <<  MY_COORDS  << "Read: " << bytes_transferred << " bytes" << endl << msg << endl ;
+           
             
             FsMessage fsMsg( msg ) ;
         
             switch( m_state ) {
                 case waiting_for_greeting:
                     if( FsMessage::auth != fsMsg.getCategory() ) {
-                        SSP_LOG(log_error) << "Expected to receive auth/request upon connecting, instead got: " << msg << endl ;
+                        SSP_LOG(log_error) << MY_COORDS << "Expected to receive auth/request upon connecting, instead got: " << msg << endl ;
                         bSetTimer = true ;
                     }
                     else {
-                        boost::asio::write( m_socket, boost::asio::buffer("auth ClueCon\r\n\r\n")) ;
+                        out = "auth ClueCon\r\n\r\n" ;
                         m_state = authenticating ;
                         bReadAgain = true ;
                     }
@@ -105,12 +111,12 @@ namespace ssp {
                     
                 case authenticating:
                     if( FsMessage::ok != fsMsg.getReplyStatus() ) {
-                        SSP_LOG(log_error) << "Authentication failed: " << msg << endl ;
+                        SSP_LOG(log_error) << MY_COORDS << "Authentication failed: " << msg << endl ;
                         m_state = authentication_failed ;
                         bSetTimer = true ;
                     }
                     else {
-                        boost::asio::write( m_socket, boost::asio::buffer("api sofia status\r\n\r\n")) ;
+                        out = "api sofia status\r\n\r\n";
                         m_state = obtaining_sip_configuration;
                         bReadAgain = true ;
                     }
@@ -119,12 +125,12 @@ namespace ssp {
                 case obtaining_sip_configuration:
                     if( FsMessage::api == fsMsg.getCategory() && FsMessage::response == fsMsg.getType() ) {
                         if( !fsMsg.getSipProfile("internal", m_strSipAddress, m_nSipPort) ) {
-                            SSP_LOG(log_error) << "Failed to parse internal sip profile from response: " << msg << endl ;
+                            SSP_LOG(log_error) << MY_COORDS << "Failed to parse internal sip profile from response: " << msg << endl ;
                             m_state = obtaining_sip_configuration_failed ;
                             bSetTimer = true ;
                         }
                         else {
-                            boost::asio::write( m_socket, boost::asio::buffer("api status\r\n\r\n")) ;
+                           out = "api status\r\n\r\n" ;
                             m_state = querying_status ; //we've reached the "normal" querying state
                             bReadAgain = true ;
                         }
@@ -134,16 +140,23 @@ namespace ssp {
                 case querying_status:
                     if( FsMessage::api == fsMsg.getCategory() && FsMessage::response == fsMsg.getType() ) {
                         if( !fsMsg.getFsStatus( m_nCurrentSessions, m_nMaxSessions ) ) {
-                            SSP_LOG(log_error) << "Failed to parse freeswitch status from response: " << msg << endl ;
+                            SSP_LOG(log_error) << MY_SIP_COORDS << "Failed to parse freeswitch status from response: " << msg << endl ;
                         }
                         else {
-                            SSP_LOG(log_error) << "FS at " << m_strSipAddress << ":" << m_nSipPort << " has active sessions: " << m_nCurrentSessions << ", max sessions: " << m_nMaxSessions << endl ;
+                            SSP_LOG(log_error) << MY_SIP_COORDS << "FS at " << m_strSipAddress << ":" << m_nSipPort << " has active sessions: " << m_nCurrentSessions << ", max sessions: " << m_nMaxSessions << endl ;
                         }
                         bSetTimer = true ;
                     }
                     break ;
                     
             }
+            
+            if( out.length() > 0 ) {
+                if( m_strSipAddress.length() > 0 )  SSP_LOG(log_debug) <<  MY_SIP_COORDS  << "Write: " << out.length() << " bytes" << endl << out << endl ;
+                else SSP_LOG(log_debug) <<  MY_COORDS  << "Write: " << out.length() << " bytes" << endl << out << endl ;                
+                boost::asio::write( m_socket, boost::asio::buffer(out) ) ;
+            }
+
             
             if( bReadAgain ) {
                 m_socket.async_read_some(boost::asio::buffer(m_buffer),
@@ -192,7 +205,7 @@ namespace ssp {
             }
         }
         else {
-            SSP_LOG(log_error) << "FsInstance timer error " << m_strAddress << ":" << m_nEventSocketPort << " --> " << ec.message() << endl;
+            SSP_LOG(log_error) << MY_COORDS << "FsInstance timer error " << m_strAddress << ":" << m_nEventSocketPort << " --> " << ec.message() << endl;
         }
     }
 
