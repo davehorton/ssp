@@ -44,7 +44,7 @@ namespace ssp {
             
         }
         else {
-            SSP_LOG(log_error) << "Unable to resolve FS at " << m_strAddress << ":" << m_nEventSocketPort << " --> " << ec << endl;
+            SSP_LOG(log_error) << "Unable to resolve FS at " << m_strAddress << ":" << m_nEventSocketPort << " --> " << ec.message() << endl;
             
             m_state = resolve_failed ;
             start_timer( 5 ) ;
@@ -61,7 +61,7 @@ namespace ssp {
                     boost::bind( &FsInstance::read_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred ) ) ;
         }
         else {
-            SSP_LOG(log_error) << "Unable to connect to FS at " << m_strAddress << ":" << m_nEventSocketPort << " --> " << ec << endl;
+            SSP_LOG(log_error) << "Unable to connect to FS at " << m_strAddress << ":" << m_nEventSocketPort << " --> " << ec.message() << endl;
 
             m_state = connect_failed ;
             start_timer( 5 ) ;
@@ -141,7 +141,7 @@ namespace ssp {
             }
         }
         else {
-            SSP_LOG(log_error) << "Unable to connect to FS at " << m_strAddress << ":" << m_nEventSocketPort << " --> " << ec << endl;           
+            SSP_LOG(log_error) << "Unable to connect to FS at " << m_strAddress << ":" << m_nEventSocketPort << " --> " << ec.message() << endl;
         }
     }
     
@@ -179,7 +179,7 @@ namespace ssp {
             }
         }
         else {
-            SSP_LOG(log_error) << "FsInstance timer error " << m_strAddress << ":" << m_nEventSocketPort << " --> " << ec << endl;
+            SSP_LOG(log_error) << "FsInstance timer error " << m_strAddress << ":" << m_nEventSocketPort << " --> " << ec.message() << endl;
         }
     }
 
