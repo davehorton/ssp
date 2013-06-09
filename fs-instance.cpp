@@ -33,16 +33,6 @@ namespace ssp {
     FsInstance::~FsInstance() {
         
     }
-    void FsInstance::timer_handler(const boost::system::error_code& ec) {
-        if( !ec ) {
-            SSP_LOG(log_debug) << "FsInstance timer went off " << m_strAddress << ":" << m_nEventSocketPort << " state is: " << m_state << endl ;
-            
-            //TODO: determine what to do
-         }
-        else {
-            SSP_LOG(log_error) << "FsInstance timer error " << m_strAddress << ":" << m_nEventSocketPort << " --> " << ec << endl;
-        }
-    }
 
     void FsInstance::resolve_handler( const boost::system::error_code& ec, boost::asio::ip::tcp::resolver::iterator it) {
  
@@ -133,6 +123,9 @@ namespace ssp {
                         if( !fsMsg.getFsStatus( m_nCurrentSessions, m_nMaxSessions ) ) {
                             SSP_LOG(log_error) << "Failed to parse freeswitch status from response: " << msg << endl ;
                         }
+                        else {
+                            SSP_LOG(log_error) << "FS at " << m_strSipAddress << ":" << m_nSipPort << " has active sessions: " << m_nCurrentSessions << ", max sessions: " << m_nMaxSessions << endl ;
+                        }
                         bSetTimer = true ;
                     }
                     break ;
@@ -151,6 +144,45 @@ namespace ssp {
             SSP_LOG(log_error) << "Unable to connect to FS at " << m_strAddress << ":" << m_nEventSocketPort << " --> " << ec << endl;           
         }
     }
+    
+    void FsInstance::timer_handler(const boost::system::error_code& ec) {
+        bool bReadAgain = false ;
+        bool bSetTimer = false ;
+        if( !ec ) {
+            SSP_LOG(log_debug) << "FsInstance timer went off " << m_strAddress << ":" << m_nEventSocketPort << " state is: " << m_state << endl ;
+            switch( m_state ) {
+                case resolve_failed:
+                    break ;
+                    
+                case connect_failed:
+                    break ;
+                    
+                case waiting_for_greeting:
+                    break ;
+                    
+                case authentication_failed:
+                    break ;
+                    
+                case obtaining_sip_configuration_failed:
+                    break ;
+                    
+                default:
+                    bReadAgain = true ;
+                    boost::asio::write( m_socket, boost::asio::buffer("api status\r\n\r\n")) ;
+            }
+            if( bReadAgain ) {
+                m_socket.async_read_some(boost::asio::buffer(m_buffer),
+                                         boost::bind( &FsInstance::read_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred ) ) ;
+            }
+            if( bSetTimer ) {
+                start_timer( 5 ) ;
+            }
+        }
+        else {
+            SSP_LOG(log_error) << "FsInstance timer error " << m_strAddress << ":" << m_nEventSocketPort << " --> " << ec << endl;
+        }
+    }
+
     void FsInstance::start_timer( unsigned int nSeconds ) {
         boost::asio::deadline_timer timer(m_ioService);
         timer.expires_from_now(boost::posix_time::seconds(nSeconds));
