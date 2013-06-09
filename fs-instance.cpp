@@ -162,6 +162,7 @@ namespace ssp {
                 boost::asio::write( m_socket, boost::asio::buffer(out) ) ;
             }
 
+            m_fsMsg.reset() ;
             
             if( bReadAgain ) {
                 m_socket.async_read_some(boost::asio::buffer(m_buffer),
@@ -172,7 +173,7 @@ namespace ssp {
             }
         }
         else {
-            SSP_LOG(log_error) << "Unable to connect to FS at " << m_strAddress << ":" << m_nEventSocketPort << " --> " << ec.message() << endl;
+            SSP_LOG(log_error) << MY_COORDS  << "Read error: " << ec.message() << endl;
         }
     }
     
