@@ -166,7 +166,10 @@ namespace ssp {
                         else {
                             SSP_LOG(log_info) << MY_SIP_COORDS << "FS at " << m_strSipAddress << ":" << m_nSipPort << " has active sessions: " << m_nCurrentSessions << ", max sessions: " << m_nMaxSessions << endl ;
                             bSetTimer = true ;
-                            bNotifyReconnect = true ;
+                            if( m_bDisconnected ) {
+                                m_bDisconnected = false ;
+                                bNotifyReconnect = true ;
+                            }
                         }
                     }
                     break ;
