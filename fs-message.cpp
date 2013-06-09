@@ -152,16 +152,16 @@ namespace ssp {
         return true ;
     }
     bool FsMessage::parseLeadingInteger( const string& str, unsigned int& number) const {
-        SSP_LOG(log_debug) << "parsing integer from '" << str << "'" << endl ;
+        //SSP_LOG(log_debug) << "parsing integer from '" << str << "'" << endl ;
         tokenizer tok( str, boost::char_separator<char>(" ") ) ;
         tokenizer::iterator it = tok.begin() ;
         string s = *it;
-        SSP_LOG(log_debug) << "proposed integer value is '" << s << "'" << endl ;
+        //SSP_LOG(log_debug) << "proposed integer value is '" << s << "'" << endl ;
         if( !s.empty() && std::find_if(s.begin(), s.end(), ::isdigit ) != s.end() ) {
             number = ::atoi( s.c_str() ) ;
             return true ;
         }
-        SSP_LOG(log_debug) << "invalid integer string " << str << endl ;
+        //SSP_LOG(log_debug) << "invalid integer string " << str << endl ;
         return false ;    }
 
 }

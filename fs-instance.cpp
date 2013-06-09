@@ -18,7 +18,7 @@ namespace ssp {
  
  
     FsInstance::FsInstance( boost::asio::io_service& ioService, const string& address, unsigned int port, bool busyOut ):
-        m_ioService(ioService), m_socket(ioService), m_resolver(ioService), 
+        m_ioService(ioService), m_socket(ioService), m_resolver(ioService), m_timer(ioService),
         m_strAddress(address), m_nEventSocketPort(port), m_lastCheck(0), m_nSipPort(0),
         m_bConnected(false), m_nMaxSessions(0), m_nCurrentSessions(0), m_bBusyOut(busyOut), m_state(starting) {
             
@@ -222,8 +222,7 @@ namespace ssp {
     }
 
     void FsInstance::start_timer( unsigned int nSeconds ) {
-        boost::asio::deadline_timer timer(m_ioService);
-        timer.expires_from_now(boost::posix_time::seconds(nSeconds));
-        timer.async_wait( boost::bind( &FsInstance::timer_handler, shared_from_this(), boost::asio::placeholders::error )) ;        
+        m_timer.expires_from_now(boost::posix_time::seconds(nSeconds));
+        m_timer.async_wait( boost::bind( &FsInstance::timer_handler, shared_from_this(), boost::asio::placeholders::error )) ;
     }
 }

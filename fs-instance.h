@@ -81,6 +81,7 @@ namespace ssp {
         boost::asio::io_service& m_ioService;
         tcp::socket     m_socket;
         tcp::resolver   m_resolver ;
+        boost::asio::deadline_timer m_timer ;
         boost::array<char, 8132> m_buffer ;
         FsMessage       m_fsMsg ;
     } ;
