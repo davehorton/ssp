@@ -25,7 +25,7 @@ namespace ssp {
         convert << m_nEventSocketPort ;
         boost::asio::ip::tcp::resolver resolver(ioService) ;
         boost::asio::ip::tcp::resolver::query query( m_strAddress, convert.str()) ;
-        resolver.async_resolve(query, boost::bind(&FsInstance::resolve_handler, this, boost::asio::placeholders::error,  boost::asio::placeholders::iterator) ) ;
+        resolver.async_resolve(query, boost::bind(&FsInstance::resolve_handler, shared_from_this(), boost::asio::placeholders::error,  boost::asio::placeholders::iterator) ) ;
             
         m_state = resolving ;
     }
@@ -40,7 +40,7 @@ namespace ssp {
             SSP_LOG(log_debug) << "Successfully resolved FS server at " << m_strAddress << ":" << m_nEventSocketPort << " --> " << ec << endl;
             
             m_state = connecting ;
-            m_socket.async_connect( *it, boost::bind(&FsInstance::connect_handler, this, boost::asio::placeholders::error) ) ;
+            m_socket.async_connect( *it, boost::bind(&FsInstance::connect_handler, shared_from_this(), boost::asio::placeholders::error) ) ;
             
         }
         else {
@@ -58,7 +58,7 @@ namespace ssp {
             m_state = waiting_for_greeting ;
             
             m_socket.async_read_some(boost::asio::buffer(m_buffer),
-                    boost::bind( &FsInstance::read_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred ) ) ;
+                    boost::bind( &FsInstance::read_handler, shared_from_this(), boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred ) ) ;
         }
         else {
             SSP_LOG(log_error) << "Unable to connect to FS at " << m_strAddress << ":" << m_nEventSocketPort << " --> " << ec.message() << endl;
@@ -134,7 +134,7 @@ namespace ssp {
             
             if( bReadAgain ) {
                 m_socket.async_read_some(boost::asio::buffer(m_buffer),
-                                         boost::bind( &FsInstance::read_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred ) ) ;
+                                         boost::bind( &FsInstance::read_handler, shared_from_this(), boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred ) ) ;
             }
             if( bSetTimer ) {
                 start_timer( 5 ) ;
@@ -172,7 +172,7 @@ namespace ssp {
             }
             if( bReadAgain ) {
                 m_socket.async_read_some(boost::asio::buffer(m_buffer),
-                                         boost::bind( &FsInstance::read_handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred ) ) ;
+                                         boost::bind( &FsInstance::read_handler, shared_from_this(), boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred ) ) ;
             }
             if( bSetTimer ) {
                 start_timer( 5 ) ;
@@ -186,6 +186,6 @@ namespace ssp {
     void FsInstance::start_timer( unsigned int nSeconds ) {
         boost::asio::deadline_timer timer(m_ioService);
         timer.expires_from_now(boost::posix_time::seconds(nSeconds));
-        timer.async_wait( boost::bind( &FsInstance::timer_handler, this, boost::asio::placeholders::error )) ;        
+        timer.async_wait( boost::bind( &FsInstance::timer_handler, shared_from_this(), boost::asio::placeholders::error )) ;        
     }
 }

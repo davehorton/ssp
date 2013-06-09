@@ -13,6 +13,7 @@
 #include <time.h>
 #include <boost/asio.hpp>
 #include <boost/array.hpp>
+#include <boost/enable_shared_from_this.hpp>
 
 #include "ssp.h"
 
@@ -21,7 +22,7 @@ using  boost::asio::ip::tcp ;
 
 namespace ssp {
     
-    class FsInstance {
+    class FsInstance : public boost::enable_shared_from_this<FsInstance> {
     public:
         FsInstance( boost::asio::io_service& ioService, const string& strAddress, unsigned int port, bool busyOut = false) ;
         ~FsInstance() ;
