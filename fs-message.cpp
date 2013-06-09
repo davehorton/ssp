@@ -104,17 +104,17 @@ namespace ssp {
     }
     
     bool FsMessage::getSipProfile( const string& profile, string& address, unsigned int port ) const {
-        SSP_LOG(log_debug) << "searching for profile " << profile << " in content " << m_strContent << endl ;
+        //SSP_LOG(log_debug) << "searching for profile " << profile << " in content " << m_strContent << endl ;
         tokenizer tok( m_strContent, boost::char_separator<char>("\r\n")) ;
         for( tokenizer::iterator it = tok.begin(); it != tok.end(); ++it ) {
-            SSP_LOG(log_debug) << "line: " << *it << endl ;
+            //SSP_LOG(log_debug) << "line: " << *it << endl ;
             tokenizer tok2( *it, boost::char_separator<char>(" \t")) ;
             tokenizer::iterator it2 = tok2.begin() ;
-            SSP_LOG(log_debug) << "first token: " << *it2 << endl ;
+            //SSP_LOG(log_debug) << "first token: " << *it2 << endl ;
             if( 0 == (*it2).compare( profile ) ) {
                 advance( it2, 2 ) ;
                 const string& contact = *it2 ;
-                SSP_LOG(log_debug) << "contact: " << contact << endl ;
+                //SSP_LOG(log_debug) << "contact: " << contact << endl ;
                 tokenizer tok3( *it2,  boost::char_separator<char>("@:")) ;
                 tokenizer::iterator it3 = tok3.begin() ;
                 advance(it3, 2) ;
@@ -131,21 +131,30 @@ namespace ssp {
         tokenizer tok( m_strContent, boost::char_separator<char>("\r\n")) ;
         tokenizer::iterator it = tok.begin();
         
-        if( distance( tok.begin(), tok.end() ) < 5 ) return false ;
+        if( distance( tok.begin(), tok.end() ) < 5 ) {
+            SSP_LOG(log_debug) << "expected at least 5 lines of status, instead got " << distance( tok.begin(), tok.end() ) << endl ;
+            return false ;
+        } ;
         advance( it, 3 ) ;
-        if( !parseLeadingInteger(*it, nCurrentSessions) ) return false ;
+        if( !parseLeadingInteger(*it, nCurrentSessions) ) {
+            return false ;
+        }
         advance( it, 1 ) ;
-        if( !parseLeadingInteger(*it, nMaxSessions) ) return false ;
+        if( !parseLeadingInteger(*it, nMaxSessions) ) {
+            return false ;
+        }
         
         return true ;
     }
     bool FsMessage::parseLeadingInteger( const string& str, unsigned int& number) const {
+        SSP_LOG(log_debug) << "parsing integer from " << str << endl ;
         tokenizer tok( str, boost::char_separator<char>(" ")) ;
         const string& s = *(tok.begin());
         if( !s.empty() && std::find_if(s.begin(), s.end(), ::isdigit ) == s.end() ) {
             number = ::atoi( s.c_str() ) ;
             return true ;
         }
+        SSP_LOG(log_debug) << "invalid integer string " << str << endl ;        
         return false ;
     }
 

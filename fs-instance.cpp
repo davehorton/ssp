@@ -135,6 +135,7 @@ namespace ssp {
                             bSetTimer = true ;
                         }
                         else {
+                            SSP_LOG(log_info) << MY_SIP_COORDS << "FS is listening for SIP on " << m_strSipAddress << ":" << m_nSipPort << endl ;
                             out = "api status\r\n\r\n" ;
                             m_state = querying_status ; //we've reached the "normal" querying state
                             bReadAgain = true ;
