@@ -37,6 +37,8 @@ namespace ssp {
         m_strContent.clear() ;
         m_strReplyText.clear() ;
         m_nContentLength = 0 ;
+        m_bComplete = false ;
+        m_bValid = false ;
     }
     
     void FsMessage::parse( const string& data ) throw(string) {
@@ -100,6 +102,9 @@ namespace ssp {
            (m_nContentLength> 0 && m_strContent.length() == m_nContentLength ) ) {
             
             m_bComplete = true ;
+        }
+        else {
+            SSP_LOG(log_debug) << "read partial message" << endl ;
         }
     }
     

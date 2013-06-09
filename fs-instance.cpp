@@ -98,8 +98,8 @@ namespace ssp {
                 SSP_LOG(log_debug) << data ;
             }
             
-            bool bComplete = m_fsMsg.append( data ) ;
-            if( !bComplete ) {
+            m_fsMsg.append( data ) ;
+            if( !m_fsMsg.isComplete() ) {
                 m_socket.async_read_some(boost::asio::buffer(m_buffer),
                                          boost::bind( &FsInstance::read_handler, shared_from_this(), boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred ) ) ;
                 return ;
@@ -151,11 +151,12 @@ namespace ssp {
                     if( FsMessage::api == m_fsMsg.getCategory() && FsMessage::response == m_fsMsg.getType() ) {
                         if( !m_fsMsg.getFsStatus( m_nCurrentSessions, m_nMaxSessions ) ) {
                             SSP_LOG(log_error) << MY_SIP_COORDS << "Failed to parse freeswitch status from response: " << data << endl ;
+                            bSetTimer = true ;
                         }
                         else {
-                            SSP_LOG(log_error) << MY_SIP_COORDS << "FS at " << m_strSipAddress << ":" << m_nSipPort << " has active sessions: " << m_nCurrentSessions << ", max sessions: " << m_nMaxSessions << endl ;
+                            SSP_LOG(log_info) << MY_SIP_COORDS << "FS at " << m_strSipAddress << ":" << m_nSipPort << " has active sessions: " << m_nCurrentSessions << ", max sessions: " << m_nMaxSessions << endl ;
+                            bSetTimer = true ;
                         }
-                        bSetTimer = true ;
                     }
                     break ;
                     
