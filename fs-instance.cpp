@@ -90,8 +90,8 @@ namespace ssp {
             string data( m_buffer.data(), bytes_transferred ) ;
             string out ;
            
-            if( m_fsMsg.isEmpty() ) {
-                if( m_strSipAddress.length() > 0 )  SSP_LOG(log_debug) <<  MY_SIP_COORDS  << "Read: " << bytes_transferred << " bytes" << endl << data << endl ;
+            if( FsMessage::unknown_category == m_fsMsg.getCategory() ) {
+                if( m_strSipAddress.length() > 0 )  SSP_LOG(log_debug) <<  MY_SIP_COORDS  << "Read " << bytes_transferred << " bytes" << endl << data << endl ;
                 else SSP_LOG(log_debug) <<  MY_COORDS  << "Read: " << bytes_transferred << " bytes" << endl << data << endl ;
             }
             else {
@@ -157,8 +157,8 @@ namespace ssp {
             }
             
             if( out.length() > 0 ) {
-                if( m_strSipAddress.length() > 0 )  SSP_LOG(log_debug) <<  MY_SIP_COORDS  << "Write: " << out.length() << " bytes" << endl << out << endl ;
-                else SSP_LOG(log_debug) <<  MY_COORDS  << "Write: " << out.length() << " bytes" << endl << out << endl ;                
+                if( m_strSipAddress.length() > 0 )  SSP_LOG(log_debug) <<  MY_SIP_COORDS  << "Write " << out.length() << " bytes" << endl << out << endl ;
+                else SSP_LOG(log_debug) <<  MY_COORDS  << "Write " << out.length() << " bytes" << endl << out << endl ;                
                 boost::asio::write( m_socket, boost::asio::buffer(out) ) ;
             }
 

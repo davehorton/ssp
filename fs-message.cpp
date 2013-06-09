@@ -103,14 +103,17 @@ namespace ssp {
     }
     
     bool FsMessage::getSipProfile( const string& profile, string& address, unsigned int port ) const {
-        
+        SSP_LOG(log_debug) << "searching for profile " << profile << " in content " << m_strContent << endl ;
         tokenizer tok( m_strContent, boost::char_separator<char>("\r\n")) ;
         for( tokenizer::iterator it = tok.begin(); it != tok.end(); ++it ) {
+            SSP_LOG(log_debug) << "line: " << *it << endl ;
             tokenizer tok2( *it, boost::char_separator<char>(" \t")) ;
             tokenizer::iterator it2 = tok2.begin() ;
+            SSP_LOG(log_debug) << "first token: " << *it2 << endl ;
             if( 0 == (*it2).compare( profile ) ) {
                 advance( it2, 2 ) ;
                 const string& contact = *it2 ;
+                SSP_LOG(log_debug) << "contact: " << contact << endl l
                 tokenizer tok3( *it2,  boost::char_separator<char>("@:")) ;
                 tokenizer::iterator it3 = tok3.begin() ;
                 advance(it3, 2) ;
