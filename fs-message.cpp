@@ -11,17 +11,22 @@
 #include "ssp-controller.h"
 
 namespace ssp {
-    FsMessage::FsMessage( const string& data ) : m_bValid(false), m_bComplete(false) {
+    FsMessage::FsMessage() : m_bValid(false), m_bComplete(false) {
         reset() ;
-        try {
-            parse( data ) ;
-            m_bValid = true ;
-        } catch( exception& e ) {
-            SSP_LOG(log_error) << "Error parsing freeswitch msg: " << data << ": " << e.what() << endl ;
-        }
     }
     FsMessage::~FsMessage() {
         
+    }
+    
+    bool FsMessage::append( const string& data ) {
+        m_rawMsg.append( data ) ;
+        try {
+            parse( data ) ;
+            m_bValid = true ;
+        } catch( string& e ) {
+            SSP_LOG(log_error) << "Error parsing freeswitch msg: " << data << ": " << e << endl ;
+        }
+        return m_bComplete ;
     }
     
     void FsMessage::reset() {
@@ -35,65 +40,66 @@ namespace ssp {
     }
     
     void FsMessage::parse( const string& data ) throw(string) {
-        m_rawMsg.append( data ) ;
-        
-        boost::char_separator<char> sep("\r\n") ;
-        tokenizer tok( m_rawMsg, sep) ;
-        int i = 0 ;
-        for( tokenizer::iterator it = tok.begin(); it != tok.end(); ++i, ++it ) {
-            const string& line = *it ;
-            if( unknown_category == m_category ) {
-                if( 0 != line.find("Content-Type: ")) throw("Invalid msg: Expected Content-Type on first line: " + line) ;
-                
-                string s = line.substr(14) ;
-                tokenizer tok2(s, boost::char_separator<char>("/") ) ;
-                if( 2 != distance(tok2.begin(), tok2.end()) ) throw("Invalid Content-Type: " + s) ;
-                
-                tokenizer::iterator it2 = tok2.begin() ;
-                if( 0 == (*it2).compare("api")) m_category = api ;
-                else if( 0 == (*it2).compare("auth")) m_category = auth ;
-                else if( 0 == (*it2).compare("command")) m_category = command ;
-                else if( 0 == (*it2).compare("text")) m_category = text ;
-                else throw("Invalid/unknown Content-Type: '" + line + "': " + (*it2) + " is an unknown category") ;
-                
-                ++it2 ;
-                if( 0 == (*it2).compare("reply") )  m_type = reply ;
-                else if( 0 == (*it2).compare("request") )  m_type = request ;
-                else if( 0 == (*it2).compare("response") )  m_type = response ;
-                else if( 0 == (*it2).compare("disconnect-notice") )  m_type = disconnect_notice ;
-                else throw("Invalid/unknown Content-Type: '" + line + "': " + (*it2) + " is an unknown type") ;
-            }
-            else if( command == m_category && reply == m_type ) {
-                if( undefined != m_replyStatus ) throw("Invalid msg: multiple lines of Reply-Text: " + line) ;
-                if( 0 != line.find("Reply-Text: ")) throw("Invalid msg: Expected Reply-Text on second line of command/reply msg: " + line) ;
-                m_strReplyText = line ;
-                string s = line.substr(12) ;
-                if( 0 == s.find("+OK") ) m_replyStatus = ok ;
-                else if( 0 == s.find("+ERR")) m_replyStatus = err ;
-                else throw("Invalid reply status: " + s ) ;
-            }
-            else if( (api == m_category && response == m_type) || text == m_category ) {
-                if( 0 == m_nContentLength ) {
-                    if( 0 != line.find("Content-Length: ")) throw("Invalid msg: Expected Content-Length on second line of api/response or text msg: " + line) ;
-                    string s = line.substr(16) ;
-                    m_nContentLength = atoi( s.c_str() ) ;                    
-                }
-                else {
-                    m_strContent.append( line ) ;
-                }
-            }
+
+        if( m_nContentLength > 0 ) {
+            m_strContent.append( data ) ;
         }
-        
-        if( m_nContentLength > 0 && m_strContent.length() != m_nContentLength ) {
-            ostringstream reportedLength, actualLength ;
-            reportedLength << m_nContentLength ;
-            actualLength << m_strContent.length() ;
-            throw("Content-Length was " + reportedLength.str() + " but read " + actualLength.str() ) ;
+        else {
+            boost::char_separator<char> sep("\r\n","\r\n") ;
+            tokenizer tok( m_rawMsg, sep) ;
+            int i = 0 ;
+            for( tokenizer::iterator it = tok.begin(); it != tok.end(); ++i, ++it ) {
+                const string& line = *it ;
+                if( unknown_category == m_category ) {
+                    if( 0 != line.find("Content-Type: ")) throw("Invalid msg: Expected Content-Type on first line: " + line) ;
+                    
+                    string s = line.substr(14) ;
+                    tokenizer tok2(s, boost::char_separator<char>("/") ) ;
+                    if( 2 != distance(tok2.begin(), tok2.end()) ) throw("Invalid Content-Type: " + s) ;
+                    
+                    tokenizer::iterator it2 = tok2.begin() ;
+                    if( 0 == (*it2).compare("api")) m_category = api ;
+                    else if( 0 == (*it2).compare("auth")) m_category = auth ;
+                    else if( 0 == (*it2).compare("command")) m_category = command ;
+                    else if( 0 == (*it2).compare("text")) m_category = text ;
+                    else throw("Invalid/unknown Content-Type: '" + line + "': " + (*it2) + " is an unknown category") ;
+                    
+                    ++it2 ;
+                    if( 0 == (*it2).compare("reply") )  m_type = reply ;
+                    else if( 0 == (*it2).compare("request") )  m_type = request ;
+                    else if( 0 == (*it2).compare("response") )  m_type = response ;
+                    else if( 0 == (*it2).compare("disconnect-notice") )  m_type = disconnect_notice ;
+                    else throw("Invalid/unknown Content-Type: '" + line + "': " + (*it2) + " is an unknown type") ;
+                }
+                else if( command == m_category && reply == m_type ) {
+                    if( undefined != m_replyStatus ) throw("Invalid msg: multiple lines of Reply-Text: " + line) ;
+                    if( 0 != line.find("Reply-Text: ")) throw("Invalid msg: Expected Reply-Text on second line of command/reply msg: " + line) ;
+                    m_strReplyText = line ;
+                    string s = line.substr(12) ;
+                    if( 0 == s.find("+OK") ) m_replyStatus = ok ;
+                    else if( 0 == s.find("+ERR")) m_replyStatus = err ;
+                    else throw("Invalid reply status: " + s ) ;
+                }
+                else if( (api == m_category && response == m_type) || text == m_category ) {
+                    if( 0 == m_nContentLength ) {
+                        if( 0 != line.find("Content-Length: ")) throw("Invalid msg: Expected Content-Length on second line of api/response or text msg: " + line) ;
+                        string s = line.substr(16) ;
+                        m_nContentLength = atoi( s.c_str() ) ;
+                    }
+                    else {
+                        m_strContent.append( line ) ;
+                    }
+                }
+            }
+           
         }
-        
-        m_bValid = true ;
-        m_bComplete = true ;
-        
+  
+        if( request == m_type ||
+           reply == m_type && undefined != m_replyStatus ||
+           (m_nContentLength> 0 && m_strContent.length() == m_nContentLength ) ) {
+            
+            m_bComplete = true ;
+        }
     }
     
     bool FsMessage::getSipProfile( const string& profile, string& address, unsigned int port ) const {

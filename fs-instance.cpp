@@ -9,7 +9,6 @@
 #include <boost/bind.hpp>
 
 #include "fs-instance.h"
-#include "fs-message.h"
 #include "ssp-controller.h"
 
 #define MY_COORDS   m_strAddress << ":" << m_nEventSocketPort << " - "
@@ -88,18 +87,24 @@ namespace ssp {
         if( !ec ) {
             bool bSetTimer = false ;
             bool bReadAgain = false ;
-            string msg( m_buffer.data(), bytes_transferred ) ;
+            string data( m_buffer.data(), bytes_transferred ) ;
             string out ;
-            if( m_strSipAddress.length() > 0 )  SSP_LOG(log_debug) <<  MY_SIP_COORDS  << "Read: " << bytes_transferred << " bytes" << endl << msg << endl ;
-            else SSP_LOG(log_debug) <<  MY_COORDS  << "Read: " << bytes_transferred << " bytes" << endl << msg << endl ;
            
+            if( m_fsMsg.isEmpty() ) {
+                if( m_strSipAddress.length() > 0 )  SSP_LOG(log_debug) <<  MY_SIP_COORDS  << "Read: " << bytes_transferred << " bytes" << endl << data << endl ;
+                else SSP_LOG(log_debug) <<  MY_COORDS  << "Read: " << bytes_transferred << " bytes" << endl << data << endl ;
+            }
+            else {
+                SSP_LOG(log_debug) << data ;
+            }
             
-            FsMessage fsMsg( msg ) ;
-        
+            bool bComplete = m_fsMsg.append( data ) ;
+            if( !bComplete ) return ;
+            
             switch( m_state ) {
                 case waiting_for_greeting:
-                    if( FsMessage::auth != fsMsg.getCategory() ) {
-                        SSP_LOG(log_error) << MY_COORDS << "Expected to receive auth/request upon connecting, instead got: " << msg << endl ;
+                    if( FsMessage::auth != m_fsMsg.getCategory() ) {
+                        SSP_LOG(log_error) << MY_COORDS << "Expected to receive auth/request upon connecting, instead got: " << data << endl ;
                         bSetTimer = true ;
                     }
                     else {
@@ -110,8 +115,8 @@ namespace ssp {
                     break;
                     
                 case authenticating:
-                    if( FsMessage::ok != fsMsg.getReplyStatus() ) {
-                        SSP_LOG(log_error) << MY_COORDS << "Authentication failed: " << msg << endl ;
+                    if( FsMessage::ok != m_fsMsg.getReplyStatus() ) {
+                        SSP_LOG(log_error) << MY_COORDS << "Authentication failed: " << data << endl ;
                         m_state = authentication_failed ;
                         bSetTimer = true ;
                     }
@@ -123,14 +128,14 @@ namespace ssp {
                     break;
 
                 case obtaining_sip_configuration:
-                    if( FsMessage::api == fsMsg.getCategory() && FsMessage::response == fsMsg.getType() ) {
-                        if( !fsMsg.getSipProfile("internal", m_strSipAddress, m_nSipPort) ) {
-                            SSP_LOG(log_error) << MY_COORDS << "Failed to parse internal sip profile from response: " << msg << endl ;
+                    if( FsMessage::api == m_fsMsg.getCategory() && FsMessage::response == m_fsMsg.getType() ) {
+                        if( !m_fsMsg.getSipProfile("internal", m_strSipAddress, m_nSipPort) ) {
+                            SSP_LOG(log_error) << MY_COORDS << "Failed to parse internal sip profile from response: " << data << endl ;
                             m_state = obtaining_sip_configuration_failed ;
                             bSetTimer = true ;
                         }
                         else {
-                           out = "api status\r\n\r\n" ;
+                            out = "api status\r\n\r\n" ;
                             m_state = querying_status ; //we've reached the "normal" querying state
                             bReadAgain = true ;
                         }
@@ -138,9 +143,9 @@ namespace ssp {
                     break ;
                     
                 case querying_status:
-                    if( FsMessage::api == fsMsg.getCategory() && FsMessage::response == fsMsg.getType() ) {
-                        if( !fsMsg.getFsStatus( m_nCurrentSessions, m_nMaxSessions ) ) {
-                            SSP_LOG(log_error) << MY_SIP_COORDS << "Failed to parse freeswitch status from response: " << msg << endl ;
+                    if( FsMessage::api == m_fsMsg.getCategory() && FsMessage::response == m_fsMsg.getType() ) {
+                        if( !m_fsMsg.getFsStatus( m_nCurrentSessions, m_nMaxSessions ) ) {
+                            SSP_LOG(log_error) << MY_SIP_COORDS << "Failed to parse freeswitch status from response: " << data << endl ;
                         }
                         else {
                             SSP_LOG(log_error) << MY_SIP_COORDS << "FS at " << m_strSipAddress << ":" << m_nSipPort << " has active sessions: " << m_nCurrentSessions << ", max sessions: " << m_nMaxSessions << endl ;

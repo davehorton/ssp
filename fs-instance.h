@@ -16,6 +16,7 @@
 #include <boost/enable_shared_from_this.hpp>
 
 #include "ssp.h"
+#include "fs-message.h"
 
 using namespace std ;
 using  boost::asio::ip::tcp ;
@@ -81,6 +82,7 @@ namespace ssp {
         tcp::socket     m_socket;
         tcp::resolver   m_resolver ;
         boost::array<char, 8132> m_buffer ;
+        FsMessage       m_fsMsg ;
     } ;
     
     

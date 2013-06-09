@@ -18,7 +18,7 @@ using namespace std ;
 namespace ssp {
     class FsMessage {
     public:
-        FsMessage( const string& data ) ;
+        FsMessage() ;
         ~FsMessage() ;
  
         enum FS_MSG_CATEGORY {
@@ -43,8 +43,11 @@ namespace ssp {
             err
         } ;
 
+        bool append( const string& data ) ;
         bool isValid() const { return m_bValid; }
         bool isComplete() const { return m_bComplete; }
+        bool isEmpty() const { 0 == m_rawMsg.length() ; }
+    
         FS_MSG_CATEGORY getCategory() const { return m_category ; }
         FS_MSG_TYPE getType() const { return m_type ; }
         bool getReplyText( string& strReplyText ) {
@@ -68,7 +71,6 @@ namespace ssp {
         void parse( const string& data ) throw(string) ;
         
     private:
-        FsMessage() ;
         
         bool parseLeadingInteger( const string& s, unsigned int& number) const ;
         
