@@ -2,6 +2,7 @@
 
 #include "fs-monitor.h"
 #include "ssp-controller.h"
+#include "fs-exception.h"
 
 typedef boost::tokenizer<boost::char_separator<char> > tokenizer ;
 
@@ -64,8 +65,14 @@ namespace ssp {
             
             try {
                 m_ioService.run() ;
-                SSP_LOG(log_notice) << "FsMonitor: io_service run loop ended" << endl ;
+                SSP_LOG(log_notice) << "FsMonitor: io_service run loop ended normally" << endl ;
                 break ;
+            }
+            catch( FsDisconnectException& e ) {
+                SSP_LOG(log_error) << e.what() << endl ;
+            }
+            catch( FsReconnectException& e ) {
+                SSP_LOG(log_notice) << e.what() << endl ;
             }
             catch( exception& e) {
                 SSP_LOG(log_error) << "Error in event thread: " << e.what() << endl ;

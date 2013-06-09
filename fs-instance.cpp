@@ -9,6 +9,7 @@
 #include <boost/bind.hpp>
 
 #include "fs-instance.h"
+#include "fs-exception.h"
 #include "ssp-controller.h"
 
 #define MY_COORDS   m_strAddress << ":" << m_nEventSocketPort << " - "
@@ -20,7 +21,7 @@ namespace ssp {
     FsInstance::FsInstance( boost::asio::io_service& ioService, const string& address, unsigned int port, bool busyOut ):
         m_ioService(ioService), m_socket(ioService), m_resolver(ioService), m_timer(ioService),
         m_strAddress(address), m_nEventSocketPort(port), m_lastCheck(0), m_nSipPort(0),
-        m_bConnected(false), m_nMaxSessions(0), m_nCurrentSessions(0), m_bBusyOut(busyOut), m_state(starting) {
+        m_bConnected(false), m_nMaxSessions(0), m_nCurrentSessions(0), m_bBusyOut(busyOut), m_state(starting),m_bDisconnected(false) {
             
     }
     
@@ -87,6 +88,7 @@ namespace ssp {
         if( !ec ) {
             bool bSetTimer = false ;
             bool bReadAgain = false ;
+            bool bNotifyReconnect = false ;
             string data( m_buffer.data(), bytes_transferred ) ;
             string out ;
            
@@ -104,6 +106,14 @@ namespace ssp {
                                          boost::bind( &FsInstance::read_handler, shared_from_this(), boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred ) ) ;
                 return ;
             } ;
+            
+            if( FsMessage::text == m_fsMsg.getCategory() && FsMessage::disconnect_notice == m_fsMsg.getType() ) {
+                m_socket.close();
+                m_bDisconnected = true ;
+                m_state = starting ;
+                start_timer(1) ;
+                throw new FsDisconnectException( m_strAddress, m_nEventSocketPort, "Freeswitch notified of impending shutdown") ;
+            }
             
             switch( m_state ) {
                 case waiting_for_greeting:
@@ -156,6 +166,7 @@ namespace ssp {
                         else {
                             SSP_LOG(log_info) << MY_SIP_COORDS << "FS at " << m_strSipAddress << ":" << m_nSipPort << " has active sessions: " << m_nCurrentSessions << ", max sessions: " << m_nMaxSessions << endl ;
                             bSetTimer = true ;
+                            bNotifyReconnect = true ;
                         }
                     }
                     break ;
@@ -177,6 +188,7 @@ namespace ssp {
             if( bSetTimer ) {
                 start_timer( 5 ) ;
             }
+            if( bNotifyReconnect ) throw new FsReconnectException( m_strAddress, m_nEventSocketPort, "Successfully reconnected") ;
         }
         else {
             SSP_LOG(log_error) << MY_COORDS  << "Read error; " << ec.message() << ":" << ec.value() << endl;
@@ -190,6 +202,9 @@ namespace ssp {
         if( !ec ) {
             SSP_LOG(log_debug) << "FsInstance timer went off " << m_strAddress << ":" << m_nEventSocketPort << " state is: " << m_state << endl ;
             switch( m_state ) {
+                case starting:
+                    start() ;
+                    break ;
                 case resolve_failed:
                     break ;
                     

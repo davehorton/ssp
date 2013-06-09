@@ -70,6 +70,7 @@ namespace ssp {
         string          m_strAddress ;
         unsigned int    m_nEventSocketPort ;
         time_t          m_lastCheck ;
+        bool            m_bDisconnected ;
         bool            m_bConnected ;
         unsigned int    m_nMaxSessions ;
         unsigned int    m_nCurrentSessions ;
@@ -77,6 +78,7 @@ namespace ssp {
         unsigned int    m_nSipPort ;
         bool            m_bBusyOut ;
         CONNECTION_STATE    m_state ;
+        
         
         boost::asio::io_service& m_ioService;
         tcp::socket     m_socket;
