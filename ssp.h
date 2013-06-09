@@ -27,7 +27,7 @@
 #include <boost/log/sinks/sync_frontend.hpp>
 #include <boost/log/sinks/syslog_backend.hpp>
 #include <boost/log/sources/severity_logger.hpp>
-
+#include <boost/tokenizer.hpp>
 #include <boost/thread.hpp>
 
 
@@ -43,6 +43,7 @@ namespace ssp {
     
     class SipLbController ;
     
+    typedef boost::tokenizer<boost::char_separator<char> > tokenizer ;
     
 	enum severity_levels {
 		log_notice,

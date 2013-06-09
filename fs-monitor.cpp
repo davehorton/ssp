@@ -9,7 +9,6 @@ namespace ssp {
     
     
     FsMonitor::FsMonitor() {
-        
     }
     
     FsMonitor::~FsMonitor() {
@@ -57,26 +56,21 @@ namespace ssp {
     void FsMonitor::threadFunc() {
         SSP_LOG(log_info) << "Starting thread function, hardware concurrency: " << boost::thread::hardware_concurrency() <<  endl ;
         
+        /* to make sure the event loop doesn't terminate when there is no work to do */
+        boost::asio::io_service::work work(m_ioService);
         
-        
-        try {
-            while(true) {
-                SSP_LOG(log_debug) << "Querying freeswitch servers" << endl ;
-                
-                /* health check on freeswitch servers */
-                {
-                    boost::lock_guard<boost::mutex> lock(m_mutex) ;
-                    
-                }
-                
-                
-                
-                boost::this_thread::sleep( boost::posix_time::seconds(5) ) ;
-            }
+        for(;;) {
             
-        } catch( boost::thread_interrupted&) {
-            SSP_LOG(log_notice) << "FsMonitor thread stopping" << endl ;
+            //try {
+                m_ioService.run() ;
+                break ;
+            //}
+            //catch( my_exception& e) {
+           //     SSP_LOG(log_error) << "Error in event thread: " << e << endl ;
+            //    break ;
+            //}
         }
+        
     }
     
 }

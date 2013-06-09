@@ -37,6 +37,7 @@ namespace ssp {
         
         
     private:
+        
         deque< boost::shared_ptr<FsInstance> >  m_servers ;
         boost::thread               m_thread ;
         boost::mutex                m_mutex ;

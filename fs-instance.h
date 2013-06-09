@@ -29,6 +29,7 @@ namespace ssp {
         
         /* getters / setters */
         const string& getAddress() const { return m_strAddress; }
+        const string& getSipAddress() const { return m_strSipAddress; }
         unsigned int getEventSocketPort() const { return m_nEventSocketPort ; }
         time_t getLastCheck() const { return m_lastCheck ; }
         bool isConnected() const { return m_bConnected; }
@@ -41,8 +42,25 @@ namespace ssp {
         void resolve_handler( const boost::system::error_code& ec, boost::asio::ip::tcp::resolver::iterator it) ;
         void connect_handler( const boost::system::error_code& ec ) ;
         void read_handler( const boost::system::error_code& ec, std::size_t bytes_transferred ) ;
+        void timer_handler(const boost::system::error_code& error) ;
     protected:
         
+        enum CONNECTION_STATE {
+            starting,
+            resolving,
+            resolve_failed,
+            connecting,
+            connect_failed,
+            waiting_for_greeting,
+            authenticating,
+            authentication_failed,
+            obtaining_sip_configuration,
+            obtaining_sip_configuration_failed,
+            querying_status,
+            disconnecting
+        } ;
+        
+        void start_timer( unsigned int nSeconds ) ;
         
     private:
         string          m_strAddress ;
@@ -51,8 +69,11 @@ namespace ssp {
         bool            m_bConnected ;
         unsigned int    m_nMaxSessions ;
         unsigned int    m_nCurrentSessions ;
+        string          m_strSipAddress ;
         unsigned int    m_nSipPort ;
         bool            m_bBusyOut ;
+        CONNECTION_STATE    m_state ;
+        
         boost::asio::io_service& m_ioService;
         tcp::socket     m_socket;
         boost::array<char, 8132> m_buffer ;
