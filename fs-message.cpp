@@ -108,7 +108,7 @@ namespace ssp {
         }
     }
     
-    bool FsMessage::getSipProfile( const string& profile, string& address, unsigned int port ) const {
+    bool FsMessage::getSipProfile( const string& profile, string& address, unsigned int& port ) const {
         //SSP_LOG(log_debug) << "searching for profile " << profile << " in content " << m_strContent << endl ;
         tokenizer tok( m_strContent, boost::char_separator<char>("\n")) ;
         for( tokenizer::iterator it = tok.begin(); it != tok.end(); ++it ) {

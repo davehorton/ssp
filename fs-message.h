@@ -63,7 +63,7 @@ namespace ssp {
         }
         FS_REPLY_STATUS getReplyStatus() const { return m_replyStatus; }
         
-        bool getSipProfile( const string& profile, string& address, unsigned int port ) const ;
+        bool getSipProfile( const string& profile, string& address, unsigned int& port ) const ;
         bool getFsStatus( unsigned int& nCurrentSessions, unsigned int& nMaxSessions ) const ;
         
         
