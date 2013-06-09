@@ -47,7 +47,8 @@ namespace ssp {
         bool isValid() const { return m_bValid; }
         bool isComplete() const { return m_bComplete; }
         bool isEmpty() const { 0 == m_rawMsg.length() ; }
-    
+        void reset() ;
+   
         FS_MSG_CATEGORY getCategory() const { return m_category ; }
         FS_MSG_TYPE getType() const { return m_type ; }
         bool getReplyText( string& strReplyText ) {
@@ -67,8 +68,7 @@ namespace ssp {
         
         
     protected:
-        void reset() ;
-        void parse( const string& data ) throw(string) ;
+         void parse( const string& data ) throw(string) ;
         
     private:
         
