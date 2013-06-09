@@ -47,7 +47,7 @@ namespace ssp {
             m_strContent.append( data ) ;
         }
         else {
-            boost::char_separator<char> sep("\r\n") ;
+            boost::char_separator<char> sep("\n") ;
             tokenizer tok( m_rawMsg, sep) ;
             int i = 0 ;
             for( tokenizer::iterator it = tok.begin(); it != tok.end(); ++i, ++it ) {
@@ -90,7 +90,7 @@ namespace ssp {
                     }
                     else {
                         m_strContent.append( line ) ;
-                        m_strContent.append( "\r\n" ) ;
+                        m_strContent.append( "\n" ) ;
                     }
                 }
             }
@@ -104,13 +104,13 @@ namespace ssp {
             m_bComplete = true ;
         }
         else {
-            SSP_LOG(log_debug) << "read partial message; Content-Length is " << m_nContentLength << " but read only " << m_strContent.length() << endl ;
+            SSP_LOG(log_debug) << "read partial message; Content-Length is " << m_nContentLength << " but read " << m_strContent.length() << endl ;
         }
     }
     
     bool FsMessage::getSipProfile( const string& profile, string& address, unsigned int port ) const {
         //SSP_LOG(log_debug) << "searching for profile " << profile << " in content " << m_strContent << endl ;
-        tokenizer tok( m_strContent, boost::char_separator<char>("\r\n")) ;
+        tokenizer tok( m_strContent, boost::char_separator<char>("\n")) ;
         for( tokenizer::iterator it = tok.begin(); it != tok.end(); ++it ) {
             //SSP_LOG(log_debug) << "line: " << *it << endl ;
             tokenizer tok2( *it, boost::char_separator<char>(" \t")) ;
@@ -133,7 +133,7 @@ namespace ssp {
         return false ;
     }
     bool FsMessage::getFsStatus( unsigned int& nCurrentSessions, unsigned int& nMaxSessions ) const {
-        tokenizer tok( m_strContent, boost::char_separator<char>("\r\n")) ;
+        tokenizer tok( m_strContent, boost::char_separator<char>("\n")) ;
         tokenizer::iterator it = tok.begin();
         
         if( distance( tok.begin(), tok.end() ) < 5 ) {
