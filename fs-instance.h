@@ -79,6 +79,7 @@ namespace ssp {
         
         boost::asio::io_service& m_ioService;
         tcp::socket     m_socket;
+        tcp::resolver   m_resolver ;
         boost::array<char, 8132> m_buffer ;
     } ;
     

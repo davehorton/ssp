@@ -16,7 +16,7 @@ namespace ssp {
  
  
     FsInstance::FsInstance( boost::asio::io_service& ioService, const string& address, unsigned int port, bool busyOut ):
-        m_ioService(ioService), m_socket(ioService),
+        m_ioService(ioService), m_socket(ioService), m_resolver(ioService), 
         m_strAddress(address), m_nEventSocketPort(port), m_lastCheck(0), m_nSipPort(0),
         m_bConnected(false), m_nMaxSessions(0), m_nCurrentSessions(0), m_bBusyOut(busyOut), m_state(starting) {
             
@@ -31,9 +31,8 @@ namespace ssp {
         
         ostringstream convert ;
         convert << m_nEventSocketPort ;
-        boost::asio::ip::tcp::resolver resolver(m_ioService) ;
         boost::asio::ip::tcp::resolver::query query( m_strAddress, convert.str()) ;
-        resolver.async_resolve(query, boost::bind(&FsInstance::resolve_handler, shared_from_this(), boost::asio::placeholders::error,  boost::asio::placeholders::iterator) ) ;
+        m_resolver.async_resolve(query, boost::bind(&FsInstance::resolve_handler, shared_from_this(), boost::asio::placeholders::error,  boost::asio::placeholders::iterator) ) ;
         
     }
 
