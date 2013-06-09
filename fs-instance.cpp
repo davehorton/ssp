@@ -179,13 +179,14 @@ namespace ssp {
             }
         }
         else {
-            SSP_LOG(log_error) << MY_COORDS  << "Read error: " << ec.message() << endl;
+            SSP_LOG(log_error) << MY_COORDS  << "Read error; " << ec.message() << ":" << ec.value() << endl;
         }
     }
     
     void FsInstance::timer_handler(const boost::system::error_code& ec) {
         bool bReadAgain = false ;
         bool bSetTimer = false ;
+        string out ;
         if( !ec ) {
             SSP_LOG(log_debug) << "FsInstance timer went off " << m_strAddress << ":" << m_nEventSocketPort << " state is: " << m_state << endl ;
             switch( m_state ) {
@@ -206,7 +207,12 @@ namespace ssp {
                     
                 default:
                     bReadAgain = true ;
-                    boost::asio::write( m_socket, boost::asio::buffer("api status\r\n\r\n")) ;
+                    out ="api status\r\n\r\n" ;
+            }
+            if( out.length() > 0 ) {
+                if( m_strSipAddress.length() > 0 )  SSP_LOG(log_debug) <<  MY_SIP_COORDS  << "Write " << out.length() << " bytes" << endl << out << endl ;
+                else SSP_LOG(log_debug) <<  MY_COORDS  << "Write " << out.length() << " bytes" << endl << out << endl ;
+                boost::asio::write( m_socket, boost::asio::buffer(out) ) ;
             }
             if( bReadAgain ) {
                 m_socket.async_read_some(boost::asio::buffer(m_buffer),
