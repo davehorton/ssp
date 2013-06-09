@@ -45,7 +45,7 @@ namespace ssp {
             m_strContent.append( data ) ;
         }
         else {
-            boost::char_separator<char> sep("\r\n","\r\n") ;
+            boost::char_separator<char> sep("\r\n","\r\n",boost::keep_empty_tokens) ;
             tokenizer tok( m_rawMsg, sep) ;
             int i = 0 ;
             for( tokenizer::iterator it = tok.begin(); it != tok.end(); ++i, ++it ) {
