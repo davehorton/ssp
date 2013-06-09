@@ -104,7 +104,7 @@ namespace ssp {
             m_bComplete = true ;
         }
         else {
-            SSP_LOG(log_debug) << "read partial message" << endl ;
+            SSP_LOG(log_debug) << "read partial message; Content-Length is " << m_nContentLength << " but read only " << m_strContent.length() << endl ;
         }
     }
     
