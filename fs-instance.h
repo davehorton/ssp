@@ -43,7 +43,7 @@ namespace ssp {
         
         
         void resolve_handler( const boost::system::error_code& ec, boost::asio::ip::tcp::resolver::iterator it) ;
-        void connect_handler( const boost::system::error_code& ec ) ;
+        void connect_handler( const boost::system::error_code& ec, boost::asio::ip::tcp::resolver::iterator it ) ;
         void read_handler( const boost::system::error_code& ec, std::size_t bytes_transferred ) ;
         void timer_handler(const boost::system::error_code& error) ;
     protected:

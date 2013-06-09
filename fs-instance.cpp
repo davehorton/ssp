@@ -39,11 +39,16 @@ namespace ssp {
     void FsInstance::resolve_handler( const boost::system::error_code& ec, boost::asio::ip::tcp::resolver::iterator it) {
  
         if( !ec ) {
-            SSP_LOG(log_debug) << "Successfully resolved FS server at " << m_strAddress << ":" << m_nEventSocketPort << " --> " << ec << endl;
+            SSP_LOG(log_debug) << "Successfully resolved FS server at " << m_strAddress << ":" << m_nEventSocketPort ;
             
             m_state = connecting ;
-            m_socket.async_connect( *it, boost::bind(&FsInstance::connect_handler, shared_from_this(), boost::asio::placeholders::error) ) ;
             
+            /*
+                Attempt a connection to the first endpoint in the list. 
+                Each endpoint will be tried until we successfully establish a connection.
+            */
+            tcp::endpoint endpoint = *it;
+            m_socket.async_connect( endpoint, boost::bind(&FsInstance::connect_handler, shared_from_this(), boost::asio::placeholders::error, ++it) ) ;
         }
         else {
             SSP_LOG(log_error) << "Unable to resolve FS at " << m_strAddress << ":" << m_nEventSocketPort << " --> " << ec.message() << endl;
@@ -53,7 +58,7 @@ namespace ssp {
          }
     }
     
-    void FsInstance::connect_handler( const boost::system::error_code& ec ) {
+    void FsInstance::connect_handler( const boost::system::error_code& ec, tcp::resolver::iterator it ) {
         if( !ec ) {
             SSP_LOG(log_debug) << "Successfully connected to FS server at " << m_strAddress << ":" << m_nEventSocketPort << " --> " << ec << endl;
             
@@ -62,9 +67,15 @@ namespace ssp {
             m_socket.async_read_some(boost::asio::buffer(m_buffer),
                     boost::bind( &FsInstance::read_handler, shared_from_this(), boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred ) ) ;
         }
+        else if (it != tcp::resolver::iterator()) {
+            /* The connection failed. Try the next endpoint in the list. */
+            m_socket.close();
+            tcp::endpoint endpoint = *it;
+            m_socket.async_connect( endpoint, boost::bind(&FsInstance::connect_handler, shared_from_this(), boost::asio::placeholders::error, ++it) ) ;         
+        }
         else {
             SSP_LOG(log_error) << "Unable to connect to FS at " << m_strAddress << ":" << m_nEventSocketPort << " --> " << ec.message() << endl;
-
+    
             m_state = connect_failed ;
             start_timer( 5 ) ;
          }
