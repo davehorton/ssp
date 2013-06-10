@@ -32,7 +32,7 @@ namespace ssp {
         
         const char* what() const throw() {
             ostringstream oss ;
-            oss << m_strAddress << ":" << m_nEventSocketPort << " - Error: " << m_strReason ;
+            oss << m_strAddress << ":" << m_nEventSocketPort << "--> " << m_strReason ;
             if( boost::system::errc::success != m_ec ) {
                 oss << "(error code: " << m_ec.value() << ")" ;
             }
