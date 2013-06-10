@@ -69,13 +69,13 @@ namespace ssp {
                 break ;
             }
             catch( FsDisconnectException& e ) {
-                SSP_LOG(log_error) << e.what() << endl ;
+                SSP_LOG(log_error) << string( e.what() ) << endl ;
             }
             catch( FsReconnectException& e ) {
-                SSP_LOG(log_notice) << e.what() << endl ;
+                SSP_LOG(log_notice) << string( e.what() ) << endl ;
             }
             catch( exception& e) {
-                SSP_LOG(log_error) << "Error in event thread: " << e.what() << endl ;
+                SSP_LOG(log_error) << "Error in event thread: " << string( e.what() ) << endl ;
                 break ;
             }
         }

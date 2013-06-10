@@ -113,7 +113,7 @@ namespace ssp {
                 m_bDisconnected = true ;
                 m_state = starting ;
                 start_timer(1) ;
-                throw FsDisconnectException( m_strAddress, m_nEventSocketPort, "Freeswitch notified of impending shutdown") ;
+                throw FsDisconnectException( m_strAddress, m_nEventSocketPort, "Disconnected due to freeswitch shutting down") ;
             }
             
             switch( m_state ) {
@@ -192,7 +192,7 @@ namespace ssp {
             if( bSetTimer ) {
                 start_timer( 5 ) ;
             }
-            if( bNotifyReconnect ) throw FsReconnectException( m_strAddress, m_nEventSocketPort, "Successfully reconnected") ;
+            if( bNotifyReconnect ) throw FsReconnectException( m_strAddress, m_nEventSocketPort, "Reconnected") ;
         }
         else {
             SSP_LOG(log_error) << MY_COORDS  << "Read error; " << ec.message() << ":" << ec.value() << endl;
