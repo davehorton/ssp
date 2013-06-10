@@ -31,7 +31,8 @@ namespace ssp {
     
     void FsInstance::start() {
         m_state = resolving ;
-        
+        m_fsMsg.reset() ;
+      
         ostringstream convert ;
         convert << m_nEventSocketPort ;
         boost::asio::ip::tcp::resolver::query query( m_strAddress, convert.str()) ;
