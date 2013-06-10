@@ -113,7 +113,7 @@ namespace ssp {
                 m_bDisconnected = true ;
                 m_state = starting ;
                 start_timer(1) ;
-                throw FsDisconnectException( m_strAddress, m_nEventSocketPort, "Disconnected due to freeswitch shutting down") ;
+                throw FsDisconnectException( m_strAddress, m_nEventSocketPort, "Disconnected; freeswitch was shut down") ;
             }
             
             switch( m_state ) {
