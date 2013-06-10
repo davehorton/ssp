@@ -363,7 +363,9 @@ namespace ssp {
             return  ;
         }
         
+        SSP_LOG(log_notice) << "Starting sofia event loop" << endl ;
         su_root_run( m_root ) ;
+        SSP_LOG(log_notice) << "Sofia event loop ended" << endl ;
         
         nta_agent_destroy( m_nta ) ;
     }
