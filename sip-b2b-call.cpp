@@ -17,16 +17,12 @@ namespace ssp {
                             sip_call_id_t* icid,
                             nta_leg_t* oleg,
                             nta_outgoing_t* orq,
-                            sip_call_id_t* ocid,
-                            const vector<string>& routes,
-                            peer_type peer ) : m_legInbound(ileg),
+                            sip_call_id_t* ocid ) : m_legInbound(ileg),
                 m_irq(irq),
                 m_callidInbound(icid->i_id),
                 m_legOutbound(oleg),
                 m_orq(orq),
                 m_callidOutbound(ocid->i_id),
-                m_routes(routes),
-                m_initiatingPeer(peer),
                 m_lastStatus( 0 )
                 {
         

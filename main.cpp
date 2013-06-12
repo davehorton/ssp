@@ -13,7 +13,7 @@ void handleSigHup( int signal ) {
 int main( int argc, char *argv[] ) {
 	theOneAndOnlyController = new SipLbController( argc, argv ) ;
 	signal( SIGHUP, handleSigHup ) ;
-	theOneAndOnlyController->run() ;
+	theOneAndOnlyController->run2() ;
 	return 0 ;
 }
 

@@ -320,7 +320,8 @@ namespace ssp {
                 m_sysLogPort = pt.get<unsigned int>("ssp.logging.syslog.address", 516) ;
                 m_syslogFacility = pt.get<string>("ssp.logging.syslog.facility","local7") ;
                 
-                m_sipUrl = pt.get<string>("ssp.sip.contact", "sip:*") ;
+                m_inboundSipUrl = pt.get<string>("ssp.inbound.sip.contact", "sip:*") ;
+                m_outboundSipUrl = pt.get<string>("ssp.outbound.sip.contact", "sip:*") ;
                 
                 string ibStrategy = pt.get<string>("ssp.routing.inbound.<xmlattr>.strategy", "") ;
                 string ibTarget = pt.get<string>("ssp.routing.inbound.<xmlattr>.target", "") ;
@@ -496,7 +497,8 @@ namespace ssp {
         const string& getSyslogAddress() const { return m_syslogAddress; }
         unsigned int getSyslogPort() const { return m_sysLogPort ; }
         
-        const string& getSipUrl() const { return m_sipUrl; }
+        const string& getInboundSipUrl() const { return m_inboundSipUrl; }
+        const string& getOutboundSipUrl() const { return m_outboundSipUrl; }
         
         bool getSyslogTarget( std::string& address, unsigned int& port ) const {
             address = m_syslogAddress ;
@@ -689,7 +691,8 @@ namespace ssp {
         string m_syslogAddress ;
         unsigned int m_sysLogPort ;
         string m_syslogFacility ;
-        string m_sipUrl ;
+        string m_inboundSipUrl ;
+        string m_outboundSipUrl ;
         CustomerDnisMap_t m_mapCustomerDnis ;
         CarrierServerMap_t m_mapInboundCarrier ;
         CarrierServerMap_t m_mapOutboundCarrier ;
@@ -712,11 +715,15 @@ namespace ssp {
         return m_pimpl->isValid() ;
     }
     
-    bool SspConfig::getSipUrl( std::string& sipUrl ) const {
-	sipUrl = m_pimpl->getSipUrl() ;
-	return true ; 
+    bool SspConfig::getInboundSipUrl( std::string& sipUrl ) const {
+        sipUrl = m_pimpl->getInboundSipUrl() ;
+        return true ;
     }
-   
+    bool SspConfig::getOutboundSipUrl( std::string& sipUrl ) const {
+        sipUrl = m_pimpl->getOutboundSipUrl() ;
+        return true ;
+    }
+    
     bool SspConfig::getSyslogTarget( std::string& address, unsigned int& port ) const {
         return m_pimpl->getSyslogTarget( address, port ) ;
     }

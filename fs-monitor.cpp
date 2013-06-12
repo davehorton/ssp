@@ -79,7 +79,19 @@ namespace ssp {
                 break ;
             }
         }
-        
     }
+    bool FsMonitor::getAvailableServer( boost::shared_ptr<FsInstance>& server ) {
+        boost::lock_guard<boost::mutex> lock(m_mutex) ;
+        for( deque< boost::shared_ptr<FsInstance> >::const_iterator it = m_servers.begin(); it != m_servers.end(); it++) {
+            boost:shared_ptr<FsInstance> fs = *it ;
+            if( fs->isAvailable() ) {
+                server = fs ;
+                return true ;
+            }
+        }
+        
+        return false ;
+    }
+
     
 }

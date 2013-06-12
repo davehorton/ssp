@@ -26,10 +26,10 @@ namespace ssp {
         
         bool isValid() ;
 
-        bool getSipUrl( std::string& sipUrl ) const ;
+        bool getInboundSipUrl( std::string& sipUrl ) const ;
+        bool getOutboundSipUrl( std::string& sipUrl ) const ;
         bool getSyslogTarget( std::string& address, unsigned int& port ) const ;
         bool getSyslogFacility( sinks::syslog::facility& facility ) const ;
-        bool getSipConfiguration( std::string& address, unsigned int& port ) const ;
         bool getCustomer( const std::string& dnis, std::string& customer) const ;
         bool getCarrier( const std::string& sourceAddress, std::string& customer) const ;
         bool getInboundRoutes( const std::string& sourceAddress, const std::string& dnis, const std::string& ani, std::vector<std::string>& routes, routing_strategy& strategy, routing_error& error ) const ;

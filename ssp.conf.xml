@@ -4,10 +4,15 @@
     Note: all configuration information is optional, with the exception that there must be at least one 'appserver' element
     If no other configuration is supplied, inbound routing is round-robin and outbound routing is same-in-same-out-ip-address
     -->
+    <inbound>
+        <sip>
+            <contact>sip:209.251.49.135</contact>
+        </sip>        
+
     
-    <sip>
-        <contact>sip:209.251.49.135</contact>
-    </sip>
+    
+    
+    </inbound>
     
     <logging>
         <syslog>

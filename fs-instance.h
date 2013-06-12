@@ -41,6 +41,7 @@ namespace ssp {
         unsigned int getMaxSessions() const { return m_nMaxSessions; }
         unsigned int getCurrentSessions() const { return m_nCurrentSessions; }
         unsigned int getSipPort() const { return m_nSipPort ; }
+        bool isAvailable() const { return querying_status == m_state && m_nCurrentSessions < m_nMaxSessions - 2 ;}
         
         
         void resolve_handler( const boost::system::error_code& ec, boost::asio::ip::tcp::resolver::iterator it) ;

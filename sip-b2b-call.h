@@ -14,8 +14,7 @@ namespace ssp {
 	
     class SipB2bCall {
     public:
-        SipB2bCall( nta_leg_t* ileg, nta_incoming_t* irq, sip_call_id_t* icid, nta_leg_t* oleg, nta_outgoing_t* orq, sip_call_id_t* ocid,
-                   const vector<string>& routes, peer_type peer ) ;
+        SipB2bCall( nta_leg_t* ileg, nta_incoming_t* irq, sip_call_id_t* icid, nta_leg_t* oleg, nta_outgoing_t* orq, sip_call_id_t* ocid ) ;
         ~SipB2bCall() ;
 
         bool operator==(const SipB2bCall& other ) const {
@@ -40,8 +39,6 @@ namespace ssp {
         string m_callidOutbound ;
         
         int m_lastStatus ;
-        vector<string> m_routes ;
-        peer_type m_initiatingPeer ;
         
     private:
         SipB2bCall() {}

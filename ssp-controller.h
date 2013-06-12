@@ -33,6 +33,7 @@
 #include "ssp-config.h"
 #include "sip-b2b-call.h"
 #include "fs-monitor.h"
+#include "sip-inbound-call.h"
 
 using namespace std ;
 
@@ -41,7 +42,9 @@ namespace ssp {
     using boost::shared_ptr;
 	using boost::scoped_ptr;
         
-     typedef boost::unordered_map<string, shared_ptr<SipB2bCall> > dialog_map_t ;
+    typedef boost::unordered_map<string, shared_ptr<SipB2bCall> > dialog_map_t ;
+
+    typedef boost::unordered_map<string, shared_ptr<SipInboundCall> > iip_map_t ; //invite-in-progress
     
 
 	class SipLbController : private boost::noncopyable{
@@ -51,22 +54,29 @@ namespace ssp {
 	
 		void handleSigHup( int signal ) ;
 		void run() ;
+		void run2() ;
 		src::severity_logger_mt<severity_levels>& getLogger() const { return *m_logger; }
         src::severity_logger_mt< severity_levels >* createLogger() ;
         
         int processRequestOutsideDialog( nta_leg_t* leg, nta_incoming_t* irq, sip_t const *sip) ;
         int processRequestInsideDialog( nta_leg_t* leg, nta_incoming_t* irq, sip_t const *sip) ;
         int processUacMsgInsideDialog( nta_outgoing_t* request, sip_t const *sip ) ;
+        int statelessCallback( msg_t *msg, sip_t *sip ) ;
         
         bool removeDialog( const SipB2bCall* dialog ) ;
+        
+        bool isInboundProxy() { return m_bInbound; }
+        bool isOutboundProxy() { return m_bOutbound; }
         
 	private:
 		SipLbController() {} ; 
 
         int processNewInvite( nta_leg_t* leg, nta_incoming_t* irq, sip_t const *sip) ;
-        int processNewIncomingInvite( nta_leg_t* leg, nta_incoming_t* irq, sip_t const *sip) ;
+        //int processNewIncomingInvite( nta_leg_t* leg, nta_incoming_t* irq, sip_t const *sip) ;
         int processNewOutgoingInvite( nta_leg_t* leg, nta_incoming_t* irq, sip_t const *sip) ;
-        
+        int processNewInboundInvite( nta_leg_t* leg, nta_incoming_t* irq, sip_t const *sip) ;
+       
+        sip_request_t* generateInboundRequestUri( sip_request_t* const oruri, const string& address, unsigned int port ) ;
         sip_from_t* generateOutgoingFrom( sip_from_t* const incomingFrom ) ;
         sip_to_t* generateOutgoingTo( sip_to_t* const incomingTo ) ;
         sip_contact_t* generateOutgoingContact( sip_contact_t* const incomingContact ) ;
@@ -92,10 +102,15 @@ namespace ssp {
         su_home_t* 	m_home ;
         su_root_t* 	m_root ;
         nta_agent_t*	m_nta ;
+        string          m_my_via ;
+        string          m_my_nameaddr ;
+        sip_contact_t*  m_my_contact ;
+
         
         /* these are invites which are in the process of establishing a dialog */
-        //call_id_tuple_map_t m_mapInvitesInProgress ;
         dialog_map_t m_mapDialog ;
+        
+        iip_map_t   m_mapInvitesInProgress ;
         
         boost::unordered_set< shared_ptr<SipB2bCall> > m_setDiscardedDialogs ;
         

@@ -31,6 +31,8 @@ namespace ssp {
         
         void reset( const deque<string>& servers ) ;
         
+        bool getAvailableServer( boost::shared_ptr<FsInstance>& server ) ;
+        
         
     protected:
         void threadFunc() ;
@@ -39,6 +41,7 @@ namespace ssp {
     private:
         
         deque< boost::shared_ptr<FsInstance> >  m_servers ;
+        
         boost::thread               m_thread ;
         boost::mutex                m_mutex ;
         boost::asio::io_service     m_ioService ;
