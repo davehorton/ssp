@@ -370,7 +370,7 @@ BOOST_LOG_ANONYMOUS_NAMESPACE {
         };
 
         // The packet size is mandated in RFC3164, plus one for the terminating zero
-        char packet[1025];
+        char packet[4097];
         std::size_t packet_size = boost::log::aux::snprintf(
             packet,
             sizeof(packet),
