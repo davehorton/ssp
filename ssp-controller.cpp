@@ -596,69 +596,63 @@ namespace ssp {
         if( sip->sip_request ) {
             
             /* requests */
-            
-            if( sip->sip_request->rq_method == sip_method_ack ) {
-                /* forward ACKs for non-success response */
-                string strCallId = sip->sip_call_id->i_id ;
-                iip_map_t::const_iterator it = m_mapInvitesInProgress.find( strCallId ) ;
-                if( m_mapInvitesInProgress.end() == it ) {
-                    SSP_LOG(log_error) << "Unable to find INVITE transaction for ACK with callid: " << strCallId << endl ;
-                    nta_msg_discard(m_nta, msg);
-                    return 0 ;
-                }
+
+            /* check if we already have a route for this callid */
+            string strCallId = sip->sip_call_id->i_id ;
+            iip_map_t::const_iterator it = m_mapInvitesInProgress.find( strCallId ) ;
+            if( m_mapInvitesInProgress.end() != it ) {
                 shared_ptr<SipInboundCall> iip = it->second ;
                 shared_ptr<FsInstance> server = iip->getServer() ;
-                
-                /* forward the ACK to the server (this should be for a non-success response, as ACKs for successful transactions go straight there */
                 string strUrlDest = iip->getDestUrl() ;
-                SSP_LOG(log_debug) << "Forwarding ACK to " << strUrlDest << endl ;
+                SSP_LOG(log_debug) << "Forwarding request to " << strUrlDest << endl ;
                 int rv = nta_msg_tsend( m_nta, msg, URL_STRING_MAKE(strUrlDest.c_str()), TAG_NULL(), TAG_END() ) ;
                 if( 0 != rv ) {
                     SSP_LOG(log_error) << "Error forwarding message: " << rv ;
                 }
-                m_mapInvitesInProgress.erase( it ) ;
-                SSP_LOG(log_debug) << "There are now " << m_mapInvitesInProgress.size() << " invites in progress" << endl ;
                 return 0 ;
             }
-            else if( sip->sip_request->rq_method == sip_method_invite ) {
-                /* select a freeswitch server */
-                boost::shared_ptr<FsInstance> server ;
-                if( !m_fsMonitor.getAvailableServer( server ) ) {
-                    SSP_LOG(log_warning) << "No available server for incoming call; returning to carrier for busy handling " << sip->sip_call_id->i_id  << endl ;
-                    return 486 ;
+
+            /* new request */
+            switch (sip->sip_request->rq_method ) {
+                case sip_method_options:
+                    return 200 ;
+                    
+                case sip_method_invite:
+                {
+                    
+                    /* select a freeswitch server */
+                    boost::shared_ptr<FsInstance> server ;
+                    if( !m_fsMonitor.getAvailableServer( server ) ) {
+                        SSP_LOG(log_warning) << "No available server for incoming call; returning to carrier for busy handling " << sip->sip_call_id->i_id  << endl ;
+                        return 486 ;
+                    }
+                    
+                    ostringstream dest ;
+                    dest << "sip:" << sip->sip_to->a_url[0].url_user << "@" << server->getSipAddress() << ":" << server->getSipPort() ;
+                    SSP_LOG(log_notice) << "sending outbound invite to request uri " << dest.str() << endl ;
+                    string url = dest.str() ;
+                    const char* szDest = url.c_str() ;
+                    
+                    int rv = nta_msg_tsend( m_nta,
+                                           msg,
+                                           URL_STRING_MAKE(szDest),
+                                           TAG_NULL(),
+                                           TAG_END() ) ;
+                    if( 0 != rv ) {
+                        SSP_LOG(log_error) << "Error forwarding message: " << rv ;
+                        return rv ;
+                    }
+                    
+                    shared_ptr<SipInboundCall> iip = boost::make_shared<SipInboundCall>( SipInboundCall( sip->sip_call_id->i_id, dest.str(),  server ) ) ;
+                    m_mapInvitesInProgress.insert( iip_map_t::value_type( iip->getCallId(), iip )) ;
+                    SSP_LOG(log_debug) << "There are now " << m_mapInvitesInProgress.size() << " invites in progress" << endl ;
+                    return 0 ;
                 }
-                
-                ostringstream dest ;
-                dest << "sip:" << sip->sip_to->a_url[0].url_user << "@" << server->getSipAddress() << ":" << server->getSipPort() ;
-                SSP_LOG(log_notice) << "sending outbound invite to request uri " << dest.str() << endl ;
-                string url = dest.str() ;
-                const char* szDest = url.c_str() ;
-                
-                //sip_request_t* ruri = generateInboundRequestUri( sip->sip_request, server->getSipAddress(), server->getSipPort() ) ;
-                
-                //ostringstream request_line ;
-                //request_line << "INVITE " << dest.str() << " SIP/2.0" ;
-                //SSP_LOG(log_notice) << "new request uri " << request_line.str() << endl ;
-                //sip_request_t* ruri = sip_request_make(m_home, request_line.str().c_str() ) ;
-                //sip->sip_request = ruri ;
-                int rv = nta_msg_tsend( m_nta,
-                                       msg,
-                                       URL_STRING_MAKE(szDest),
-                                       TAG_NULL(),
-                                       TAG_END() ) ;
-                if( 0 != rv ) {
-                    SSP_LOG(log_error) << "Error forwarding message: " << rv ;
-                    return rv ;
-                }
-                //TODO: free ruri
-                
-                shared_ptr<SipInboundCall> iip = boost::make_shared<SipInboundCall>( SipInboundCall( sip->sip_call_id->i_id, dest.str(),  server ) ) ;
-                m_mapInvitesInProgress.insert( iip_map_t::value_type( iip->getCallId(), iip )) ;
-                SSP_LOG(log_debug) << "There are now " << m_mapInvitesInProgress.size() << " invites in progress" << endl ;
-                return 0 ;               
+                    
+                default:
+                    SSP_LOG(log_error) << "Error: received new request that was not an INVITE or OPTIONS ";
+                    break;
             }
-            
-            //TODO: need to deal with cancels, pracks
         }
         else {
             
