@@ -10,7 +10,7 @@ ssp_LDADD= ${srcdir}/deps/sofia-sip-1.12.11/libsofia-sip-ua/.libs/libsofia-sip-u
 #	cd ${srcdir}/deps/boost_1_52_0 && b2 --clean
 
 ${srcdir}/deps/boost_1_52_0/stage/lib/libboost_thread.a ${srcdir}/deps/boost_1_52_0/stage/lib/libboost_system.a ${srcdir}/deps/boost_1_52_0/stage/lib/libboost_log.a:
-	cd ${srcdir}/deps/boost_1_52_0 && b2 stage
+	cd ${srcdir}/deps/boost_1_52_0 && ./b2 stage
 
 ${srcdir}/deps/sofia-sip-1.12.11/libsofia-sip-ua/.libs/libsofia-sip-ua.a:
 	cd ${srcdir}/deps/sofia-sip-1.12.11 && $(MAKE)
