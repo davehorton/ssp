@@ -62,6 +62,7 @@ namespace ssp {
         int processRequestInsideDialog( nta_leg_t* leg, nta_incoming_t* irq, sip_t const *sip) ;
         int processUacMsgInsideDialog( nta_outgoing_t* request, sip_t const *sip ) ;
         int statelessCallback( msg_t *msg, sip_t *sip ) ;
+        int processTimer() ;
         
         bool removeDialog( const SipB2bCall* dialog ) ;
         

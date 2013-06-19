@@ -11,6 +11,7 @@ namespace ssp {
     class SipB2bCall ;
 }
 
+#define SU_ROOT_MAGIC_T ssp::SipLbController
 #define NTA_AGENT_MAGIC_T ssp::SipLbController
 #define NTA_LEG_MAGIC_T ssp::SipLbController
 #define NTA_OUTGOING_MAGIC_T ssp::SipB2bCall
@@ -111,6 +112,11 @@ namespace {
     int stateless_callback( nta_leg_magic_t* controller, nta_agent_t* agent, msg_t *msg, sip_t *sip) {
         return controller->statelessCallback( msg, sip ) ;
     }
+    
+    void timerHandler(su_root_magic_t *controller, su_timer_t *timer, su_timer_arg_t *arg) {
+        controller->processTimer() ;
+    }
+
     
 }
 
@@ -454,11 +460,15 @@ namespace ssp {
         
         
         if( m_bInbound ) {
-            deque<string> servers ;
+            deque<string> servers ; 
             m_Config->getAppservers(servers) ;
             m_fsMonitor.reset(servers) ;
             m_fsMonitor.run() ;
         }
+        
+        /* start a timer */
+        su_timer_t* timer = su_timer_create( su_root_task(m_root), 15000) ;
+        su_timer_set_for_ever(timer, timerHandler, NULL) ;
         
         
         SSP_LOG(log_notice) << "Starting sofia event loop" << endl ;
@@ -468,6 +478,10 @@ namespace ssp {
         nta_agent_destroy( m_nta ) ;
     }
 
+    int SipLbController::processTimer() {
+        SSP_LOG(log_debug)  << "timer went off" ;
+        return 0 ;
+    }
     int SipLbController::processRequestInsideDialog( nta_leg_t* leg, nta_incoming_t* irq, sip_t const *sip) {
         SSP_LOG(log_notice) << "got request within a dialog" << endl ;
         return 0 ;
@@ -615,8 +629,9 @@ namespace ssp {
             /* new request */
             switch (sip->sip_request->rq_method ) {
                 case sip_method_options:
-                    return 200 ;
-                    
+                    nta_msg_treply( m_nta, msg, 200, NULL, TAG_NULL(), TAG_END() ) ;
+                    return 0 ;
+                   
                 case sip_method_invite:
                 {
                     
