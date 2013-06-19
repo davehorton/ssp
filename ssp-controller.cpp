@@ -1,6 +1,7 @@
 #include <iostream>
 #include <fstream>
 #include <getopt.h>
+#include <assert.h>
 
 #include <boost/property_tree/xml_parser.hpp>
 #include <boost/property_tree/ptree.hpp>
@@ -11,10 +12,13 @@ namespace ssp {
     class SipB2bCall ;
 }
 
+#define SU_ROOT_MAGIC_T ssp::SipLbController
 #define NTA_AGENT_MAGIC_T ssp::SipLbController
 #define NTA_LEG_MAGIC_T ssp::SipLbController
 #define NTA_OUTGOING_MAGIC_T ssp::SipB2bCall
 #define NTA_INCOMING_MAGIC_T ssp::SipB2bCall
+
+#define COMPLETED_TRANSACTION_HOLD_TIME_IN_SECS (32)
 
 /* have to define the 'magic' above before including the sofia include files */
 #include <sofia-sip/sip_protos.h>
@@ -111,6 +115,11 @@ namespace {
     int stateless_callback( nta_leg_magic_t* controller, nta_agent_t* agent, msg_t *msg, sip_t *sip) {
         return controller->statelessCallback( msg, sip ) ;
     }
+    
+    void timerHandler(su_root_magic_t *controller, su_timer_t *timer, su_timer_arg_t *arg) {
+        controller->processTimer() ;
+    }
+
     
 }
 
@@ -454,11 +463,15 @@ namespace ssp {
         
         
         if( m_bInbound ) {
-            deque<string> servers ;
+            deque<string> servers ; 
             m_Config->getAppservers(servers) ;
             m_fsMonitor.reset(servers) ;
             m_fsMonitor.run() ;
         }
+        
+        /* start a timer */
+        su_timer_t* timer = su_timer_create( su_root_task(m_root), 15000) ;
+        su_timer_set_for_ever(timer, timerHandler, NULL) ;
         
         
         SSP_LOG(log_notice) << "Starting sofia event loop" << endl ;
@@ -468,6 +481,32 @@ namespace ssp {
         nta_agent_destroy( m_nta ) ;
     }
 
+    int SipLbController::processTimer() {
+        assert( m_mapInvitesCompleted.size() == m_deqCompletedCallIds.size() ) ; //precondition
+        
+        SSP_LOG(log_debug) << "Processing " << m_deqCompletedCallIds.size() << " completed calls" << endl ;
+        time_t now = time(NULL);
+        deque<string>::iterator it = m_deqCompletedCallIds.begin() ;
+        while ( m_deqCompletedCallIds.end() != it ) {            
+            iip_map_t::const_iterator itCall = m_mapInvitesCompleted.find( *it ) ;
+            
+            assert( itCall != m_mapInvitesCompleted.end() ) ;
+            
+            shared_ptr<SipInboundCall> pCall = itCall->second ;
+            if( now - pCall->getCompletedTime() < COMPLETED_TRANSACTION_HOLD_TIME_IN_SECS ) {
+                break ;
+            }
+            
+            SSP_LOG(log_debug) << "Removing information for call-id " << *it << endl ;
+            m_mapInvitesCompleted.erase( itCall ) ;
+            m_deqCompletedCallIds.erase( it++ ) ;
+        }
+         
+        SSP_LOG(log_debug) << "After processing " << m_deqCompletedCallIds.size() << " completed calls remain" << endl ;
+        assert( m_mapInvitesCompleted.size() == m_deqCompletedCallIds.size() ) ; //postcondition
+        
+        return 0 ;
+    }
     int SipLbController::processRequestInsideDialog( nta_leg_t* leg, nta_incoming_t* irq, sip_t const *sip) {
         SSP_LOG(log_notice) << "got request within a dialog" << endl ;
         return 0 ;
@@ -593,13 +632,13 @@ namespace ssp {
     
     int SipLbController::statelessCallback( msg_t *msg, sip_t *sip ) {
         
+        string strCallId = sip->sip_call_id->i_id ;
+        iip_map_t::const_iterator it = m_mapInvitesInProgress.find( strCallId ) ;
         if( sip->sip_request ) {
             
             /* requests */
 
             /* check if we already have a route for this callid */
-            string strCallId = sip->sip_call_id->i_id ;
-            iip_map_t::const_iterator it = m_mapInvitesInProgress.find( strCallId ) ;
             if( m_mapInvitesInProgress.end() != it ) {
                 shared_ptr<SipInboundCall> iip = it->second ;
                 shared_ptr<FsInstance> server = iip->getServer() ;
@@ -615,8 +654,9 @@ namespace ssp {
             /* new request */
             switch (sip->sip_request->rq_method ) {
                 case sip_method_options:
-                    return 200 ;
-                    
+                    nta_msg_treply( m_nta, msg, 200, NULL, TAG_NULL(), TAG_END() ) ;
+                    return 0 ;
+                   
                 case sip_method_invite:
                 {
                     
@@ -648,6 +688,10 @@ namespace ssp {
                     SSP_LOG(log_debug) << "There are now " << m_mapInvitesInProgress.size() << " invites in progress" << endl ;
                     return 0 ;
                 }
+                case sip_method_ack:
+                    /* we're done if we get the ACK (should only be in the case of a final non-success response */
+                    setCompleted( it ) ;
+                    break ;
                     
                 default:
                     SSP_LOG(log_error) << "Error: received new request that was not an INVITE or OPTIONS ";
@@ -657,12 +701,30 @@ namespace ssp {
         else {
             
             /* responses */
- 
+            if( m_mapInvitesInProgress.end() != it ) {
+                if( sip_method_invite == sip->sip_cseq->cs_method ) {
+                    
+                    /* we're done if we get a success final response since ACK will go straight to the FS server */
+                    int status = sip->sip_status->st_status ;
+                    shared_ptr<SipInboundCall> iip = it->second ;
+                    iip->setLatestStatus( status ) ;
+
+                    if( 200 == status ) setCompleted( it ) ;
+                }
+            }
+     
             SSP_LOG(log_debug) << "sending response" << endl ;
             int rv = nta_msg_tsend( m_nta, msg, NULL, TAG_NULL(), TAG_END() ) ;
             return 0 ;
 
         }        
+    }
+    void SipLbController::setCompleted( iip_map_t::const_iterator& it )  {
+        shared_ptr<SipInboundCall> iip = it->second ;
+        iip->setCompleted() ;
+        m_mapInvitesCompleted.insert( iip_map_t::value_type( iip->getCallId(), iip )) ;
+        m_deqCompletedCallIds.push_back( iip->getCallId() ) ;
+        m_mapInvitesInProgress.erase( it ) ;
     }
 
     /*

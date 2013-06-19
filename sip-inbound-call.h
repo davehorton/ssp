@@ -26,6 +26,9 @@ namespace ssp {
         const boost::shared_ptr<FsInstance>& getServer(void) const { return m_server; }
         void setLatestStatus(unsigned int status) { m_latestStatus = status ;}
         unsigned int getLatestStatus(void) const { return m_latestStatus; }
+        void setCompleted(void) { time(&m_completeTime) ; }
+        time_t getCompletedTime(void) const { return m_completeTime; }
+        bool isCompleted(void) const { return m_completeTime > 0 ; }
         
         
     protected:
@@ -38,6 +41,7 @@ namespace ssp {
         string                  m_strDestUrl ;
         boost::shared_ptr<FsInstance>  m_server ;
         unsigned int            m_latestStatus ;
+        time_t                  m_completeTime ;
         
     } ;
     
