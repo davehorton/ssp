@@ -81,6 +81,8 @@ namespace ssp {
         sip_from_t* generateOutgoingFrom( sip_from_t* const incomingFrom ) ;
         sip_to_t* generateOutgoingTo( sip_to_t* const incomingTo ) ;
         sip_contact_t* generateOutgoingContact( sip_contact_t* const incomingContact ) ;
+        
+        void setCompleted( iip_map_t::const_iterator& it ) ;
 
 		bool parseCmdArgs( int argc, char* argv[] ) ;
 		void usage() ;
@@ -107,15 +109,18 @@ namespace ssp {
         string          m_my_nameaddr ;
         sip_contact_t*  m_my_contact ;
 
+        /* freeswitch monitor */
+        FsMonitor       m_fsMonitor ;
         
         /* these are invites which are in the process of establishing a dialog */
         dialog_map_t m_mapDialog ;
         
-        iip_map_t   m_mapInvitesInProgress ;
+        iip_map_t   m_mapInvitesInProgress ;    //invites without a final response, or (in the case of a non-success final response)
+        iip_map_t   m_mapInvitesCompleted ;     //invites with an ACK, or (in case of success) a 200 OK response
+        deque<string>   m_deqCompletedCallIds ;
         
         boost::unordered_set< shared_ptr<SipB2bCall> > m_setDiscardedDialogs ;
         
-        FsMonitor       m_fsMonitor ;
         
         
         
