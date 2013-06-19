@@ -17,6 +17,7 @@ namespace ssp {
 #define NTA_LEG_MAGIC_T ssp::SipLbController
 #define NTA_OUTGOING_MAGIC_T ssp::SipB2bCall
 #define NTA_INCOMING_MAGIC_T ssp::SipB2bCall
+#define SU_TIMER_ARG_T ssp::SipLbController
 
 #define COMPLETED_TRANSACTION_HOLD_TIME_IN_SECS (32)
 
@@ -116,7 +117,7 @@ namespace {
         return controller->statelessCallback( msg, sip ) ;
     }
     
-    void timerHandler(su_root_magic_t *controller, su_timer_t *timer, su_timer_arg_t *arg) {
+    void timerHandler(su_root_magic_t *magic, su_timer_t *timer, su_timer_arg_t *controller) {
         controller->processTimer() ;
     }
 
@@ -471,7 +472,7 @@ namespace ssp {
         
         /* start a timer */
         su_timer_t* timer = su_timer_create( su_root_task(m_root), 15000) ;
-        su_timer_set_for_ever(timer, timerHandler, NULL) ;
+        su_timer_set_for_ever(timer, timerHandler, this) ;
         
         
         SSP_LOG(log_notice) << "Starting sofia event loop" << endl ;
