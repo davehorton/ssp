@@ -500,7 +500,7 @@ namespace ssp {
             
             SSP_LOG(log_debug) << "Removing information for call-id " << *it << endl ;
             m_mapInvitesCompleted.erase( itCall ) ;
-            m_deqCompletedCallIds.erase( it++ ) ;
+            it = m_deqCompletedCallIds.erase( it ) ;
         }
          
         SSP_LOG(log_debug) << "After processing " << m_deqCompletedCallIds.size() << " completed calls remain" << endl ;
