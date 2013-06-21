@@ -7,6 +7,20 @@ AM_INIT_AUTOMAKE
 AC_CONFIG_SRCDIR([main.cpp])
 AC_CONFIG_HEADER([config.h])
 
+AM_CONDITIONAL(OSX, false)
+AM_CONDITIONAL(LINUX, false)
+
+AC_CANONICAL_HOST
+
+case $host_os in
+*darwin* | *rhapsody* | *macosx*)
+     AM_CONDITIONAL(OSX, true)
+     ;;
+*)
+     AM_CONDITIONAL(LINUX, true)
+     ;;
+esac
+
 # Checks for programs.
 AC_PROG_CXX
 AC_PROG_CC

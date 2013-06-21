@@ -4,7 +4,10 @@ LDADD= -lboost_thread -lpthread -lssl
 bin_PROGRAMS= ssp
 ssp_SOURCES= main.cpp sip-agent.cpp ssp-controller.cpp ssp-config.cpp fs-monitor.cpp fs-instance.cpp fs-message.cpp fs-exception.cpp sip-inbound-call.cpp ssp.cpp
 ssp_CPPFLAGS=-D_REENTRANT
-ssp_LDADD= ${srcdir}/deps/sofia-sip-1.12.11/libsofia-sip-ua/.libs/libsofia-sip-ua.a ${srcdir}/deps/boost_1_52_0/stage/lib/libboost_thread.a ${srcdir}/deps/boost_1_52_0/stage/lib/libboost_system.a ${srcdir}/deps/boost_1_52_0/stage/lib/libboost_log.a -lpthread -lssl -lcrypto -lrt
+ssp_LDADD= ${srcdir}/deps/sofia-sip-1.12.11/libsofia-sip-ua/.libs/libsofia-sip-ua.a ${srcdir}/deps/boost_1_52_0/stage/lib/libboost_thread.a ${srcdir}/deps/boost_1_52_0/stage/lib/libboost_system.a ${srcdir}/deps/boost_1_52_0/stage/lib/libboost_log.a -lpthread -lssl -lcrypto
+if LINUX
+ssp_LDADD += -lrt
+endif
 
 #clean-local:
 #	cd ${srcdir}/deps/boost_1_52_0 && b2 --clean
