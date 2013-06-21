@@ -10,7 +10,7 @@
 
 namespace ssp {
 	
-    SipInboundCall::SipInboundCall(const char* szCallId, const string& strDestUrl, boost::shared_ptr<FsInstance>& server ) : m_strCallId(szCallId), m_strDestUrl(strDestUrl), m_server(server), m_latestStatus(0) {
+    SipInboundCall::SipInboundCall(const char* szCallId, const string& strDestUrl ) : m_strCallId(szCallId), m_strDestUrl(strDestUrl), m_latestStatus(0), m_expireTime(0) {
         
     }
     
