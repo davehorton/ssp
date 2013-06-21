@@ -5,9 +5,13 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <sys/types.h>
-#include <su/sofia-sip/su_wait.h>
-#include <nta/sofia-sip/nta.h>
+#include <sofia-sip/su_wait.h>
+#include <sofia-sip/nta.h>
 #include <sofia-sip/sip_status.h>
+#include <sofia-sip/sip_protos.h>
+#include <sofia-sip/su_log.h>
+#include <sofia-sip/nta.h>
+#include <sofia-sip/nta_stateless.h>
 
 #include <sys/stat.h>
 #include <stdexcept>

@@ -18,12 +18,6 @@ namespace ssp {
 
 #define COMPLETED_TRANSACTION_HOLD_TIME_IN_SECS (32)
 
-/* have to define the 'magic' above before including the sofia include files */
-#include "sip/sofia-sip/sip_protos.h"
-#include "su/sofia-sip/su_log.h"
-#include "nta/sofia-sip/nta.h"
-#include "nta/sofia-sip/nta_stateless.h"
-
 #include "ssp-controller.h"
 #include "fs-instance.h"
 
