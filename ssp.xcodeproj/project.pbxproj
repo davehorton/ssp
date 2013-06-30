@@ -7,6 +7,15 @@
 	objects = {
 
 /* Begin PBXFileReference section */
+		3D00CCFD177F6D68001F21CC /* fs-spoofer.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = "fs-spoofer.cpp"; sourceTree = "<group>"; };
+		3D00CCFE177F75B5001F21CC /* fs-exception.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = "fs-exception.cpp"; sourceTree = "<group>"; };
+		3D00CCFF177F75B5001F21CC /* fs-exception.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "fs-exception.h"; sourceTree = "<group>"; };
+		3D00CD00177F75B5001F21CC /* fs-instance.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = "fs-instance.cpp"; sourceTree = "<group>"; };
+		3D00CD01177F75B5001F21CC /* fs-instance.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "fs-instance.h"; sourceTree = "<group>"; };
+		3D00CD02177F75B5001F21CC /* fs-message.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = "fs-message.cpp"; sourceTree = "<group>"; };
+		3D00CD03177F75B5001F21CC /* fs-message.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "fs-message.h"; sourceTree = "<group>"; };
+		3D00CD04177F75B5001F21CC /* fs-monitor.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = "fs-monitor.cpp"; sourceTree = "<group>"; };
+		3D00CD05177F75B5001F21CC /* fs-monitor.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "fs-monitor.h"; sourceTree = "<group>"; };
 		3D16358B16668D2900702662 /* ssp.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = ssp.cpp; sourceTree = "<group>"; };
 		3D6425271656E64D007F1493 /* ssp-config.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = "ssp-config.cpp"; sourceTree = "<group>"; };
 		3D6425281656E64D007F1493 /* ssp-config.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "ssp-config.h"; sourceTree = "<group>"; };
@@ -43127,18 +43136,10 @@
 		3DB4FA911652B482002D0A07 /* README */ = {isa = PBXFileReference; lastKnownFileType = text; path = README; sourceTree = "<group>"; };
 		3DB4FA931652B482002D0A07 /* etc_sysconfig_sofia_rs */ = {isa = PBXFileReference; lastKnownFileType = text; path = etc_sysconfig_sofia_rs; sourceTree = "<group>"; };
 		3DB4FA941652B482002D0A07 /* sofia-rs */ = {isa = PBXFileReference; lastKnownFileType = text.script.sh; path = "sofia-rs"; sourceTree = "<group>"; };
-		3DB4FA951652B482002D0A07 /* sip-agent.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = "sip-agent.cpp"; sourceTree = "<group>"; };
-		3DB4FA961652B482002D0A07 /* sip-agent.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "sip-agent.h"; sourceTree = "<group>"; };
-		3DB4FA971652B482002D0A07 /* sip-call-leg.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = "sip-call-leg.cpp"; sourceTree = "<group>"; };
-		3DB4FA981652B482002D0A07 /* sip-call-leg.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "sip-call-leg.h"; sourceTree = "<group>"; };
-		3DB4FA991652B482002D0A07 /* sip-b2b-call.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = "sip-b2b-call.cpp"; sourceTree = "<group>"; };
-		3DB4FA9A1652B482002D0A07 /* sip-b2b-call.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "sip-b2b-call.h"; sourceTree = "<group>"; };
 		3DB4FA9B1652B482002D0A07 /* ssp-controller.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = "ssp-controller.cpp"; sourceTree = "<group>"; };
 		3DB4FA9C1652B482002D0A07 /* ssp-controller.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "ssp-controller.h"; sourceTree = "<group>"; };
 		3DB4FA9D1652B482002D0A07 /* ssp.conf.xml */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = ssp.conf.xml; sourceTree = "<group>"; };
 		3DB4FA9E1652B482002D0A07 /* main.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = main.cpp; sourceTree = "<group>"; };
-		3DB4FAA01652B482002D0A07 /* sip-server.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = "sip-server.cpp"; sourceTree = "<group>"; };
-		3DB4FAA11652B482002D0A07 /* sip-server.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "sip-server.h"; sourceTree = "<group>"; };
 		3DDE7B6A16612679007F0472 /* ssp.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ssp.h; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -118724,22 +118725,23 @@
 		3DB4FAA21652B912002D0A07 /* source */ = {
 			isa = PBXGroup;
 			children = (
-				3DB4FA951652B482002D0A07 /* sip-agent.cpp */,
-				3DB4FA961652B482002D0A07 /* sip-agent.h */,
-				3DB4FA971652B482002D0A07 /* sip-call-leg.cpp */,
-				3DB4FA981652B482002D0A07 /* sip-call-leg.h */,
-				3DB4FA991652B482002D0A07 /* sip-b2b-call.cpp */,
-				3DB4FA9A1652B482002D0A07 /* sip-b2b-call.h */,
+				3D00CCFE177F75B5001F21CC /* fs-exception.cpp */,
+				3D00CCFF177F75B5001F21CC /* fs-exception.h */,
+				3D00CD00177F75B5001F21CC /* fs-instance.cpp */,
+				3D00CD01177F75B5001F21CC /* fs-instance.h */,
+				3D00CD02177F75B5001F21CC /* fs-message.cpp */,
+				3D00CD03177F75B5001F21CC /* fs-message.h */,
+				3D00CD04177F75B5001F21CC /* fs-monitor.cpp */,
+				3D00CD05177F75B5001F21CC /* fs-monitor.h */,
 				3DB4FA9B1652B482002D0A07 /* ssp-controller.cpp */,
 				3DB4FA9C1652B482002D0A07 /* ssp-controller.h */,
 				3DB4FA9D1652B482002D0A07 /* ssp.conf.xml */,
 				3DB4FA9E1652B482002D0A07 /* main.cpp */,
-				3DB4FAA01652B482002D0A07 /* sip-server.cpp */,
-				3DB4FAA11652B482002D0A07 /* sip-server.h */,
 				3D6425271656E64D007F1493 /* ssp-config.cpp */,
 				3D6425281656E64D007F1493 /* ssp-config.h */,
 				3DDE7B6A16612679007F0472 /* ssp.h */,
 				3D16358B16668D2900702662 /* ssp.cpp */,
+				3D00CCFD177F6D68001F21CC /* fs-spoofer.cpp */,
 			);
 			name = source;
 			sourceTree = "<group>";
