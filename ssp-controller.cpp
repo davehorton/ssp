@@ -465,7 +465,7 @@ namespace ssp {
                         return rv ;
                     }
                     
-                    shared_ptr<SipInboundCall> iip = boost::make_shared<SipInboundCall>( SipInboundCall( sip->sip_call_id->i_id, dest.str() ) ) ;
+                    shared_ptr<SipInboundCall> iip = boost::make_shared<SipInboundCall>( SipInboundCall( strCallId, dest.str() ) ) ;
                     m_mapInvitesInProgress.insert( iip_map_t::value_type( iip->getCallId(), iip )) ;
                     SSP_LOG(log_debug) << "There are now " << m_mapInvitesInProgress.size() << " invites in progress" << endl ;
                     return 0 ;
@@ -503,6 +503,7 @@ namespace ssp {
     }
     void SipLbController::setCompleted( iip_map_t::const_iterator& it )  {
         shared_ptr<SipInboundCall> iip = it->second ;
+        if( iip->isCompleted() ) return ;
         iip->setCompleted() ;
         m_deqCompletedCallIds.push_back( iip->getCallId() ) ;
     }
