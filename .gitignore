@@ -1,6 +1,8 @@
 .DS_Store
 Makefile.in
 autom4te.cache/*
+debug/config.*
+debug/Makefile
 
 # Compiled Object files
 *.slo
