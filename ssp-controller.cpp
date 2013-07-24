@@ -409,7 +409,8 @@ namespace ssp {
 
     int SipLbController::processTimer() {
         
-        SSP_LOG(log_debug) << "Processing " << m_deqCompletedCallIds.size() << " completed calls" << endl ;
+        SSP_LOG(log_debug) << "Processing " << m_deqCompletedCallIds.size() << " completed calls and a total of "
+        << m_mapInvitesInProgress.size() << " completed plus in progress calls remain "<< endl ;
         time_t now = time(NULL);
         deque<string>::iterator it = m_deqCompletedCallIds.begin() ;
         while ( m_deqCompletedCallIds.end() != it ) {            
@@ -427,8 +428,9 @@ namespace ssp {
             it = m_deqCompletedCallIds.erase( it ) ;
         }
          
-        SSP_LOG(log_debug) << "After processing " << m_deqCompletedCallIds.size() << " completed calls remain" << endl ;
-        if( 0 == m_nIterationCount && 0 == m_deqCompletedCallIds.size() ) {
+        SSP_LOG(log_debug) << "After processing " << m_deqCompletedCallIds.size() << " completed calls remain, and a total of "
+            << m_mapInvitesInProgress.size() << " completed plus in progress calls remain "<< endl ;
+        if( 0 == m_nIterationCount && 0 == m_deqCompletedCallIds.size() && 0 == m_mapInvitesInProgress.size() ) {
             SSP_LOG(log_notice) << "shutting down timer, interation count reached" << endl ;
             su_timer_reset( m_timer ) ;
             su_timer_destroy( m_timer ) ;
@@ -443,7 +445,7 @@ namespace ssp {
     
     int SipLbController::statelessCallback( msg_t *msg, sip_t *sip ) {
         
-        string strCallId( sip->sip_call_id->i_id ) ;
+        string strCallId( sip->sip_call_id->i_id, strlen(sip->sip_call_id->i_id) ) ;
         iip_map_t::const_iterator it = m_mapInvitesInProgress.find( strCallId ) ;
         if( sip->sip_request ) {
             
@@ -473,11 +475,16 @@ namespace ssp {
                    
                 case sip_method_invite:
                 {
+                    if( 0 == m_nIterationCount )  {
+                        SSP_LOG(log_error) << "Discarding new INVITE because we are in the process of shutting down " << endl ;
+                        nta_msg_discard( m_nta, msg ) ;
+                        return 0 ;
+                    }
                     
                     /* select a freeswitch server */
                     boost::shared_ptr<FsInstance> server ;
                     if( !m_fsMonitor.getAvailableServer( server ) ) {
-                        SSP_LOG(log_warning) << "No available server for incoming call; returning to carrier for busy handling " << sip->sip_call_id->i_id  << endl ;
+                        SSP_LOG(log_warning) << "No available server for incoming call; returning to carrier for busy handling " << strCallId << endl ;
                         return 486 ;
                     }
                     
@@ -500,7 +507,7 @@ namespace ssp {
                         return rv ;
                     }
                     
-                    shared_ptr<SipInboundCall> iip = boost::make_shared<SipInboundCall>( SipInboundCall( strCallId, str ) ) ;
+                    shared_ptr<SipInboundCall> iip = boost::make_shared<SipInboundCall>( strCallId, str ) ;
                     m_mapInvitesInProgress.insert( iip_map_t::value_type( iip->getCallId(), iip )) ;
                     SSP_LOG(log_debug) << "There are now " << m_mapInvitesInProgress.size() << " invites in progress" << endl ;
                     
@@ -509,12 +516,14 @@ namespace ssp {
                     return 0 ;
                 }
                 case sip_method_ack:
-                    /* we're done if we get the ACK (should only be in the case of a final non-success response */
+                    /* we're done if we get the ACK (should only be in the case of a final non-success response) */
                     setCompleted( it ) ;
+                    nta_msg_discard( m_nta, msg ) ;
                     break ;
                     
                 default:
                     SSP_LOG(log_error) << "Error: received new request that was not an INVITE or OPTIONS ";
+                    nta_msg_discard( m_nta, msg ) ;
                     break;
             }
         }

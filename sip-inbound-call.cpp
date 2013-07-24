@@ -10,8 +10,8 @@
 
 namespace ssp {
 	
-    SipInboundCall::SipInboundCall(const string& strCallId, const char* szDestUrl ) : m_strCallId(strCallId), m_strDestUrl(szDestUrl), m_latestStatus(0), m_expireTime(0), m_bComplete(false) {
-        
+    SipInboundCall::SipInboundCall(const string& strCallId, const char* szDestUrl ) : m_strCallId(strCallId), m_latestStatus(0), m_expireTime(0), m_bComplete(false) {
+        m_strDestUrl.assign( szDestUrl, strlen(szDestUrl) ) ;
     }
     
     SipInboundCall::~SipInboundCall() {
