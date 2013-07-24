@@ -708,7 +708,7 @@ namespace ssp {
     }
     
     SspConfig::~SspConfig() {
-        
+       delete m_pimpl ;
     }
     
     bool SspConfig::isValid() {

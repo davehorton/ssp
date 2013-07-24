@@ -26,7 +26,7 @@ namespace ssp {
     }
     
     FsInstance::~FsInstance() {
-
+        SSP_LOG(log_notice) << "Destroying FsInstance" << endl ;
     }
     
     void FsInstance::start() {

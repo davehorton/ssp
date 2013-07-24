@@ -26,7 +26,10 @@ namespace ssp {
     }
     
     void FsMonitor::stop() {
+        SSP_LOG(log_notice) << "Stopping monitor thread" << endl ;
+        m_ioService.stop() ;
         m_thread.join() ;
+        m_servers.clear() ;        
     }
     
     void FsMonitor::reset( const deque<string>& servers ) {
@@ -34,7 +37,7 @@ namespace ssp {
         boost::lock_guard<boost::mutex> lock(m_mutex) ;
         
         //TODO: destroy existing servers ?  Or add new ones, drop only missing ones?
-        m_servers.empty() ;
+        m_servers.clear() ;
         
         boost::char_separator<char> sep(":");
         string strAddress ;

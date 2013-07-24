@@ -49,8 +49,8 @@ namespace ssp {
         else {
             boost::char_separator<char> sep("\n") ;
             tokenizer tok( m_rawMsg, sep) ;
-            int i = 0 ;
-            for( tokenizer::iterator it = tok.begin(); it != tok.end(); ++i, ++it ) {
+            tokenizer::iterator it = tok.begin() ;
+            for( int i = 0; it != tok.end(); ++i, ++it ) {
                 const string& line = *it ;
                 if( unknown_category == m_category ) {
                     if( 0 != line.find("Content-Type: ")) throw("Invalid msg: Expected Content-Type on first line: " + line) ;
