@@ -20,7 +20,7 @@ namespace ssp {
 	
     class SipInboundCall {
     public:
-        SipInboundCall(const char* szCallId, const string& strUrlDest ) ;
+        SipInboundCall(const string& strCallId, const char* szUrlDest ) ;
         ~SipInboundCall() ;
         
         const string& getCallId(void) const { return m_strCallId; }

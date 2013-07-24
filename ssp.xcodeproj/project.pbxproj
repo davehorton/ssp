@@ -16,6 +16,8 @@
 		3D00CD03177F75B5001F21CC /* fs-message.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "fs-message.h"; sourceTree = "<group>"; };
 		3D00CD04177F75B5001F21CC /* fs-monitor.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = "fs-monitor.cpp"; sourceTree = "<group>"; };
 		3D00CD05177F75B5001F21CC /* fs-monitor.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "fs-monitor.h"; sourceTree = "<group>"; };
+		3D0AA8E81780BDFD0069F42F /* sip-inbound-call.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = "sip-inbound-call.cpp"; sourceTree = "<group>"; };
+		3D0AA8E91780BDFD0069F42F /* sip-inbound-call.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "sip-inbound-call.h"; sourceTree = "<group>"; };
 		3D16358B16668D2900702662 /* ssp.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = ssp.cpp; sourceTree = "<group>"; };
 		3D6425271656E64D007F1493 /* ssp-config.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = "ssp-config.cpp"; sourceTree = "<group>"; };
 		3D6425281656E64D007F1493 /* ssp-config.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "ssp-config.h"; sourceTree = "<group>"; };
@@ -118725,6 +118727,8 @@
 		3DB4FAA21652B912002D0A07 /* source */ = {
 			isa = PBXGroup;
 			children = (
+				3D0AA8E81780BDFD0069F42F /* sip-inbound-call.cpp */,
+				3D0AA8E91780BDFD0069F42F /* sip-inbound-call.h */,
 				3D00CCFE177F75B5001F21CC /* fs-exception.cpp */,
 				3D00CCFF177F75B5001F21CC /* fs-exception.h */,
 				3D00CD00177F75B5001F21CC /* fs-instance.cpp */,

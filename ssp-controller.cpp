@@ -119,7 +119,7 @@ namespace {
 namespace ssp {
 
     SipLbController::SipLbController( int argc, char* argv[] ) : m_bDaemonize(false), m_bLoggingInitialized(false),
-        m_configFilename(DEFAULT_CONFIG_FILENAME), m_bInbound(false), m_bOutbound(false) {
+        m_configFilename(DEFAULT_CONFIG_FILENAME), m_bInbound(false), m_bOutbound(false), m_nIterationCount(-1) {
         
         if( !parseCmdArgs( argc, argv ) ) {
             usage() ;
@@ -158,12 +158,13 @@ namespace ssp {
                 /* These options don't set a flag.
                  We distinguish them by their indices. */
                 {"file",    required_argument, 0, 'f'},
+                {"iterations",    required_argument, 0, 'i'},
                 {0, 0, 0, 0}
             };
             /* getopt_long stores the option index here. */
             int option_index = 0;
             
-            c = getopt_long (argc, argv, "f:",
+            c = getopt_long (argc, argv, "f:i:",
                              long_options, &option_index);
             
             /* Detect the end of the options. */
@@ -185,6 +186,11 @@ namespace ssp {
                 case 'f':
                     m_configFilename = optarg ;
                     break;
+                    
+                case 'i':
+                    m_nIterationCount = ::atoi( optarg ) ;
+                    cout << "option iteration count set; program will exit after handling " << m_nIterationCount << " INVITES !!" << endl ;
+                    break ;
                     
                 case '?':
                     /* getopt_long already printed an error message. */
@@ -261,6 +267,10 @@ namespace ssp {
         return new src::severity_logger_mt< severity_levels >(keywords::severity = log_info);
     }
 
+    void SipLbController::deinitializeLogging() {
+        logging::core::get()->remove_sink( m_sink ) ;
+        m_sink.reset() ;
+    }
     void SipLbController::initializeLogging() {
         try {
             // Create a syslog sink
@@ -271,7 +281,7 @@ namespace ssp {
             m_Config->getSyslogFacility( facility ) ;
             m_Config->getSyslogTarget( syslogAddress, syslogPort ) ;
             
-            shared_ptr< sinks::synchronous_sink< sinks::syslog_backend > > sink(
+            m_sink.reset(
                 new sinks::synchronous_sink< sinks::syslog_backend >(
                      keywords::use_impl = sinks::syslog::udp_socket_based
                     , keywords::facility = facility
@@ -286,17 +296,17 @@ namespace ssp {
             mapping[log_warning] = sinks::syslog::warning;
             mapping[log_error] = sinks::syslog::critical;
 
-            sink->locked_backend()->set_severity_mapper(mapping);
+            m_sink->locked_backend()->set_severity_mapper(mapping);
 
             // Set the remote address to sent syslog messages to
-            sink->locked_backend()->set_target_address( syslogAddress.c_str() );
+            m_sink->locked_backend()->set_target_address( syslogAddress.c_str() );
 
             // Add the sink to the core
-            logging::core::get()->add_sink(sink);
+            logging::core::get()->add_sink(m_sink);
             
             m_bLoggingInitialized = true ;
 
-	    std::cout << "Created logger" << endl ;
+            std::cout << "Created logger" << endl ;
             
         }
         catch (std::exception& e) {
@@ -344,11 +354,14 @@ namespace ssp {
         setenv("TPORT_LOG", "1", 1) ;
         
         /* this causes su_clone_start to start a new thread */
-        su_root_threading( m_root, 1 ) ;
+        //su_root_threading( m_root, 1 ) ;
         
         /* create our agent */
+        char str[URL_MAXLEN] ;
+        memset(str, 0, URL_MAXLEN) ;
+        strncpy( str, url.c_str(), url.length() ) ;
         m_nta = nta_agent_create( m_root,
-                                 URL_STRING_MAKE(url.c_str()),               /* our contact address */
+                                 URL_STRING_MAKE(str),               /* our contact address */
                                  stateless_callback,         /* callback function */
                                  this,                  /* magic passed to callback */
                                  TAG_NULL(),
@@ -364,7 +377,7 @@ namespace ssp {
         ostringstream s ;
         s << "SIP/2.0/UDP " <<  m_my_contact->m_url[0].url_host ;
         if( m_my_contact->m_url[0].url_port ) s << ":" <<  m_my_contact->m_url[0].url_port  ;
-        m_my_via = s.str() ;
+        m_my_via.assign( s.str().c_str(), s.str().length() ) ;
         SSP_LOG(log_debug) << "My via header: " << m_my_via << endl ;
         
         
@@ -376,16 +389,23 @@ namespace ssp {
         }
         
         /* start a timer */
-        su_timer_t* timer = su_timer_create( su_root_task(m_root), 15000) ;
-        su_timer_set_for_ever(timer, timerHandler, this) ;
+        m_timer = su_timer_create( su_root_task(m_root), 15000) ;
+        su_timer_set_for_ever(m_timer, timerHandler, this) ;
         
         
         SSP_LOG(log_notice) << "Starting sofia event loop" << endl ;
         su_root_run( m_root ) ;
         SSP_LOG(log_notice) << "Sofia event loop ended" << endl ;
+        m_fsMonitor.stop() ;
         
-        nta_agent_destroy( m_nta ) ;
-    }
+        su_root_destroy( m_root ) ;
+        m_root = NULL ;
+        su_home_unref( m_home ) ;
+        su_deinit() ;
+
+        m_Config.reset(0) ;
+        this->deinitializeLogging() ;
+   }
 
     int SipLbController::processTimer() {
         
@@ -408,13 +428,22 @@ namespace ssp {
         }
          
         SSP_LOG(log_debug) << "After processing " << m_deqCompletedCallIds.size() << " completed calls remain" << endl ;
+        if( 0 == m_nIterationCount && 0 == m_deqCompletedCallIds.size() ) {
+            SSP_LOG(log_notice) << "shutting down timer, interation count reached" << endl ;
+            su_timer_reset( m_timer ) ;
+            su_timer_destroy( m_timer ) ;
+            m_timer = NULL ;
+            nta_agent_destroy( m_nta ) ;
+            m_nta = NULL ;
+            su_root_break( m_root ) ;
+        }
         
         return 0 ;
     }
     
     int SipLbController::statelessCallback( msg_t *msg, sip_t *sip ) {
         
-        string strCallId = sip->sip_call_id->i_id ;
+        string strCallId( sip->sip_call_id->i_id ) ;
         iip_map_t::const_iterator it = m_mapInvitesInProgress.find( strCallId ) ;
         if( sip->sip_request ) {
             
@@ -426,9 +455,12 @@ namespace ssp {
                 iip->updateExpireTime() ;
                 string strUrlDest = iip->getDestUrl() ;
                 SSP_LOG(log_debug) << "Forwarding request to " << strUrlDest << endl ;
-                int rv = nta_msg_tsend( m_nta, msg, URL_STRING_MAKE(strUrlDest.c_str()), TAG_NULL(), TAG_END() ) ;
+                char str[URL_MAXLEN] ;
+                memset(str, 0, URL_MAXLEN) ;
+                strncpy( str, strUrlDest.c_str(), strUrlDest.length() ) ;
+                int rv = nta_msg_tsend( m_nta, msg, URL_STRING_MAKE(str), TAG_NULL(), TAG_END() ) ;
                 if( 0 != rv ) {
-                    SSP_LOG(log_error) << "Error forwarding message: " << rv ;
+                    SSP_LOG(log_error) << "Error forwarding message: " << rv << endl ;
                 }
                 return 0 ;
             }
@@ -454,10 +486,13 @@ namespace ssp {
                     SSP_LOG(log_notice) << "sending outbound invite to request uri " << dest.str() << endl ;
                     string url = dest.str() ;
                     const char* szDest = url.c_str() ;
+                    char str[URL_MAXLEN] ;
+                    memset(str, 0, URL_MAXLEN) ;
+                    strncpy( str, url.c_str(), url.length() ) ;
                     
                     int rv = nta_msg_tsend( m_nta,
                                            msg,
-                                           URL_STRING_MAKE(szDest),
+                                           URL_STRING_MAKE(str),
                                            TAG_NULL(),
                                            TAG_END() ) ;
                     if( 0 != rv ) {
@@ -465,9 +500,12 @@ namespace ssp {
                         return rv ;
                     }
                     
-                    shared_ptr<SipInboundCall> iip = boost::make_shared<SipInboundCall>( SipInboundCall( sip->sip_call_id->i_id, dest.str() ) ) ;
+                    shared_ptr<SipInboundCall> iip = boost::make_shared<SipInboundCall>( SipInboundCall( strCallId, str ) ) ;
                     m_mapInvitesInProgress.insert( iip_map_t::value_type( iip->getCallId(), iip )) ;
                     SSP_LOG(log_debug) << "There are now " << m_mapInvitesInProgress.size() << " invites in progress" << endl ;
+                    
+                    if( m_nIterationCount > 0 ) m_nIterationCount-- ;
+                    
                     return 0 ;
                 }
                 case sip_method_ack:
@@ -503,6 +541,7 @@ namespace ssp {
     }
     void SipLbController::setCompleted( iip_map_t::const_iterator& it )  {
         shared_ptr<SipInboundCall> iip = it->second ;
+        if( iip->isCompleted() ) return ;
         iip->setCompleted() ;
         m_deqCompletedCallIds.push_back( iip->getCallId() ) ;
     }

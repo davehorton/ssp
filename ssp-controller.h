@@ -79,6 +79,7 @@ namespace ssp {
 		
 		void daemonize() ;
 		void initializeLogging() ;
+		void deinitializeLogging() ;
 		bool readConfig( void ) ;
 	
 		scoped_ptr< src::severity_logger_mt<severity_levels> > m_logger ;
@@ -87,13 +88,16 @@ namespace ssp {
 		bool m_bLoggingInitialized ;
 		string m_configFilename ;
         
+        shared_ptr< sinks::synchronous_sink< sinks::syslog_backend > > m_sink ;
         scoped_ptr<SspConfig> m_Config ;
         int m_bDaemonize ;
         int m_bInbound ;
         int m_bOutbound ;
+        int m_nIterationCount ;
         
         su_home_t* 	m_home ;
         su_root_t* 	m_root ;
+        su_timer_t* m_timer ;
         nta_agent_t*	m_nta ;
         string          m_my_via ;
         string          m_my_nameaddr ;
