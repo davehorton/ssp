@@ -7,6 +7,7 @@
     <inbound>
         <sip>
             <contact>sip:209.251.49.135</contact>
+            <agent-mode>stateful</agent-mode>
         </sip>        
 
     
@@ -20,6 +21,7 @@
             <port>514</port>
             <facility>local6</facility>
         </syslog>
+        <sofia-loglevel>7</sofia-loglevel>
     </logging>
     
     <!-- grouping of DNISs into customers -->

@@ -302,7 +302,7 @@ namespace ssp {
     */
     class SspConfig::Impl {
     public:
-        Impl( const char* szFilename) : m_bIsValid(false) {
+        Impl( const char* szFilename) : m_bIsValid(false), m_agent_mode(agent_mode_stateless) {
             cout << "reading configuration file: " << szFilename << endl ;
             try {
                 std::filebuf fb;
@@ -319,9 +319,15 @@ namespace ssp {
                 m_syslogAddress = pt.get<string>("ssp.logging.syslog.address", "localhost") ;
                 m_sysLogPort = pt.get<unsigned int>("ssp.logging.syslog.address", 516) ;
                 m_syslogFacility = pt.get<string>("ssp.logging.syslog.facility","local7") ;
+                m_nSofiaLogLevel = pt.get<unsigned int>("ssp.logging.sofia-loglevel", 1) ;
                 
                 m_inboundSipUrl = pt.get<string>("ssp.inbound.sip.contact", "sip:*") ;
                 m_outboundSipUrl = pt.get<string>("ssp.outbound.sip.contact", "sip:*") ;
+                
+                string inboundMode = pt.get<string>("ssp.inbound.sip.agent-mode", "stateless") ;
+                if( 0 == inboundMode.compare("stateful") ) {
+                    m_agent_mode = agent_mode_stateful ;
+                }
                 
                 string ibStrategy = pt.get<string>("ssp.routing.inbound.<xmlattr>.strategy", "") ;
                 string ibTarget = pt.get<string>("ssp.routing.inbound.<xmlattr>.target", "") ;
@@ -669,6 +675,9 @@ namespace ssp {
             group = it->second ;
             return true;             
         }
+        unsigned int getSofiaLogLevel(void) { return m_nSofiaLogLevel; }
+        
+        agent_mode getAgentMode(void) { return m_agent_mode; }
 
         
     private:
@@ -699,6 +708,8 @@ namespace ssp {
         AppserverMap_t m_mapAppserver;
         AppserverGroupMap_t m_mapAppserverGroup ;
         Routing_t m_routing ;
+        agent_mode m_agent_mode ;
+        unsigned int m_nSofiaLogLevel ;
     } ;
     
     /*
@@ -749,6 +760,13 @@ namespace ssp {
     
     void SspConfig::getAppservers( deque<string>& servers) {
         return m_pimpl->getAppservers(servers) ;
+    }
+    
+    agent_mode SspConfig::getAgentMode() {
+        return m_pimpl->getAgentMode() ;
+    }
+    unsigned int SspConfig::getSofiaLogLevel() {
+        return m_pimpl->getSofiaLogLevel() ;
     }
     
 

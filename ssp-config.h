@@ -37,6 +37,9 @@ namespace ssp {
         
         void getAppservers( deque<string>& servers) ;
         
+        agent_mode getAgentMode(void) ;
+        unsigned int getSofiaLogLevel(void) ;
+        
         peer_type queryPeerType( const string& strAddress ) ;
 
         void Log() const ;

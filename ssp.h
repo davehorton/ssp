@@ -86,6 +86,11 @@ namespace ssp {
         external_peer
     } ;
     
+    enum agent_mode {
+        agent_mode_stateless,
+        agent_mode_stateful
+    } ;
+    
 }
 
 #ifdef SSP_MAIN
