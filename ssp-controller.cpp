@@ -817,6 +817,7 @@ namespace ssp {
         if( sip->sip_request->rq_method == sip_method_cancel ) {
             nta_outgoing_t* orq = this->getAssociatedTransaction( irq ) ;
             assert( NULL != orq ) ;
+            nta_outgoing_cancel( orq ) ;
             nta_outgoing_destroy( orq ) ;
             this->clearTransaction( orq ) ;
         }
