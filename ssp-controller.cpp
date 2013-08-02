@@ -684,6 +684,8 @@ namespace ssp {
                                            SIPTAG_TO(sip->sip_from),
                                            SIPTAG_FROM(sip->sip_to),
                                            TAG_END());
+                nta_leg_server_route( a_leg, sip->sip_record_route, sip->sip_contact ) ;
+                
                 const char* a_tag = nta_incoming_tag( irq, NULL) ;
                 nta_leg_tag( a_leg, a_tag ) ;
                 SSP_LOG(log_debug) << "generated local tag for A leg " << a_tag << endl ;

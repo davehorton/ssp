@@ -136,8 +136,12 @@ namespace ssp {
         
         
         /* stateful */
+        
+        /* collection of transaction pairs for invites in progress */
         typedef boost::bimap<nta_incoming_t*,nta_outgoing_t*> bimapTxns ;
         bimapTxns m_transactions ;
+        
+        /* collection of leg pairs for stable dialogs */
         typedef boost::bimap<nta_leg_t*,nta_leg_t*> bimapDialogs ;
         bimapDialogs m_dialogs ;
         
