@@ -145,7 +145,7 @@ namespace ssp {
         
         /* now we can initialize logging */
         m_logger.reset( this->createLogger() ) ;
-        
+            
     }
 
     SipLbController::~SipLbController() {
@@ -426,6 +426,7 @@ namespace ssp {
             deque<string> servers ; 
             m_Config->getAppservers(servers) ;
             m_fsMonitor.reset(servers) ;
+            m_fsMonitor.setRoundRobinInterval( m_Config->getMaxRoundRobins() )  ;
             m_fsMonitor.run() ;
         }
         
@@ -526,11 +527,12 @@ namespace ssp {
                     }
                     
                     /* select a freeswitch server */
-                    boost::shared_ptr<FsInstance> server ;
-                    if( !m_fsMonitor.getAvailableServer( server ) ) {
+                    deque< boost::shared_ptr<FsInstance> > servers ;
+                    if( !m_fsMonitor.getAvailableServers( servers ) ) {
                         SSP_LOG(log_warning) << "No available server for incoming call; returning to carrier for busy handling " << strCallId << endl ;
                         return 486 ;
                     }
+                    boost::shared_ptr<FsInstance> server = servers[0] ;
                     
                     ostringstream dest ;
                     dest << "sip:" << sip->sip_to->a_url[0].url_user << "@" << server->getSipAddress() << ":" << server->getSipPort() ;
@@ -659,14 +661,23 @@ namespace ssp {
             {
                 /* send 100 Trying */
                 nta_incoming_treply( irq, SIP_100_TRYING, TAG_END() ) ;
-
+                
+                /* check if this is a known carrier */
+                string carrier ;
+                if( !m_Config->getCarrier( sip->sip_contact->m_url[0].url_host, carrier) && m_Config->isAcl("carrier") ) {
+                    SSP_LOG(log_error) << "Received invite from address not associated with a configured carrier; rejecting" << endl ;
+                    return 403 ;
+                }
+                
                 /* select a freeswitch server */
                 string strCallId( sip->sip_call_id->i_id, strlen(sip->sip_call_id->i_id) ) ;
-                boost::shared_ptr<FsInstance> server ;
-                if( !m_fsMonitor.getAvailableServer( server ) ) {
+                /* select a freeswitch server */
+                deque< boost::shared_ptr<FsInstance> > servers ;
+                if( !m_fsMonitor.getAvailableServers( servers ) ) {
                     SSP_LOG(log_warning) << "No available server for incoming call; returning to carrier for busy handling " << strCallId << endl ;
                     return 486 ;
                 }
+                boost::shared_ptr<FsInstance> server = servers[0] ;
                 ostringstream dest ;
                 dest << "sip:" << sip->sip_to->a_url[0].url_user << "@" << server->getSipAddress() << ":" << server->getSipPort() ;
                 SSP_LOG(log_notice) << "sending outbound invite to request uri " << dest.str() << endl ;
@@ -688,13 +699,11 @@ namespace ssp {
                 
                 const char* a_tag = nta_incoming_tag( irq, NULL) ;
                 nta_leg_tag( a_leg, a_tag ) ;
-                SSP_LOG(log_debug) << "generated local tag for A leg " << a_tag << endl ;
                 SSP_LOG(log_debug) << "incoming leg " << a_leg << endl ;
 
                 /* callback for ACK or CANCEL from A */
                 nta_incoming_bind( irq, handleAckOrCancel, this ) ;
-                
-                
+                                
                 /* create the B leg.  Let nta generate a Call-ID for us */
                 sip_from_t* from = generateOutgoingFrom( sip->sip_from ) ;
                 sip_to_t* to = generateOutgoingTo( sip->sip_to ) ;
@@ -708,9 +717,15 @@ namespace ssp {
                 
                 const char* b_tag = nta_agent_newtag(m_home, "tag=%s", m_nta) ;
                 nta_leg_tag( b_leg, b_tag ) ;
-                SSP_LOG(log_debug) << "generated local tag for B leg: " << b_tag << endl ;
                 SSP_LOG(log_debug) << "outgoing leg " << b_leg << endl ;
                 
+                std::stringstream carrierString ;
+                carrierString << "X-Originating-Carrier: " ;
+                carrierString << (carrier.empty() ? "unknown": carrier);
+
+                std::stringstream carrierTrunk ;
+                carrierTrunk << "X-Originating-Carrier-IP: " ;
+                carrierTrunk << sip->sip_contact->m_url[0].url_host;
                 
                 /* send the outbound INVITE */
                  nta_outgoing_t* orq = nta_outgoing_tcreate(b_leg, response_to_invite, this,
@@ -718,20 +733,21 @@ namespace ssp {
                                             SIP_METHOD_INVITE,
                                             URL_STRING_MAKE(str),
                                             SIPTAG_CONTACT(contact),
-                                           SIPTAG_CONTENT_TYPE(sip->sip_content_type),
-                                           SIPTAG_CONTENT_DISPOSITION(sip->sip_content_disposition),
-                                           SIPTAG_CONTENT_LENGTH(sip->sip_content_length),
-                                           SIPTAG_PAYLOAD(sip->sip_payload),
-                                           SIPTAG_SUPPORTED(sip->sip_supported),
-                                           SIPTAG_SUBJECT(sip->sip_subject),
-                                           SIPTAG_UNSUPPORTED(sip->sip_unsupported),
-                                           SIPTAG_REQUIRE(sip->sip_require),
+                                            SIPTAG_CONTENT_TYPE(sip->sip_content_type),
+                                            SIPTAG_CONTENT_DISPOSITION(sip->sip_content_disposition),
+                                            SIPTAG_CONTENT_LENGTH(sip->sip_content_length),
+                                            SIPTAG_PAYLOAD(sip->sip_payload),
+                                            SIPTAG_SUPPORTED(sip->sip_supported),
+                                            SIPTAG_SUBJECT(sip->sip_subject),
+                                            SIPTAG_UNSUPPORTED(sip->sip_unsupported),
+                                            SIPTAG_REQUIRE(sip->sip_require),
                                             SIPTAG_USER_AGENT(sip->sip_user_agent),
                                             SIPTAG_ALLOW(sip->sip_allow),
-                                           SIPTAG_PRIVACY(sip->sip_privacy),
-                                           SIPTAG_P_ASSERTED_IDENTITY(sip_p_asserted_identity( sip )),
-                                           SIPTAG_UNKNOWN(sip_unknown(sip)),
-                                           //SIPTAG_UNKNOWN_STR("X-Originating-Carrier: XO"),
+                                            SIPTAG_PRIVACY(sip->sip_privacy),
+                                            SIPTAG_P_ASSERTED_IDENTITY(sip_p_asserted_identity( sip )),
+                                            SIPTAG_UNKNOWN(sip_unknown(sip)),
+                                            SIPTAG_UNKNOWN_STR(carrierString.str().c_str()),
+                                            SIPTAG_UNKNOWN_STR(carrierTrunk.str().c_str()),
                                             TAG_END());
                 
                 /* save the associated transactions, so that we can look up incoming given outgoing or vice versa */

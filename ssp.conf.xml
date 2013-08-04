@@ -4,17 +4,40 @@
     Note: all configuration information is optional, with the exception that there must be at least one 'appserver' element
     If no other configuration is supplied, inbound routing is round-robin and outbound routing is same-in-same-out-ip-address
     -->
+    
+    <!-- configuration specific to ssp handling inbound calls (originations) -->
     <inbound>
         <sip>
+            <!-- local sip address to bind to.  Default: 'sip:*' -->
             <contact>sip:209.251.49.135</contact>
+            
+            <!-- 'stateless' or 'stateful'.  Default: 'stateless' -->
             <agent-mode>stateful</agent-mode>
-        </sip>        
-
-    
-    
-    
+        </sip>
+        <!-- Number of sequential calls to distribute in round robin fashion to available servers;
+         after round-robining that number of calls, the next will be sent to the least loaded available server.
+         This feature is intended to level out the number of calls across servers over time, even when they are
+         started at different points in time. Default: 0; which means round robin forever (i.e. feature is disabled)
+         
+         Note: 'available' means on-line, taking calls, and has capacity.
+         -->
+        <max-round-robins>3</max-round-robins>
+        
+        <!-- 'carrier', or 'none'; specifies whether or not to restrict calls to known carriers (defined below).  Default: 'carrier' -->
+        <acl>none</acl>
+        
+        <!-- internal app servers that we distribute calls across -->
+        <appserver event-socket-port="8021">localhost</appserver>
+        <!--
+         <appserver event-socket-port="8021">209.251.49.139</appserver>
+         <appserver event-socket-port="8021">209.251.49.140</appserver>
     </inbound>
     
+    <!-- configuration specific to ssp handling outbound calls (terminations) -->
+    <outbound>
+    </outbound>
+            
+    <!-- logging configuration -->
     <logging>
         <syslog>
             <address>localhost</address>
@@ -37,8 +60,7 @@
     <carrier name="level3">
         <inbound>
             <address>192.168.1.54</address>
-            <address>192.168.1.59</address>
-            <address netmask="255.255.255.0">172.20.3.0</address>
+            <address port="5061">192.168.1.59</address>
         </inbound>
         <outbound>
             <address>172.21.3.96</address>
@@ -46,7 +68,5 @@
         </outbound>
     </carrier>
     
-    <!-- internal app servers that we distribute calls across -->
-    <appserver event-socket-port="8021">209.251.49.135</appserver>
     
 </ssp>

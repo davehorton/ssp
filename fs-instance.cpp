@@ -253,4 +253,16 @@ namespace ssp {
         m_timer.expires_from_now(boost::posix_time::seconds(nSeconds));
         m_timer.async_wait( boost::bind( &FsInstance::timer_handler, shared_from_this(), boost::asio::placeholders::error )) ;
     }
+    
+    FsInstance::operator const char * () {
+        std::stringstream s ;
+        s << m_strSipAddress ;
+        if( 0 != m_nSipPort ) {
+            s << ":" << m_nSipPort ;
+        }
+        s << "{" << m_nMaxSessions << "," << m_nCurrentSessions << "," << m_nMaxSessions - m_nCurrentSessions << "}" ;
+        
+        return s.str().c_str() ;
+        
+    }
 }

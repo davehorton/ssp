@@ -79,13 +79,7 @@ namespace ssp {
         customer_selector
     } ;
     route_selector String2RouteSelector( const std::string& s) ;
-    
-    enum peer_type {
-        unknown_peer,
-        internal_peer,
-        external_peer
-    } ;
-    
+        
     enum agent_mode {
         agent_mode_stateless,
         agent_mode_stateful

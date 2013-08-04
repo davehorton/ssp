@@ -91,20 +91,21 @@ namespace ssp {
 
     class CarrierAddressSpace_t {
     public:
-        CarrierAddressSpace_t( const string& address, unsigned int port = 5060, const string& netmask = "255.255.255.255") : m_address(address), m_netmask(netmask), m_port(port) {}
+        CarrierAddressSpace_t( const string& carrier, const string& address, unsigned int port = 5060, const string& netmask = "255.255.255.255") : m_address(address), m_netmask(netmask), m_port(port), m_carrier(carrier) {}
         ~CarrierAddressSpace_t() {}
         
         bool operator==( const CarrierAddressSpace_t& other ) const {
-            return m_address == other.m_address && m_netmask == other.m_netmask ;
+            return m_address == other.m_address && m_netmask == other.m_netmask && m_port == other.m_port ;
         }
         
-        bool matchesOrContains( const string& address ) const {
-            if( m_address == address ) {
+        bool matchesOrContains( const string& address, unsigned int port ) const {
+            if( m_address == address && m_port == port ) {
                 return true ;
             }
             return false ;
         }
         
+        const string& getCarrier() const { return m_carrier; }
         const string& getAddress() const { return m_address; }
         const string& getNetmask() const { return m_netmask; }
         unsigned int getPort() const { return m_port; }
@@ -112,6 +113,7 @@ namespace ssp {
     private:
         CarrierAddressSpace_t() ;
         
+        string m_carrier ;
         string m_address ;
         string m_netmask ;
         unsigned int m_port ;
@@ -124,7 +126,9 @@ namespace ssp {
         boost::hash_combine(seed, c.getPort());
         return seed;
     }
-    typedef boost::unordered_map< string, boost::unordered_set<CarrierAddressSpace_t> > CarrierServerMap_t ;
+    
+    typedef boost::unordered_map< string, CarrierAddressSpace_t > CarrierServerMap_t ;
+    //typedef boost::unordered_map< string, boost::unordered_set<CarrierAddressSpace_t> > CarrierServerMap_t ;
  
     class Appserver_t {
     public:
@@ -321,6 +325,7 @@ namespace ssp {
                 m_syslogFacility = pt.get<string>("ssp.logging.syslog.facility","local7") ;
                 m_nSofiaLogLevel = pt.get<unsigned int>("ssp.logging.sofia-loglevel", 1) ;
                 
+                /* sip configuration */
                 m_inboundSipUrl = pt.get<string>("ssp.inbound.sip.contact", "sip:*") ;
                 m_outboundSipUrl = pt.get<string>("ssp.outbound.sip.contact", "sip:*") ;
                 
@@ -329,11 +334,63 @@ namespace ssp {
                     m_agent_mode = agent_mode_stateful ;
                 }
                 
+                /* routing strategy: round robin for a configurable interval (0=always), then send the next call to least loaded server */
+                m_nMaxRoundRobins = pt.get<unsigned int>("ssp.inbound.max-round-robins", 0) ;
+                
+                m_strAcl = pt.get<string>("ssp.inbound.acl","carrier") ;
+                
                 string ibStrategy = pt.get<string>("ssp.routing.inbound.<xmlattr>.strategy", "") ;
                 string ibTarget = pt.get<string>("ssp.routing.inbound.<xmlattr>.target", "") ;
                 string obStrategy = pt.get<string>("ssp.routing.outbound.<xmlattr>.strategy", "") ;
                 string obTarget = pt.get<string>("ssp.routing.outbound.<xmlattr>.route", "") ;
                                 
+                BOOST_FOREACH( ptree::value_type const& v, pt.get_child("ssp.inbound") ) {
+                    if( v.first == "appserver" ) {
+                        /* get name */
+                        string appserverName ;
+                        string address = v.second.data()  ;
+                        if( !getXmlAttribute( v, "name", appserverName ) ) {
+                            appserverName = address ;
+                        }
+                        
+                        
+                        Appserver_t as( v.second.data(), v.second.get("event-socket-port", 8021) ) ;
+                        
+                        pair<AppserverMap_t::iterator, bool> ret = m_mapAppserver.insert( AppserverMap_t::value_type( appserverName, as ) ) ;
+                        if( !ret.second ) {
+                            cerr << "Multiple appserver elements have duplicate name attribute values or ip addresses" << endl ;
+                            return ;
+                        }
+                    }
+                    else if( v.first == "appserver-group" ) {
+                        /* get name */
+                        string appserverGroupName ;
+                        if( !getXmlAttribute( v, "name", appserverGroupName ) ) {
+                            return ;
+                        }
+                        
+                        boost::unordered_set<Appserver_t> setAppserver ;
+                        
+                        BOOST_FOREACH( ptree::value_type const& v2, v.second ) {
+                            if( v2.first == "appserver") {
+                                string asName = v2.second.data() ;
+                                AppserverMap_t::iterator it = m_mapAppserver.find( asName )  ;
+                                if( m_mapAppserver.end() == it ) {
+                                    cerr << "Unable to find appserver element with name: " << asName << endl ;
+                                    return ;
+                                }
+                                setAppserver.insert( it->second ) ;
+                            }
+                        }
+                        
+                        AppserverGroup_t asg( appserverGroupName, setAppserver ) ;
+                        pair<AppserverGroupMap_t::iterator, bool> ret = m_mapAppserverGroup.insert( AppserverGroupMap_t::value_type( appserverGroupName, asg ) ) ;
+                        if( !ret.second ) {
+                            cerr << "Multiple appserver-group elements have duplicate name attribute values" << endl ;
+                            return ;
+                        }
+                    }
+                }
                 BOOST_FOREACH( ptree::value_type const& v, pt.get_child("ssp") ) {
 
                     /* customer/dnis configuration */
@@ -372,70 +429,25 @@ namespace ssp {
                             return ;
 
                         boost::unordered_set<CarrierAddressSpace_t> setInbound ;
-                        boost::unordered_set<CarrierAddressSpace_t> setOutbound ;
                         BOOST_FOREACH( ptree::value_type const& v2, v.second.get_child("inbound") ) {
                             if( v2.first == "address") {
-                                CarrierAddressSpace_t c( v2.second.data(), v2.second.get("<xmlattr>.port", 5060), v2.second.get("<xmlattr>.netmask", "255.255.255.255") ) ;
-                                setInbound.insert( c ) ;
+                                CarrierAddressSpace_t c( carrierName, v2.second.data(), v2.second.get("<xmlattr>.port", 5060), v2.second.get("<xmlattr>.netmask", "255.255.255.255") ) ;
+                                pair<CarrierServerMap_t::iterator, bool> ret = m_mapInboundCarrier.insert( CarrierServerMap_t::value_type( c.getAddress(), c ) ) ;
+                                if( !ret.second ) {
+                                    cerr << "Multiple carrier elements have duplicate address attribute values" << endl ;
+                                    return ;
+                                }
+                                
                             }
                         }
+                        /*
                         BOOST_FOREACH( ptree::value_type const& v2, v.second.get_child("outbound") ) {
                             CarrierAddressSpace_t c( v2.second.data(), v2.second.get("<xmlattr>.port", 5060), v2.second.get("<xmlattr>.netmask", "255.255.255.255") ) ;
                             setOutbound.insert( c ) ;
-                        }
-                        
-                        pair<CarrierServerMap_t::iterator, bool> ret = m_mapInboundCarrier.insert( CarrierServerMap_t::value_type( carrierName, setInbound ) ) ;
-                        if( !ret.second ) {
-                            cerr << "Multiple carrier elements have duplicate name attribute values" << endl ;
-                            return ;
-                        }
+                        } 
+                         */
                     }
-                    else if( v.first == "appserver" ) {
-                        /* get name */
-                        string appserverName ;
-                        string address = v.second.data()  ;
-                        if( !getXmlAttribute( v, "name", appserverName ) ) {
-                            appserverName = address ;
-                        }
-
-                        
-                        Appserver_t as( v.second.data(), v.second.get("event-socket-port", 8021) ) ;
-                        
-                        pair<AppserverMap_t::iterator, bool> ret = m_mapAppserver.insert( AppserverMap_t::value_type( appserverName, as ) ) ;
-                        if( !ret.second ) {
-                            cerr << "Multiple appserver elements have duplicate name attribute values or ip addresses" << endl ;
-                            return ;
-                        }
-                    }
-                    else if( v.first == "appserver-group" ) {
-                        /* get name */
-                        string appserverGroupName ;
-                        if( !getXmlAttribute( v, "name", appserverGroupName ) ) {
-                            return ;
-                        }
-                        
-                        boost::unordered_set<Appserver_t> setAppserver ;
-                        
-                         BOOST_FOREACH( ptree::value_type const& v2, v.second ) {
-                             if( v2.first == "appserver") {
-                                string asName = v2.second.data() ;
-                                AppserverMap_t::iterator it = m_mapAppserver.find( asName )  ;
-                                if( m_mapAppserver.end() == it ) {
-                                    cerr << "Unable to find appserver element with name: " << asName << endl ;
-                                    return ;
-                                }
-                                setAppserver.insert( it->second ) ;
-                             }
-                        }
-                        
-                        AppserverGroup_t asg( appserverGroupName, setAppserver ) ;
-                        pair<AppserverGroupMap_t::iterator, bool> ret = m_mapAppserverGroup.insert( AppserverGroupMap_t::value_type( appserverGroupName, asg ) ) ;
-                        if( !ret.second ) {
-                            cerr << "Multiple appserver-group elements have duplicate name attribute values" << endl ;
-                            return ;
-                        }
-                    }
-                    else if( v.first == "routing" ) {
+                     else if( v.first == "routing" ) {
                         BOOST_FOREACH( const ptree::value_type& v2, v.second.get_child("inbound") ) {
                             if( v2.first == "route") {
                                 string selector = v2.second.get("<xmlattr>.selector","") ;
@@ -523,16 +535,12 @@ namespace ssp {
             return false ;
         }
         bool getCarrier( const std::string& sourceAddress, std::string& carrier) const {
-            for( CarrierServerMap_t::const_iterator it = m_mapInboundCarrier.begin(); it != m_mapInboundCarrier.end(); it++ ) {
-                BOOST_FOREACH( const CarrierAddressSpace_t& c, it->second ) {
-                    if( c.matchesOrContains( sourceAddress ) ) {
-                        carrier = it->first ;
-                        return true ;
-                    }
-                }
-            }
-            return false ;
-        }
+            CarrierServerMap_t::const_iterator it = m_mapInboundCarrier.find( sourceAddress ) ;
+            if( m_mapInboundCarrier.end() == it ) return false ;
+            CarrierAddressSpace_t c = it->second ;
+            carrier = c.getCarrier() ;
+            return true ;
+         }
         bool getInboundRoutes( const std::string& sourceAddress, const std::string& dnis, const std::string& ani, std::vector<std::string>& routes, routing_strategy& strategy, routing_error& error ) const {
             Routing_t::Route_t route ;
             string carrierName, customerName ;
@@ -603,9 +611,11 @@ namespace ssp {
                 return false ;
             }
             
+            /*
             BOOST_FOREACH( const CarrierAddressSpace_t& c, it->second ) {
                 routes.push_back( c.getAddress() ) ;
             }
+             */
             return true ;
             
         }
@@ -640,34 +650,7 @@ namespace ssp {
                 servers.push_back( s ) ;
             }
         }
-        
-        peer_type queryPeerType( const string& host ) {
-            CarrierAddressSpace_t c( host ) ;
-            
-            /* check carrier hosts first */
-            for( boost::unordered_map< string, boost::unordered_set<CarrierAddressSpace_t> >::const_iterator it = m_mapInboundCarrier.begin();
-                it != m_mapInboundCarrier.end(); it++ ) {
                 
-                boost::unordered_set<CarrierAddressSpace_t> set = it->second ;
-                if( set.end() != set.find( c ) ) {
-                    return external_peer ;
-                }
-            }
-            
-            /* now check appservers */
-            Appserver_t as( host ) ;
-            for( boost::unordered_map< string, AppserverGroup_t>::const_iterator it = m_mapAppserverGroup.begin();
-                it != m_mapAppserverGroup.end(); it++ ) {
-                
-                AppserverGroup_t group = it->second ;
-                if( group.getAppservers().end() != group.getAppservers().find( as ) ) {
-                    return internal_peer ;
-                }
-            }
-            
-            return unknown_peer ;
-        }
-        
         bool getAppserverGroup( const string& name, AppserverGroup_t& group ) {
             boost::unordered_map< string, AppserverGroup_t>::const_iterator it = m_mapAppserverGroup.find( name ) ;
             if( m_mapAppserverGroup.end() == it ) return false ;
@@ -676,8 +659,11 @@ namespace ssp {
             return true;             
         }
         unsigned int getSofiaLogLevel(void) { return m_nSofiaLogLevel; }
+        unsigned int getMaxRoundRobins(void) { return m_nMaxRoundRobins; }
         
         agent_mode getAgentMode(void) { return m_agent_mode; }
+        
+        bool getAcl(string& strAcl) { strAcl =  m_strAcl ;}
 
         
     private:
@@ -710,6 +696,8 @@ namespace ssp {
         Routing_t m_routing ;
         agent_mode m_agent_mode ;
         unsigned int m_nSofiaLogLevel ;
+        unsigned int m_nMaxRoundRobins ;
+        string m_strAcl ;
     } ;
     
     /*
@@ -753,11 +741,7 @@ namespace ssp {
     bool SspConfig::getSyslogFacility( sinks::syslog::facility& facility ) const {
         return m_pimpl->getSyslogFacility( facility ) ;
     }
-    
-    peer_type SspConfig::queryPeerType( const std::string& strAddress ) {
-        return m_pimpl->queryPeerType( strAddress ) ;
-    }
-    
+        
     void SspConfig::getAppservers( deque<string>& servers) {
         return m_pimpl->getAppservers(servers) ;
     }
@@ -767,6 +751,18 @@ namespace ssp {
     }
     unsigned int SspConfig::getSofiaLogLevel() {
         return m_pimpl->getSofiaLogLevel() ;
+    }
+    unsigned int SspConfig::getMaxRoundRobins() {
+        return m_pimpl->getMaxRoundRobins() ;
+    }
+    bool SspConfig::getAcl( string& strAcl ) {
+        m_pimpl->getAcl( strAcl ) ;
+        return true ;
+    }
+    bool SspConfig::isAcl( const string& s ) {
+        string strAcl ;
+        m_pimpl->getAcl( strAcl ) ;
+        return 0 == s.compare( strAcl ) ;
     }
     
 
