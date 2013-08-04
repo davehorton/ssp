@@ -31,11 +31,15 @@ namespace ssp {
         
         void reset( const deque<string>& servers ) ;
         
-        bool getAvailableServer( boost::shared_ptr<FsInstance>& server ) ;
+        void setRoundRobinInterval( unsigned int nInterval ) { m_RRInterval = nInterval; }
+        
+        bool getAvailableServers( deque< boost::shared_ptr<FsInstance> >& servers ) ;
         
         
     protected:
         void threadFunc() ;
+        
+        void toString( deque< boost::shared_ptr<FsInstance> >& d, std::stringstream& s ) ;
         
         
     private:
@@ -45,6 +49,10 @@ namespace ssp {
         boost::thread               m_thread ;
         boost::mutex                m_mutex ;
         boost::asio::io_service     m_ioService ;
+        
+        unsigned int                m_RRInterval ;
+        unsigned int                m_nLastServer ;
+        unsigned int                m_nLastRR ;
         
     } ;
     

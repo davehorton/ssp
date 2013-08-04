@@ -6,6 +6,8 @@
 #include <boost/property_tree/xml_parser.hpp>
 #include <boost/property_tree/ptree.hpp>
 #include <boost/foreach.hpp>
+#include <boost/function.hpp>
+#include <boost/bind.hpp>
 
 namespace ssp {
     class SipLbController ;
@@ -14,6 +16,8 @@ namespace ssp {
 #define SU_ROOT_MAGIC_T ssp::SipLbController
 #define NTA_AGENT_MAGIC_T ssp::SipLbController
 #define NTA_LEG_MAGIC_T ssp::SipLbController
+#define NTA_INCOMING_MAGIC_T ssp::SipLbController
+#define NTA_OUTGOING_MAGIC_T ssp::SipLbController
 #define SU_TIMER_ARG_T ssp::SipLbController
 
 #define COMPLETED_TRANSACTION_HOLD_TIME_IN_SECS (32)
@@ -33,6 +37,9 @@ namespace ssp {
 using namespace std ;
 
 namespace {
+    
+    int counter = 5 ;
+    
 	/* sofia logging is redirected to this function */
 	static void __sofiasip_logger_func(void *logarg, char const *fmt, va_list ap) {
         
@@ -74,7 +81,7 @@ namespace {
         
         
 	} ;
-     /*
+
     int defaultLegCallback( nta_leg_magic_t* controller,
                            nta_leg_t* leg,
                            nta_incoming_t* irq,
@@ -82,7 +89,7 @@ namespace {
         
         return controller->processRequestOutsideDialog( leg, irq, sip ) ;
     }
- 
+
     int legCallback( nta_leg_magic_t* controller,
                            nta_leg_t* leg,
                            nta_incoming_t* irq,
@@ -90,14 +97,19 @@ namespace {
         
         return controller->processRequestInsideDialog( leg, irq, sip ) ;
     }
-    
-    int uacCallback( nta_outgoing_magic_t* b2bCall,
+
+    int response_to_invite( nta_outgoing_magic_t* controller,
                     nta_outgoing_t* request,
                     sip_t const* sip ) {
         
-        return b2bCall->processUacMsgInsideDialog( request, sip ) ;
+        return controller->processInviteResponseInsideDialog( request, sip ) ;
+    }
+    int handleAckOrCancel( nta_incoming_magic_t* controller, nta_incoming_t* irq, sip_t const *sip ) {
+        return controller->processAckOrCancel( irq, sip ) ;
     }
     
+    
+/*
     int uasCallback( nta_outgoing_magic_t* b2bCall,
                     nta_incoming_t* request,
                     sip_t const* sip ) {
@@ -119,7 +131,7 @@ namespace {
 namespace ssp {
 
     SipLbController::SipLbController( int argc, char* argv[] ) : m_bDaemonize(false), m_bLoggingInitialized(false),
-        m_configFilename(DEFAULT_CONFIG_FILENAME), m_bInbound(false), m_bOutbound(false) {
+        m_configFilename(DEFAULT_CONFIG_FILENAME), m_bInbound(false), m_bOutbound(false), m_nIterationCount(-1) {
         
         if( !parseCmdArgs( argc, argv ) ) {
             usage() ;
@@ -133,7 +145,7 @@ namespace ssp {
         
         /* now we can initialize logging */
         m_logger.reset( this->createLogger() ) ;
-        
+            
     }
 
     SipLbController::~SipLbController() {
@@ -158,12 +170,13 @@ namespace ssp {
                 /* These options don't set a flag.
                  We distinguish them by their indices. */
                 {"file",    required_argument, 0, 'f'},
+                {"iterations",    required_argument, 0, 'i'},
                 {0, 0, 0, 0}
             };
             /* getopt_long stores the option index here. */
             int option_index = 0;
             
-            c = getopt_long (argc, argv, "f:",
+            c = getopt_long (argc, argv, "f:i:",
                              long_options, &option_index);
             
             /* Detect the end of the options. */
@@ -185,6 +198,11 @@ namespace ssp {
                 case 'f':
                     m_configFilename = optarg ;
                     break;
+                    
+                case 'i':
+                    m_nIterationCount = ::atoi( optarg ) ;
+                    cout << "option iteration count set; program will exit after handling " << m_nIterationCount << " INVITES !!" << endl ;
+                    break ;
                     
                 case '?':
                     /* getopt_long already printed an error message. */
@@ -261,6 +279,10 @@ namespace ssp {
         return new src::severity_logger_mt< severity_levels >(keywords::severity = log_info);
     }
 
+    void SipLbController::deinitializeLogging() {
+        logging::core::get()->remove_sink( m_sink ) ;
+        m_sink.reset() ;
+    }
     void SipLbController::initializeLogging() {
         try {
             // Create a syslog sink
@@ -271,7 +293,7 @@ namespace ssp {
             m_Config->getSyslogFacility( facility ) ;
             m_Config->getSyslogTarget( syslogAddress, syslogPort ) ;
             
-            shared_ptr< sinks::synchronous_sink< sinks::syslog_backend > > sink(
+            m_sink.reset(
                 new sinks::synchronous_sink< sinks::syslog_backend >(
                      keywords::use_impl = sinks::syslog::udp_socket_based
                     , keywords::facility = facility
@@ -286,17 +308,17 @@ namespace ssp {
             mapping[log_warning] = sinks::syslog::warning;
             mapping[log_error] = sinks::syslog::critical;
 
-            sink->locked_backend()->set_severity_mapper(mapping);
+            m_sink->locked_backend()->set_severity_mapper(mapping);
 
             // Set the remote address to sent syslog messages to
-            sink->locked_backend()->set_target_address( syslogAddress.c_str() );
+            m_sink->locked_backend()->set_target_address( syslogAddress.c_str() );
 
             // Add the sink to the core
-            logging::core::get()->add_sink(sink);
+            logging::core::get()->add_sink(m_sink);
             
             m_bLoggingInitialized = true ;
 
-	    std::cout << "Created logger" << endl ;
+            std::cout << "Created logger" << endl ;
             
         }
         catch (std::exception& e) {
@@ -340,31 +362,63 @@ namespace ssp {
         su_log_redirect(NULL, __sofiasip_logger_func, NULL);
         
         /* for now set logging to full debug */
-        su_log_set_level(NULL, 8) ;
+        su_log_set_level(NULL, m_Config->getSofiaLogLevel() ) ;
         setenv("TPORT_LOG", "1", 1) ;
         
         /* this causes su_clone_start to start a new thread */
-        su_root_threading( m_root, 1 ) ;
+        //su_root_threading( m_root, 1 ) ;
         
         /* create our agent */
-        m_nta = nta_agent_create( m_root,
-                                 URL_STRING_MAKE(url.c_str()),               /* our contact address */
-                                 stateless_callback,         /* callback function */
-                                 this,                  /* magic passed to callback */
-                                 TAG_NULL(),
-                                 TAG_END() ) ;
+        char str[URL_MAXLEN] ;
+        memset(str, 0, URL_MAXLEN) ;
+        strncpy( str, url.c_str(), url.length() ) ;
         
-        if( NULL == m_nta ) {
-            SSP_LOG(log_error) << "Error calling nta_agent_create" << endl ;
-            return ;
+        
+        if( agent_mode_stateless == m_Config->getAgentMode() ) {
+            /* stateless */
+            m_nta = nta_agent_create( m_root,
+                                     URL_STRING_MAKE(str),               /* our contact address */
+                                     stateless_callback,         /* callback function */
+                                     this,                  /* magic passed to callback */
+                                     TAG_NULL(),
+                                     TAG_END() ) ;            
+            if( NULL == m_nta ) {
+                SSP_LOG(log_error) << "Error calling nta_agent_create" << endl ;
+                return ;
+            }
+       }
+        else {
+            /* stateful */
+            m_nta = nta_agent_create( m_root,
+                                     URL_STRING_MAKE(str),               /* our contact address */
+                                     NULL,         /* no callback function */
+                                     NULL,                  /* therefore no context */
+                                     TAG_NULL(),
+                                     TAG_END() ) ;
+            
+            if( NULL == m_nta ) {
+                SSP_LOG(log_error) << "Error calling nta_agent_create" << endl ;
+                return ;
+            }
+            
+            m_defaultLeg = nta_leg_tcreate(m_nta, defaultLegCallback, this,
+                                          NTATAG_NO_DIALOG(1),
+                                          TAG_END());
+            if( NULL == m_defaultLeg ) {
+                SSP_LOG(log_error) << "Error creating default leg" << endl ;
+                return ;
+            }
+            
+            
         }
+        
         
         /* save my contact url, via, etc */
         m_my_contact = nta_agent_contact( m_nta ) ;
         ostringstream s ;
         s << "SIP/2.0/UDP " <<  m_my_contact->m_url[0].url_host ;
         if( m_my_contact->m_url[0].url_port ) s << ":" <<  m_my_contact->m_url[0].url_port  ;
-        m_my_via = s.str() ;
+        m_my_via.assign( s.str().c_str(), s.str().length() ) ;
         SSP_LOG(log_debug) << "My via header: " << m_my_via << endl ;
         
         
@@ -372,24 +426,33 @@ namespace ssp {
             deque<string> servers ; 
             m_Config->getAppservers(servers) ;
             m_fsMonitor.reset(servers) ;
+            m_fsMonitor.setRoundRobinInterval( m_Config->getMaxRoundRobins() )  ;
             m_fsMonitor.run() ;
         }
         
         /* start a timer */
-        su_timer_t* timer = su_timer_create( su_root_task(m_root), 15000) ;
-        su_timer_set_for_ever(timer, timerHandler, this) ;
+        m_timer = su_timer_create( su_root_task(m_root), 15000) ;
+        su_timer_set_for_ever(m_timer, timerHandler, this) ;
         
         
         SSP_LOG(log_notice) << "Starting sofia event loop" << endl ;
         su_root_run( m_root ) ;
         SSP_LOG(log_notice) << "Sofia event loop ended" << endl ;
+        m_fsMonitor.stop() ;
         
-        nta_agent_destroy( m_nta ) ;
-    }
+        su_root_destroy( m_root ) ;
+        m_root = NULL ;
+        su_home_unref( m_home ) ;
+        su_deinit() ;
+
+        m_Config.reset(0) ;
+        this->deinitializeLogging() ;
+   }
 
     int SipLbController::processTimer() {
         
-        SSP_LOG(log_debug) << "Processing " << m_deqCompletedCallIds.size() << " completed calls" << endl ;
+        SSP_LOG(log_debug) << "Processing " << m_deqCompletedCallIds.size() << " completed calls and a total of "
+        << m_mapInvitesInProgress.size() << " completed plus in progress calls remain "<< endl ;
         time_t now = time(NULL);
         deque<string>::iterator it = m_deqCompletedCallIds.begin() ;
         while ( m_deqCompletedCallIds.end() != it ) {            
@@ -407,14 +470,27 @@ namespace ssp {
             it = m_deqCompletedCallIds.erase( it ) ;
         }
          
-        SSP_LOG(log_debug) << "After processing " << m_deqCompletedCallIds.size() << " completed calls remain" << endl ;
+        SSP_LOG(log_debug) << "After processing " << m_deqCompletedCallIds.size() << " completed calls remain, and a total of "
+            << m_mapInvitesInProgress.size() << " completed plus in progress calls remain "<< endl ;
+        if( 0 == m_nIterationCount && 0 == m_deqCompletedCallIds.size() && 0 == m_mapInvitesInProgress.size() ) {
+            
+            if( --counter == 0  ) {
+                SSP_LOG(log_notice) << "shutting down timer, interation count reached" << endl ;
+                su_timer_reset( m_timer ) ;
+                su_timer_destroy( m_timer ) ;
+                m_timer = NULL ;
+                nta_agent_destroy( m_nta ) ;
+                m_nta = NULL ;
+                su_root_break( m_root ) ;                
+            }
+        }
         
         return 0 ;
     }
     
     int SipLbController::statelessCallback( msg_t *msg, sip_t *sip ) {
         
-        string strCallId = sip->sip_call_id->i_id ;
+        string strCallId( sip->sip_call_id->i_id, strlen(sip->sip_call_id->i_id) ) ;
         iip_map_t::const_iterator it = m_mapInvitesInProgress.find( strCallId ) ;
         if( sip->sip_request ) {
             
@@ -426,9 +502,12 @@ namespace ssp {
                 iip->updateExpireTime() ;
                 string strUrlDest = iip->getDestUrl() ;
                 SSP_LOG(log_debug) << "Forwarding request to " << strUrlDest << endl ;
-                int rv = nta_msg_tsend( m_nta, msg, URL_STRING_MAKE(strUrlDest.c_str()), TAG_NULL(), TAG_END() ) ;
+                char str[URL_MAXLEN] ;
+                memset(str, 0, URL_MAXLEN) ;
+                strncpy( str, strUrlDest.c_str(), strUrlDest.length() ) ;
+                int rv = nta_msg_tsend( m_nta, msg, URL_STRING_MAKE(str), TAG_NULL(), TAG_END() ) ;
                 if( 0 != rv ) {
-                    SSP_LOG(log_error) << "Error forwarding message: " << rv ;
+                    SSP_LOG(log_error) << "Error forwarding message: " << rv << endl ;
                 }
                 return 0 ;
             }
@@ -441,23 +520,32 @@ namespace ssp {
                    
                 case sip_method_invite:
                 {
+                    if( 0 == m_nIterationCount )  {
+                        SSP_LOG(log_error) << "Discarding new INVITE because we are in the process of shutting down " << endl ;
+                        nta_msg_discard( m_nta, msg ) ;
+                        return 0 ;
+                    }
                     
                     /* select a freeswitch server */
-                    boost::shared_ptr<FsInstance> server ;
-                    if( !m_fsMonitor.getAvailableServer( server ) ) {
-                        SSP_LOG(log_warning) << "No available server for incoming call; returning to carrier for busy handling " << sip->sip_call_id->i_id  << endl ;
+                    deque< boost::shared_ptr<FsInstance> > servers ;
+                    if( !m_fsMonitor.getAvailableServers( servers ) ) {
+                        SSP_LOG(log_warning) << "No available server for incoming call; returning to carrier for busy handling " << strCallId << endl ;
                         return 486 ;
                     }
+                    boost::shared_ptr<FsInstance> server = servers[0] ;
                     
                     ostringstream dest ;
                     dest << "sip:" << sip->sip_to->a_url[0].url_user << "@" << server->getSipAddress() << ":" << server->getSipPort() ;
                     SSP_LOG(log_notice) << "sending outbound invite to request uri " << dest.str() << endl ;
                     string url = dest.str() ;
                     const char* szDest = url.c_str() ;
+                    char str[URL_MAXLEN] ;
+                    memset(str, 0, URL_MAXLEN) ;
+                    strncpy( str, url.c_str(), url.length() ) ;
                     
                     int rv = nta_msg_tsend( m_nta,
                                            msg,
-                                           URL_STRING_MAKE(szDest),
+                                           URL_STRING_MAKE(str),
                                            TAG_NULL(),
                                            TAG_END() ) ;
                     if( 0 != rv ) {
@@ -465,18 +553,23 @@ namespace ssp {
                         return rv ;
                     }
                     
-                    shared_ptr<SipInboundCall> iip = boost::make_shared<SipInboundCall>( SipInboundCall( sip->sip_call_id->i_id, dest.str() ) ) ;
+                    shared_ptr<SipInboundCall> iip = boost::make_shared<SipInboundCall>( strCallId, str ) ;
                     m_mapInvitesInProgress.insert( iip_map_t::value_type( iip->getCallId(), iip )) ;
                     SSP_LOG(log_debug) << "There are now " << m_mapInvitesInProgress.size() << " invites in progress" << endl ;
+                    
+                    if( m_nIterationCount > 0 ) m_nIterationCount-- ;
+                    
                     return 0 ;
                 }
                 case sip_method_ack:
-                    /* we're done if we get the ACK (should only be in the case of a final non-success response */
+                    /* we're done if we get the ACK (should only be in the case of a final non-success response) */
                     setCompleted( it ) ;
+                    nta_msg_discard( m_nta, msg ) ;
                     break ;
                     
                 default:
                     SSP_LOG(log_error) << "Error: received new request that was not an INVITE or OPTIONS ";
+                    nta_msg_discard( m_nta, msg ) ;
                     break;
             }
         }
@@ -503,6 +596,7 @@ namespace ssp {
     }
     void SipLbController::setCompleted( iip_map_t::const_iterator& it )  {
         shared_ptr<SipInboundCall> iip = it->second ;
+        if( iip->isCompleted() ) return ;
         iip->setCompleted() ;
         m_deqCompletedCallIds.push_back( iip->getCallId() ) ;
     }
@@ -548,4 +642,310 @@ namespace ssp {
         
         return sip_contact_dup(m_home, f0);
     }
+    
+    /* stateful */
+    int SipLbController::processRequestOutsideDialog( nta_leg_t* defaultLeg, nta_incoming_t* irq, sip_t const *sip) {
+        SSP_LOG(log_debug) << "processRequestOutsideDialog" << endl ;
+        switch (sip->sip_request->rq_method ) {
+            case sip_method_options:
+                nta_incoming_destroy( irq ) ;
+                return 200 ;
+                
+            case sip_method_ack:
+                /* success case: call has been established */
+                SSP_LOG(log_debug) << "Received ACK for 200 OK" << endl ;
+                nta_incoming_destroy( irq ) ;
+                return 0 ;
+                
+            case sip_method_invite:
+            {
+                /* send 100 Trying */
+                nta_incoming_treply( irq, SIP_100_TRYING, TAG_END() ) ;
+                
+                /* check if this is a known carrier */
+                string carrier ;
+                if( !m_Config->getCarrier( sip->sip_contact->m_url[0].url_host, carrier) && m_Config->isAcl("carrier") ) {
+                    SSP_LOG(log_error) << "Received invite from address not associated with a configured carrier; rejecting" << endl ;
+                    return 403 ;
+                }
+                
+                /* select a freeswitch server */
+                string strCallId( sip->sip_call_id->i_id, strlen(sip->sip_call_id->i_id) ) ;
+                /* select a freeswitch server */
+                deque< boost::shared_ptr<FsInstance> > servers ;
+                if( !m_fsMonitor.getAvailableServers( servers ) ) {
+                    SSP_LOG(log_warning) << "No available server for incoming call; returning to carrier for busy handling " << strCallId << endl ;
+                    return 486 ;
+                }
+                boost::shared_ptr<FsInstance> server = servers[0] ;
+                ostringstream dest ;
+                dest << "sip:" << sip->sip_to->a_url[0].url_user << "@" << server->getSipAddress() << ":" << server->getSipPort() ;
+                SSP_LOG(log_notice) << "sending outbound invite to request uri " << dest.str() << endl ;
+                string url = dest.str() ;
+                const char* szDest = url.c_str() ;
+                char str[URL_MAXLEN] ;
+                memset(str, 0, URL_MAXLEN) ;
+                strncpy( str, url.c_str(), url.length() ) ;
+
+                /* create the A leg */
+                nta_leg_t* a_leg = nta_leg_tcreate(m_nta,
+                                           legCallback, this,
+                                           SIPTAG_CALL_ID(sip->sip_call_id),
+                                           SIPTAG_CSEQ(sip->sip_cseq),
+                                           SIPTAG_TO(sip->sip_from),
+                                           SIPTAG_FROM(sip->sip_to),
+                                           TAG_END());
+                nta_leg_server_route( a_leg, sip->sip_record_route, sip->sip_contact ) ;
+                
+                const char* a_tag = nta_incoming_tag( irq, NULL) ;
+                nta_leg_tag( a_leg, a_tag ) ;
+                SSP_LOG(log_debug) << "incoming leg " << a_leg << endl ;
+
+                /* callback for ACK or CANCEL from A */
+                nta_incoming_bind( irq, handleAckOrCancel, this ) ;
+                                
+                /* create the B leg.  Let nta generate a Call-ID for us */
+                sip_from_t* from = generateOutgoingFrom( sip->sip_from ) ;
+                sip_to_t* to = generateOutgoingTo( sip->sip_to ) ;
+                sip_contact_t* contact = generateOutgoingContact( sip->sip_contact ) ;
+                
+                nta_leg_t* b_leg =  nta_leg_tcreate(m_nta,
+                                                    legCallback, this,
+                                                    SIPTAG_FROM(from),
+                                                    SIPTAG_TO(to),
+                                                    TAG_END());
+                
+                const char* b_tag = nta_agent_newtag(m_home, "tag=%s", m_nta) ;
+                nta_leg_tag( b_leg, b_tag ) ;
+                SSP_LOG(log_debug) << "outgoing leg " << b_leg << endl ;
+                
+                std::stringstream carrierString ;
+                carrierString << "X-Originating-Carrier: " ;
+                carrierString << (carrier.empty() ? "unknown": carrier);
+
+                std::stringstream carrierTrunk ;
+                carrierTrunk << "X-Originating-Carrier-IP: " ;
+                carrierTrunk << sip->sip_contact->m_url[0].url_host;
+                
+                /* send the outbound INVITE */
+                 nta_outgoing_t* orq = nta_outgoing_tcreate(b_leg, response_to_invite, this,
+                                            NULL,
+                                            SIP_METHOD_INVITE,
+                                            URL_STRING_MAKE(str),
+                                            SIPTAG_CONTACT(contact),
+                                            SIPTAG_CONTENT_TYPE(sip->sip_content_type),
+                                            SIPTAG_CONTENT_DISPOSITION(sip->sip_content_disposition),
+                                            SIPTAG_CONTENT_LENGTH(sip->sip_content_length),
+                                            SIPTAG_PAYLOAD(sip->sip_payload),
+                                            SIPTAG_SUPPORTED(sip->sip_supported),
+                                            SIPTAG_SUBJECT(sip->sip_subject),
+                                            SIPTAG_UNSUPPORTED(sip->sip_unsupported),
+                                            SIPTAG_REQUIRE(sip->sip_require),
+                                            SIPTAG_USER_AGENT(sip->sip_user_agent),
+                                            SIPTAG_ALLOW(sip->sip_allow),
+                                            SIPTAG_PRIVACY(sip->sip_privacy),
+                                            SIPTAG_P_ASSERTED_IDENTITY(sip_p_asserted_identity( sip )),
+                                            SIPTAG_UNKNOWN(sip_unknown(sip)),
+                                            SIPTAG_UNKNOWN_STR(carrierString.str().c_str()),
+                                            SIPTAG_UNKNOWN_STR(carrierTrunk.str().c_str()),
+                                            TAG_END());
+                
+                /* save the associated transactions, so that we can look up incoming given outgoing or vice versa */
+                this->addTransactions( irq, orq) ;
+                break;
+            }
+                
+            default:
+                nta_incoming_destroy( irq ) ;
+                break ;
+                
+        }
+        
+        return 0 ;
+    }
+    int SipLbController::processInviteResponseInsideDialog( nta_outgoing_t* orq, sip_t const* sip ) {
+        SSP_LOG(log_debug) << "processInviteResponseInsideDialog, orq " << orq << endl ;
+          
+        nta_incoming_t* irq = this->getAssociatedTransaction( orq) ;
+        assert( NULL != irq ) ;
+        
+        int status = sip->sip_status->st_status ;
+
+        if( 100 == status )
+            return 0 ;
+        
+        if( status >= 200 ) {
+            nta_leg_t* incoming_leg = this->getLegFromTransaction( irq ) ;
+            assert( NULL != incoming_leg ) ;
+            SSP_LOG(log_debug) << "incoming leg " << incoming_leg << endl ;
+            
+            //nta_leg_tag( incoming_leg, nta_incoming_tag( irq, NULL) );
+            nta_incoming_treply( irq, status, sip->sip_status->st_phrase,
+                                SIPTAG_CONTACT(m_my_contact),
+                                SIPTAG_CONTENT_TYPE(sip->sip_content_type),
+                                SIPTAG_CONTENT_DISPOSITION(sip->sip_content_disposition),
+                                SIPTAG_CONTENT_LENGTH(sip->sip_content_length),
+                                SIPTAG_PAYLOAD(sip->sip_payload),
+                                TAG_END() ) ;
+            
+            if( 200 == status ) {
+                /* we need to send the ACK to a success final response */
+                SSP_LOG(log_debug) << "looking for B leg using callid: " << sip->sip_call_id << " with local tag " << sip->sip_from->a_tag << endl ;
+                nta_leg_t* outgoing_leg = nta_leg_by_dialog( m_nta, NULL, sip->sip_call_id , NULL, NULL, sip->sip_from->a_tag, NULL );
+                assert( NULL != outgoing_leg ) ;
+                SSP_LOG(log_debug) << "outgoing leg " << outgoing_leg << endl ;
+                nta_leg_rtag( outgoing_leg, sip->sip_to->a_tag) ;
+                
+                msg_t* msg = nta_outgoing_getresponse( orq ) ;
+                sip_t* final_response = sip_object( msg ) ;
+                nta_outgoing_t* ack_request = nta_outgoing_tcreate(outgoing_leg, NULL, NULL, NULL,
+                                                                   SIP_METHOD_ACK,
+                                                                   (url_string_t*) sip->sip_contact->m_url ,
+                                                                   //SIPTAG_CSEQ(sip->sip_cseq),
+                                                                   //SIPTAG_TO(sip->sip_to),
+                                                                   //SIPTAG_FROM(sip->sip_from),
+                                                                   TAG_END());
+                nta_msg_discard( m_nta, msg ) ; //NB: need to release this reference we obtained above or it will leak
+                nta_outgoing_destroy( ack_request ) ;
+                nta_leg_client_reroute( outgoing_leg, NULL, sip->sip_contact, true );
+                
+                this->addDialogs( incoming_leg, outgoing_leg ) ;
+                
+            }
+            this->clearTransaction( orq ) ;
+            
+       }
+        else {
+            nta_incoming_treply( irq, status, sip->sip_status->st_phrase,
+                                SIPTAG_CONTACT(m_my_contact),
+                                SIPTAG_CONTENT_TYPE(sip->sip_content_type),
+                                SIPTAG_CONTENT_DISPOSITION(sip->sip_content_disposition),
+                                SIPTAG_CONTENT_LENGTH(sip->sip_content_length),
+                                SIPTAG_PAYLOAD(sip->sip_payload),
+                                TAG_END() ) ;
+            
+        }
+        
+        return 0 ;
+    }
+    int SipLbController::processAckOrCancel( nta_incoming_t* irq, sip_t const *sip ) {
+        
+        SSP_LOG(log_debug) << "processAckOrCancel, irq " << irq << endl ;
+        
+        if( sip->sip_request->rq_method == sip_method_cancel ) {
+            nta_outgoing_t* orq = this->getAssociatedTransaction( irq ) ;
+            assert( NULL != orq ) ;
+            nta_outgoing_cancel( orq ) ;
+            nta_outgoing_destroy( orq ) ;
+            this->clearTransaction( orq ) ;
+        }
+        else if( sip->sip_request->rq_method == sip_method_ack ) {
+            /* we only get here in the case of a non-success response, and nta has already generated an ACK to B */
+        }
+        
+        return 0 ;
+    }
+    int SipLbController::processRequestInsideDialog( nta_leg_t* leg, nta_incoming_t* irq, sip_t const *sip) {
+        SSP_LOG(log_debug) << "processRequestInsideDialog, leg " << leg << endl ;
+        nta_leg_t* other = this->getAssociatedDialog( leg ) ;
+        assert( NULL != other ) ;
+        switch (sip->sip_request->rq_method ) {
+            case sip_method_bye:
+            {
+                
+                
+                nta_outgoing_t* cancel = nta_outgoing_tcreate( other, NULL, NULL,
+                                     NULL,
+                                     SIP_METHOD_BYE,
+                                     NULL,
+                                     TAG_END() ) ;
+                nta_outgoing_destroy(cancel) ;
+                
+                
+                this->clearDialog( leg ) ;
+                if( m_nIterationCount > 0 ) m_nIterationCount-- ;
+                return 200 ;
+            }
+                
+            default:
+                nta_incoming_destroy( irq ) ;
+                break ;
+        }
+       
+        
+        return 0 ;
+    }
+    
+    nta_incoming_t* SipLbController::getAssociatedTransaction( nta_outgoing_t* orq ) {
+        bimapTxns::right_const_iterator it = m_transactions.right.find(orq);
+        if( it == m_transactions.right.end() ) return NULL ;
+        return it->second ;
+    }
+    nta_outgoing_t* SipLbController::getAssociatedTransaction( nta_incoming_t* irq ) {
+        bimapTxns::left_const_iterator it = m_transactions.left.find(irq);
+        if( it == m_transactions.left.end() ) return NULL ;
+        return it->second ;
+    }
+    nta_leg_t* SipLbController::getLegFromTransaction( nta_outgoing_t* orq ) {
+        msg_t* msg = nta_outgoing_getrequest( orq ) ;
+        if( NULL == msg ) return NULL ;
+        sip_t* invite = sip_object( msg ) ;
+        if( NULL == invite ) return NULL ;
+        nta_leg_t* leg = nta_leg_by_dialog( m_nta, NULL, invite->sip_call_id , invite->sip_to->a_tag, NULL, invite->sip_from->a_tag, NULL );
+        nta_msg_discard( m_nta, msg ) ;
+        return leg ;
+    }
+    nta_leg_t* SipLbController::getLegFromTransaction( nta_incoming_t* irq ) {
+        const char* local_tag = nta_incoming_gettag( irq ) ;
+        msg_t* msg = nta_incoming_getrequest( irq ) ;
+        if( NULL == msg ) return NULL ;
+        sip_t* invite = sip_object( msg ) ;
+        if( NULL == invite ) return NULL ;
+        nta_leg_t* leg =  nta_leg_by_dialog( m_nta, NULL, invite->sip_call_id , invite->sip_from->a_tag, NULL, local_tag, NULL  );
+        nta_msg_discard( m_nta, msg ) ;
+        return leg ;
+    }
+    void SipLbController::clearTransaction( nta_outgoing_t* orq ) {
+        nta_incoming_t* irq = this->getAssociatedTransaction( orq ) ;
+        m_transactions.right.erase(orq) ;
+        nta_incoming_destroy( irq ) ;
+        nta_outgoing_destroy( orq ) ;
+        SSP_LOG(log_debug) << "after clearing transactions there are " << m_transactions.size() << " transactions remainining" << endl ;
+    }
+    void SipLbController::clearTransaction( nta_incoming_t* irq ) {
+        nta_outgoing_t* orq = this->getAssociatedTransaction( irq ) ;
+        m_transactions.left.erase(irq) ;
+        nta_incoming_destroy( irq ) ;
+        nta_outgoing_destroy( orq ) ;
+        SSP_LOG(log_debug) << "after clearing transactions there are " << m_transactions.size() << " transactions remainining" << endl ;
+    }
+    void SipLbController::addTransactions( nta_incoming_t* irq, nta_outgoing_t* orq) {
+        m_transactions.insert( bimapTxns::value_type(irq, orq) ) ;
+        SSP_LOG(log_debug) << "after adding transactions there are " << m_transactions.size() << " transactions remainining" << endl ;
+    }
+    void SipLbController::addDialogs( nta_leg_t* a_leg, nta_leg_t* b_leg ) {
+        m_dialogs.insert( bimapDialogs::value_type(a_leg, b_leg) ) ;
+        SSP_LOG(log_debug) << "after adding dialogs there are " << m_dialogs.size() << " dialogs remainining" << endl ;
+    }
+    void SipLbController::clearDialog( nta_leg_t* leg ) {
+        nta_leg_t* other = this->getAssociatedDialog( leg ) ;
+        if( other ) {
+            nta_leg_destroy( leg ) ;
+            nta_leg_destroy( other ) ;
+            m_dialogs.left.erase(leg) ;
+            m_dialogs.right.erase(leg) ;
+        }
+        SSP_LOG(log_debug) << "after clearing dialogs there are " << m_dialogs.size() << " dialogs remainining" << endl ;
+    }
+    nta_leg_t* SipLbController::getAssociatedDialog( nta_leg_t* leg ) {
+        bimapDialogs::left_const_iterator it = m_dialogs.left.find(leg);
+        if( it == m_dialogs.left.end() ) {
+             bimapDialogs::right_const_iterator it2 = m_dialogs.right.find(leg);
+            return it2->second ;
+        }
+        return it->second ;
+    }
+
+
+
 }

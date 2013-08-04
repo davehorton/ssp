@@ -31,6 +31,8 @@ namespace ssp {
         
         void start() ;
         
+        operator const char *() ;
+        
         /* getters / setters */
         const string& getAddress() const { return m_strAddress; }
         const string& getSipAddress() const { return m_strSipAddress; }
@@ -40,6 +42,7 @@ namespace ssp {
         bool isBusiedOut() const { return m_bBusyOut; }
         unsigned int getMaxSessions() const { return m_nMaxSessions; }
         unsigned int getCurrentSessions() const { return m_nCurrentSessions; }
+        unsigned int getAvailableSessions() const { return m_nMaxSessions - m_nCurrentSessions; }
         unsigned int getSipPort() const { return m_nSipPort ; }
         bool isAvailable() const { return querying_status == m_state && m_nCurrentSessions < m_nMaxSessions - 2 ;}
         
