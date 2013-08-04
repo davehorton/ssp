@@ -1,15 +1,34 @@
+#include <algorithm> 
+
 #include <boost/tokenizer.hpp>
+#include <boost/foreach.hpp>
+#include <boost/iterator/filter_iterator.hpp>
 
 #include "fs-monitor.h"
 #include "ssp-controller.h"
 #include "fs-exception.h"
 
+#define MAX_SERVERS_TO_TRY ((unsigned int)3)
+
 typedef boost::tokenizer<boost::char_separator<char> > tokenizer ;
 
+namespace {
+    struct is_available {
+        bool operator()(const boost::shared_ptr<ssp::FsInstance>& fs) { return fs->isAvailable() ; }
+    };
+    struct capacity_sorter {
+        bool operator ()( const boost::shared_ptr<ssp::FsInstance>& a, const  boost::shared_ptr<ssp::FsInstance>& b) {
+            if( a->isAvailable() && b->isAvailable() ) return a->getAvailableSessions() > b->getAvailableSessions() ;
+           else if( a->isAvailable()) return true ;
+           else return false ;
+        }
+    };
+    
+}
 namespace ssp {
     
     
-    FsMonitor::FsMonitor() {
+    FsMonitor::FsMonitor() : m_RRInterval(0), m_nLastServer(0), m_nLastRR(0) {
     }
     
     FsMonitor::~FsMonitor() {
@@ -26,7 +45,10 @@ namespace ssp {
     }
     
     void FsMonitor::stop() {
+        SSP_LOG(log_notice) << "Stopping monitor thread" << endl ;
+        m_ioService.stop() ;
         m_thread.join() ;
+        m_servers.clear() ;        
     }
     
     void FsMonitor::reset( const deque<string>& servers ) {
@@ -34,18 +56,17 @@ namespace ssp {
         boost::lock_guard<boost::mutex> lock(m_mutex) ;
         
         //TODO: destroy existing servers ?  Or add new ones, drop only missing ones?
-        m_servers.empty() ;
+        m_servers.clear() ;
         
         boost::char_separator<char> sep(":");
         string strAddress ;
         unsigned int nPort ;
-        for( deque<string>::const_iterator it = servers.begin(); it != servers.end(); it++) {
-            string address = *it ;
-            tokenizer tokens(*it, sep);
+        BOOST_FOREACH( const string& address, servers) {
+            tokenizer tokens(address, sep);
             int i = 0;
-            for(tokenizer::iterator itT = tokens.begin(); itT != tokens.end(); ++itT) {
-                if( 0 == i ) strAddress = *itT ;
-                if( 1 == i ) nPort = ::atoi( itT->c_str() ) ;
+            BOOST_FOREACH( const string& token, tokens) {
+                if( 0 == i ) strAddress = token ;
+                if( 1 == i ) nPort = ::atoi( token.c_str() ) ;
                 i++ ;
             }
             boost::shared_ptr<FsInstance> ptr( new FsInstance( m_ioService, strAddress, nPort ) )  ;
@@ -56,7 +77,7 @@ namespace ssp {
 
     
     void FsMonitor::threadFunc() {
-        SSP_LOG(log_info) << "Starting thread function, hardware concurrency: " << boost::thread::hardware_concurrency() <<  endl ;
+        SSP_LOG(log_debug) << "Starting thread function, hardware concurrency: " << boost::thread::hardware_concurrency() <<  endl ;
         
         /* to make sure the event loop doesn't terminate when there is no work to do */
         boost::asio::io_service::work work(m_ioService);
@@ -80,18 +101,68 @@ namespace ssp {
             }
         }
     }
-    bool FsMonitor::getAvailableServer( boost::shared_ptr<FsInstance>& server ) {
+    bool FsMonitor::getAvailableServers( deque< boost::shared_ptr<FsInstance> >& results ) {
+        
+        assert( results.empty() ) ;
+
         boost::lock_guard<boost::mutex> lock(m_mutex) ;
-        for( deque< boost::shared_ptr<FsInstance> >::const_iterator it = m_servers.begin(); it != m_servers.end(); it++) {
-            boost:shared_ptr<FsInstance> fs = *it ;
-            if( fs->isAvailable() ) {
-                server = fs ;
-                return true ;
-            }
+        unsigned int total_servers = m_servers.size() ;
+
+        unsigned int nReturnCount = std::min( MAX_SERVERS_TO_TRY, total_servers ) ;
+        if( 0 == nReturnCount ) {
+            SSP_LOG(log_error) << "No servers defined; possible configuration error" << endl ;
+            return false ;
         }
         
-        return false ;
+        bool exhaustedServers = false ;
+        unsigned int start = m_nLastServer = (++m_nLastServer < total_servers ? m_nLastServer :  0 ) ;
+        unsigned int current = start ;
+        
+        /* copy the next N servers into the results */
+        do {
+            if( m_servers[current]->isAvailable() ) {
+                results.push_back( m_servers[current] ) ;
+                
+            }
+            current = ++current < total_servers ? current: 0 ;
+            if( current == start ) exhaustedServers = true ;
+            
+        } while( !exhaustedServers && results.size() < nReturnCount ) ;
+        if( 0 == results.size() ) {
+            SSP_LOG(log_error) << "No available servers found at this time to service incoming call" << endl ;
+            return false ;
+        }
+        
+        /* if this is a "special" call where we want to hit the least loaded server, put that one at the front */
+        bool doLeastLoaded = false ;
+        if( m_RRInterval > 0 && total_servers > 1 && ++m_nLastRR > m_RRInterval ) {
+            m_nLastRR = 0 ;
+            doLeastLoaded = true ;
+            
+            deque< boost::shared_ptr<FsInstance> >  sorted( total_servers ) ;
+            capacity_sorter cs ;
+            std::copy( m_servers.begin(), m_servers.end(), sorted.begin() ) ;
+            std::sort( sorted.begin(), sorted.end(), cs ) ;
+            
+            results.push_front( sorted[0] ) ;            
+        }
+
+        std::stringstream s ;
+        this->toString( results, s ) ;
+        SSP_LOG(log_debug) << "Available freeswitch servers " << (doLeastLoaded ? "(least loaded): " : "(round robin): ") << s.str() << endl ;        
+        
+        return true ;
     }
 
-    
+    void FsMonitor::toString( deque< boost::shared_ptr<FsInstance> >& d, std::stringstream& s ) {
+        int i = 0 ;
+        BOOST_FOREACH( boost::shared_ptr<FsInstance>& fs, d ) {
+            if( i++ < 0 ) s << "," ;
+            s << fs->getSipAddress() ;
+            if( 0 != fs->getSipPort() ) {
+                s << ":" << fs->getSipPort() ;
+            }
+        }
+     }
+
 }
