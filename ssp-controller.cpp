@@ -132,6 +132,12 @@ namespace {
         boost::hash_combine(seed, t.getFrom()->a_tag);
         return seed;
     }
+    /* needed to be able to live in a boost unordered container */
+    size_t hash_value( const ssp::SipDialogInfo& d) {
+        std::size_t seed = 0;
+        boost::hash_combine(seed, d.getLeg() );
+        return seed;
+    }
 
 }
 
@@ -478,7 +484,7 @@ namespace ssp {
         }
         else {
             /* stateful */
-            SSP_LOG(log_info) << m_dialogs.size() << "/" << m_mapTerminationAttempts.size() << "/" << m_transactions.size() << " (dialogs/transactions/termination attempts)" << endl ;
+            SSP_LOG(log_info) << m_dialogs.size() << "/" << m_mapTerminationAttempts.size() << "/" << m_transactions.size() << "/" << m_mapDialogInfo.size() << " (dialogs/transactions/termination attempts/dialog info)" << endl ;
             
             if( 0 == m_nIterationCount && 0 == m_dialogs.size() && 0 == m_mapTerminationAttempts.size() && 0 == m_transactions.size() ) {
                 
@@ -814,6 +820,16 @@ namespace ssp {
             return 503 ;
         }
         
+        /* set a session timer, if configured and supported by remote (note: currently we only support the remote leg acting as refresher) */
+        unsigned long nSessionTimer = 0 ;
+        if( m_Config->getOriginationSessionTimer() > 0 && NULL != sip->sip_session_expires ) {
+            unsigned long minSE = (NULL == sip->sip_min_se ? 0 : sip->sip_min_se->min_delta) ;
+            nSessionTimer = max( minSE, m_Config->getOriginationSessionTimer() ) ;
+        }
+
+        boost::shared_ptr<SipDialogInfo> p = boost::make_shared<SipDialogInfo>( a_leg, true, nSessionTimer ) ;
+        m_mapDialogInfo.insert( mapDialogInfo::value_type( a_leg, p ) ) ;
+
         this->addTransactions( irq, orq) ;
         this->addDialogs( a_leg, b_leg ) ;
         
@@ -866,7 +882,7 @@ namespace ssp {
             chargeInfoHeader << "P-Charge-Info: <sip:" << chargeNumber << "@" << terminationSipAddress << ">" ;
         }
         
-        boost::shared_ptr<TerminationAttempt> t = boost::make_shared<TerminationAttempt>(url, sip, from, to, contact, chargeInfoHeader.str()  ) ;
+        boost::shared_ptr<TerminationAttempt> t = boost::make_shared<TerminationAttempt>(url, sip, from, to, contact, chargeInfoHeader.str(), carrier, terminationSipAddress ) ;
         nta_outgoing_t* orq ;
         nta_leg_t* b_leg ;
         if( !this->generateTerminationRequest( t, irq, orq, b_leg ) ) {
@@ -874,12 +890,12 @@ namespace ssp {
             return 503 ;
         }
  
+        m_mapTerminationAttempts.insert( mapTerminationAttempts::value_type( orq, t )) ;
         
-        if( m_nTerminationRetries > 1 ) {
-            /* save information for retrying another trunk (no need it there is only one outbound trunk( */
-            m_mapTerminationAttempts.insert( mapTerminationAttempts::value_type( orq, t )) ;
-        }
-        
+        boost::shared_ptr<SipDialogInfo> p = boost::make_shared<SipDialogInfo>( b_leg, false ) ;
+        p->setLocalSdp( sip->sip_payload->pl_data, sip->sip_payload->pl_len ) ;
+        m_mapDialogInfo.insert( mapDialogInfo::value_type( b_leg, p ) ) ;
+
         this->addTransactions( irq, orq) ;
         this->addDialogs( a_leg, b_leg ) ;
 
@@ -943,6 +959,8 @@ namespace ssp {
         bool bClearTransaction = false ;
         bool bDestroyLegs = false ;
         bool bProxyResponse = true ;
+        bool bSessionTimer = false ;
+        ostringstream ostrSessionTimer ;
         
         nta_incoming_t* irq = this->getAssociatedTransaction( orq) ;
         assert( NULL != irq ) ;
@@ -969,6 +987,19 @@ namespace ssp {
                                                                    TAG_END());
                 nta_outgoing_destroy( ack_request ) ;
                 nta_leg_client_reroute( outgoing_leg, NULL, sip->sip_contact, true );
+                
+                /* check if we want to set a session timer on this leg */
+                nta_leg_t* a_leg = this->getLegFromTransaction( irq ) ;
+                assert( a_leg ) ;
+                mapDialogInfo::iterator it = m_mapDialogInfo.find( a_leg ) ;
+                if( m_mapDialogInfo.end() != it ) {
+                    boost::shared_ptr<SipDialogInfo> p = it->second ;
+                    if( p->getSessionTimerSecs() > 0 ) {
+                        bSessionTimer = true ;
+                        p->setLocalSdp( sip->sip_payload->pl_data, sip->sip_payload->pl_len ) ;
+                        ostrSessionTimer << p->getSessionTimerSecs() << endl ;
+                    }
+                }
                                 
             }
             else if( 503 == status || 480 == status ) {
@@ -976,7 +1007,7 @@ namespace ssp {
                 /* crank back to the next route, if there is a next route */
                 mapTerminationAttempts::iterator it = m_mapTerminationAttempts.find( orq ) ;
                 if( m_mapTerminationAttempts.end() != it ) {
-                    boost::shared_ptr<TerminationAttempt>& t = it->second ;
+                    boost::shared_ptr<TerminationAttempt> t = it->second ;
                     unsigned int nAttempt = t->getAttemptCount() ;
                     if( nAttempt < m_nTerminationRetries - 1 ) {
                         string terminationSipAddress, carrier, chargeNumber ;
@@ -984,9 +1015,9 @@ namespace ssp {
                             ostringstream dest ;
                             dest << "sip:" << sip->sip_to->a_url[0].url_user << "@" << terminationSipAddress ;
                             
-                            SSP_LOG(log_debug) << "Attempting next route: " << dest.str() << endl ;
+                            SSP_LOG(log_debug) << "Attempting next route: " << terminationSipAddress << " using carrier " << carrier << endl ;
                             
-                            t->crankback( dest.str() ) ;
+                            t->crankback( dest.str(), carrier, terminationSipAddress ) ;
                             
                             nta_leg_t* b_legNew ;
                             nta_outgoing_t* orqNew ;
@@ -995,29 +1026,45 @@ namespace ssp {
                                 bProxyResponse = false ;
                                 bDestroyLegs = false ;
                                 this->updateOutgoingTransaction( irq, orq, orqNew ) ;
+                                m_mapTerminationAttempts.erase( it ) ;
+                                m_mapTerminationAttempts.insert( mapTerminationAttempts::value_type( orqNew, t) ) ;
                                 this->updateDialog( outgoing_leg, b_legNew ) ;
                                 
-                                if( t->getAttemptCount() >= m_nTerminationRetries - 1 ) {
-                                    m_mapTerminationAttempts.erase( it ) ;
-                                }
-                            }
+                             }
                         }
-                    }
-                    else {
-                        m_mapTerminationAttempts.erase( it ) ;
                     }
                 }
             }
-       }
+        }
         if( bProxyResponse ) {
+            ostringstream carrierString, carrierTrunk ;
+            bool bHaveCarrierInfo = false ;
+            
+            if( status >= 200 ) {
+                /* retrieve terminating carrier information so we can provide a custom header back to freeswitch with that information */
+                mapTerminationAttempts::iterator it = m_mapTerminationAttempts.find( orq ) ;
+                if( m_mapTerminationAttempts.end() != it ) {
+                    boost::shared_ptr<TerminationAttempt> t = it->second ;
+                    bHaveCarrierInfo = true ;
+                    carrierString << "X-Terminating-Carrier: " << t->getCarrier() ;
+                    carrierTrunk << "X-Terminating-Carrier-IP: " << t->getSipTrunk() ;
+                    
+                    SSP_LOG(log_debug) << "Returning final termination response from carrier " <<  t->getCarrier() << endl ;
+                    m_mapTerminationAttempts.erase( it ) ;
+                }
+
+            }
+
             nta_incoming_treply( irq, status, sip->sip_status->st_phrase,
                                 SIPTAG_CONTACT(m_my_contact),
                                 SIPTAG_CONTENT_TYPE(sip->sip_content_type),
                                 SIPTAG_CONTENT_DISPOSITION(sip->sip_content_disposition),
                                 SIPTAG_CONTENT_LENGTH(sip->sip_content_length),
                                 SIPTAG_PAYLOAD(sip->sip_payload),
+                                TAG_IF( bSessionTimer, SIPTAG_SESSION_EXPIRES_STR(ostrSessionTimer.str().c_str())),
+                                TAG_IF( bHaveCarrierInfo, SIPTAG_UNKNOWN_STR(carrierString.str().c_str())),
+                                TAG_IF( bHaveCarrierInfo, SIPTAG_UNKNOWN_STR(carrierTrunk.str().c_str())),
                                 TAG_END() ) ;
-            
         }
         if( bClearTransaction ) {
             this->clearTransaction( orq ) ;   
@@ -1041,6 +1088,7 @@ namespace ssp {
             nta_outgoing_destroy( orq ) ;
             this->clearTransaction( orq ) ;
             this->clearDialog( leg ) ;
+            m_mapTerminationAttempts.erase( orq ); 
         }
         else if( sip->sip_request->rq_method == sip_method_ack ) {
             /* we only get here in the case of a non-success response, and nta has already generated an ACK to B */
@@ -1056,7 +1104,6 @@ namespace ssp {
             case sip_method_bye:
             {
                 
-                
                 nta_outgoing_t* cancel = nta_outgoing_tcreate( other, NULL, NULL,
                                      NULL,
                                      SIP_METHOD_BYE,
@@ -1066,8 +1113,22 @@ namespace ssp {
                 
                 
                 this->clearDialog( leg ) ;
-                if( m_nIterationCount > 0 ) m_nIterationCount-- ;
                 return 200 ;
+            }
+            case sip_method_invite:
+            {
+                /* re-INVITE */
+                mapDialogInfo::iterator it = m_mapDialogInfo.find( leg ) ;
+                if( m_mapDialogInfo.end() != it ) {
+                    boost::shared_ptr<SipDialogInfo> p = it->second ;
+                    
+                    //TODO: if session timers are on, kill the timer, set Session-Expires, restart the timer
+                    nta_incoming_treply( irq, SIP_200_OK,
+                                        SIPTAG_CONTACT(m_my_contact),
+                                        SIPTAG_PAYLOAD_STR(p->getLocalSdp().c_str()),
+                                        SIPTAG_CONTENT_TYPE_STR("application/sdp"),
+                                        TAG_END() ) ;
+                }
             }
                 
             default:
@@ -1136,12 +1197,14 @@ namespace ssp {
         SSP_LOG(log_debug) << "after adding dialogs there are " << m_dialogs.size() << " dialogs remainining" << endl ;
     }
     void SipLbController::clearDialog( nta_leg_t* leg ) {
+        nta_leg_destroy( leg ) ;
+        m_dialogs.left.erase(leg) ;
+        m_dialogs.right.erase(leg) ;
+        m_mapDialogInfo.erase( leg ) ;
         nta_leg_t* other = this->getAssociatedDialog( leg ) ;
         if( other ) {
-            nta_leg_destroy( leg ) ;
             nta_leg_destroy( other ) ;
-            m_dialogs.left.erase(leg) ;
-            m_dialogs.right.erase(leg) ;
+            m_mapDialogInfo.erase( other ) ;
         }
         SSP_LOG(log_debug) << "after clearing dialogs there are " << m_dialogs.size() << " dialogs remainining" << endl ;
     }
@@ -1151,6 +1214,14 @@ namespace ssp {
         m_dialogs.right.erase( oldBLeg ) ;
         this->addDialogs( a_leg, newBLeg );
         nta_leg_destroy( oldBLeg ) ;
+        
+        mapDialogInfo::iterator it = m_mapDialogInfo.find( oldBLeg ) ;
+        if( m_mapDialogInfo.end() != it ) {
+            boost::shared_ptr<SipDialogInfo> p = it->second ;
+            p->setLeg( newBLeg ) ;
+            m_mapDialogInfo.insert( mapDialogInfo::value_type( newBLeg, p)) ;
+            m_mapDialogInfo.erase( oldBLeg ) ;
+        }        
     }
     nta_leg_t* SipLbController::getAssociatedDialog( nta_leg_t* leg ) {
         bimapDialogs::left_const_iterator it = m_dialogs.left.find(leg);

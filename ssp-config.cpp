@@ -249,6 +249,7 @@ namespace ssp {
                 if( 0 == pt.get<string>("ss.sip.<xmlattr>.status", "active").compare("inactive") ) {
                     m_bIsActive = false ;
                 }
+                m_nOriginationSessionTimer = pt.get<unsigned long>("ssp.inbound.session-timer", 0) ;
                 
                 /* routing strategy: round robin for a configurable interval (0=always), then send the next call to least loaded server */
                 m_nMaxRoundRobins = pt.get<unsigned int>("ssp.inbound.max-round-robins", 0) ;
@@ -500,6 +501,9 @@ namespace ssp {
         unsigned int getMaxTerminationAttempts() {
             return m_nMaxTerminationAttempts ;
         }
+        unsigned long getOriginationSessionTimer() {
+            return m_nOriginationSessionTimer ;
+        }
     private:
         
         bool getXmlAttribute( ptree::value_type const& v, const string& attrName, string& value ) {
@@ -533,7 +537,8 @@ namespace ssp {
         agent_mode m_agent_mode ;
         unsigned int m_nSofiaLogLevel ;
         unsigned int m_nMaxRoundRobins ;
-        unsigned int m_nMaxTerminationAttempts; 
+        unsigned int m_nMaxTerminationAttempts;
+        unsigned long m_nOriginationSessionTimer ;
         string m_strAcl ;
     } ;
     
@@ -605,7 +610,9 @@ namespace ssp {
     unsigned int SspConfig::getMaxTerminationAttempts(void) {
         return m_pimpl->getMaxTerminationAttempts() ;
     }
-    
+    unsigned long SspConfig::getOriginationSessionTimer() {
+        return m_pimpl->getOriginationSessionTimer() ;
+    }
 
     void SspConfig::Log() const {
         SSP_LOG(log_notice) << "Configuration:" << endl ;

@@ -47,18 +47,19 @@ namespace ssp {
 	using boost::scoped_ptr;
         
     typedef boost::unordered_map<string, shared_ptr<SipInboundCall> > iip_map_t ; //invite-in-progress
-    
 
     class TerminationAttempt {
     public:
-        TerminationAttempt(const string& url, const sip_t * const& sip, sip_from_t * const& from,  sip_to_t * const& to,  sip_contact_t * const& contact, const string& p_charge_info_header) :
-        m_nAttemptCount(0), m_sip(sip), m_from(from), m_to(to), m_contact(contact), m_p_charge_info_header(p_charge_info_header), m_url(url) {
+        TerminationAttempt(const string& url, const sip_t * const& sip, sip_from_t * const& from,  sip_to_t * const& to,  sip_contact_t * const& contact, const string& p_charge_info_header, const string& carrier, const string& sipTrunk) :
+        m_nAttemptCount(0), m_sip(sip), m_from(from), m_to(to), m_contact(contact), m_p_charge_info_header(p_charge_info_header), m_url(url), m_carrier(carrier), m_sipTrunk(sipTrunk) {
             
         }
         ~TerminationAttempt() {}
         
-        void crankback( const string& url ) {
+        void crankback( const string& url, const string& carrier, const string& sipTrunk ) {
             m_url = url ;
+            m_carrier = carrier ;
+            m_sipTrunk = sipTrunk ;
             m_nAttemptCount++ ;
         }
         unsigned int getAttemptCount(void) { return m_nAttemptCount; }
@@ -70,6 +71,8 @@ namespace ssp {
         sip_to_t const* getTo(void) const   { return m_to; }
         sip_contact_t const* getContact(void) const   { return m_contact; }
         sip_t const* getSip(void) const   { return m_sip; }
+        string& getCarrier(void) { return m_carrier; }
+        string& getSipTrunk(void) { return m_sipTrunk; }
         
     private:
         unsigned int            m_nAttemptCount ;
@@ -79,7 +82,34 @@ namespace ssp {
         sip_contact_t const*    m_contact ;
         string                  m_p_charge_info_header;
         string                  m_url;
+        string                  m_carrier ;
+        string                  m_sipTrunk ;
     } ;
+    
+    class SipDialogInfo {
+    public:
+        SipDialogInfo( nta_leg_t* leg, bool bOrigination, unsigned long nSessionTimer = 0 ) : m_leg(leg), m_bOrigination( bOrigination ), m_nSessionTimer(nSessionTimer), m_timerSessionRefresh(NULL) {
+        }
+        ~SipDialogInfo() {}
+        
+        nta_leg_t* getLeg(void) const { return m_leg; }
+        void setLeg( nta_leg_t* leg ) { m_leg = leg; }
+        bool isOrigination(void) { return m_bOrigination; }
+        unsigned int getSessionTimerSecs(void) { return m_nSessionTimer; }
+        su_timer_t* getSessionTimerTimer(void) { return m_timerSessionRefresh; }
+        const string& getLocalSdp(void) { return m_localSdp; }
+        void setLocalSdp( char* pl_data, usize_t pl_size ) {
+            m_localSdp.assign( pl_data, pl_size ) ;
+        }
+        
+    private:
+        nta_leg_t*      m_leg ;
+        bool            m_bOrigination ;
+        unsigned long   m_nSessionTimer ;
+        su_timer_t*     m_timerSessionRefresh ;
+        string          m_localSdp; 
+    } ;
+
 
 	class SipLbController : private boost::noncopyable{
 	public:
@@ -181,14 +211,17 @@ namespace ssp {
         typedef boost::bimap<nta_incoming_t*,nta_outgoing_t*> bimapTxns ;
         bimapTxns m_transactions ;
         
-        /* collection of leg pairs for stable dialogs */
+        /* collection of leg pairs for origination-termination dialogs */
         typedef boost::bimap<nta_leg_t*,nta_leg_t*> bimapDialogs ;
         bimapDialogs m_dialogs ;
         
+        /* collection of termination attempts that are in progress */
         typedef boost::unordered_map<nta_outgoing_t*, boost::shared_ptr<TerminationAttempt> > mapTerminationAttempts ;
         mapTerminationAttempts m_mapTerminationAttempts ;
-        
         unsigned int m_nTerminationRetries ;
+        
+        typedef boost::unordered_map<nta_leg_t*, boost::shared_ptr<SipDialogInfo> > mapDialogInfo ;
+        mapDialogInfo m_mapDialogInfo ;
         
 
 	} ;

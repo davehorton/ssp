@@ -44,6 +44,7 @@ namespace ssp {
         
         unsigned int getCountOfOutboundTrunks(void) ;
         unsigned int getMaxTerminationAttempts(void) ;
+        unsigned long getOriginationSessionTimer(void) ;
         
         void Log() const ;
         

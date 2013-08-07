@@ -24,6 +24,8 @@
          -->
         <max-round-robins>3</max-round-robins>
         
+        <session-timer>1800</session-timer>
+        
         
         <!-- freeswitch servers that we distribute calls across -->
         <appserver event-socket-port="8021">localhost</appserver>
