@@ -121,8 +121,8 @@ namespace {
         return controller->statelessCallback( msg, sip ) ;
     }
     
-    void timerHandler(su_root_magic_t *magic, su_timer_t *timer, su_timer_arg_t *controller) {
-        controller->processTimer() ;
+    void watchdogTimerHandler(su_root_magic_t *magic, su_timer_t *timer, su_timer_arg_t *controller) {
+        controller->processWatchdogTimer() ;
     }
 
     /* needed to be able to live in a boost unordered container */
@@ -422,8 +422,8 @@ namespace ssp {
         m_fsMonitor.run() ;
     
         /* start a timer */
-        m_timer = su_timer_create( su_root_task(m_root), 15000) ;
-        su_timer_set_for_ever(m_timer, timerHandler, this) ;
+        m_timer = su_timer_create( su_root_task(m_root), 10000) ;
+        su_timer_set_for_ever(m_timer, watchdogTimerHandler, this) ;
         
         
         SSP_LOG(log_notice) << "Starting sofia event loop" << endl ;
@@ -440,7 +440,7 @@ namespace ssp {
         this->deinitializeLogging() ;
    }
 
-    int SipLbController::processTimer() {
+    int SipLbController::processWatchdogTimer() {
         
         if( agent_mode_stateless == m_Config->getAgentMode() ) {
             SSP_LOG(log_debug) << "Processing " << m_deqCompletedCallIds.size() << " completed calls and a total of " << m_mapInvitesInProgress.size() << " completed plus in progress calls remain "<< endl ;
@@ -478,6 +478,20 @@ namespace ssp {
         }
         else {
             /* stateful */
+            SSP_LOG(log_info) << m_dialogs.size() << "/" << m_mapTerminationAttempts.size() << "/" << m_transactions.size() << " (dialogs/transactions/termination attempts)" << endl ;
+            
+            if( 0 == m_nIterationCount && 0 == m_dialogs.size() && 0 == m_mapTerminationAttempts.size() && 0 == m_transactions.size() ) {
+                
+                if( --counter == 0  ) {
+                    SSP_LOG(log_notice) << "shutting down, interation count reached" << endl ;
+                    nta_agent_destroy( m_nta ) ;
+                    m_nta = NULL ;
+                    su_root_break( m_root ) ;
+                    su_timer_reset( m_timer ) ;
+                    su_timer_destroy( m_timer ) ;
+                    m_timer = NULL ;
+                }
+            }
         }
         
         
@@ -670,7 +684,7 @@ namespace ssp {
                 
             case sip_method_invite:
             {
-                if( !m_Config->isActive() ) {
+                if( !m_Config->isActive() || 0 == m_nIterationCount ) {
                     SSP_LOG(log_error) << "Rejecting new INVITE because we are inactive " << endl ;
                     return 503 ;
                 }
@@ -678,18 +692,19 @@ namespace ssp {
                 
                 string carrier ;
                 call_type_t call_type = this->determineCallType( sip, carrier ) ;
-                
+                int rc = 0;
                 if( origination_call_type == call_type ) {
-                    return this->processOriginationRequest( irq, sip, carrier ) ;
+                    rc = this->processOriginationRequest( irq, sip, carrier ) ;
                 }
                 else if( termination_call_type == call_type ) {
-                    return this->processTerminationRequest( irq, sip ) ;
+                    rc = this->processTerminationRequest( irq, sip ) ;
                 }
                 else {
                     SSP_LOG(log_error) << "Received invite from unknown address: " <<  sip->sip_contact->m_url[0].url_host << endl ;
-                    return 403 ;
+                    rc = 403 ;
                 }
-                 break;
+                if( m_nIterationCount > 0 ) m_nIterationCount-- ;
+                return rc ;
             }
                 
             default:
@@ -729,6 +744,10 @@ namespace ssp {
                                            SIPTAG_TO(sip->sip_from),
                                            SIPTAG_FROM(sip->sip_to),
                                            TAG_END());
+        if( NULL == a_leg ) {
+            SSP_LOG(log_error) << "Error creating a leg for  origination" << endl ;
+            return 503 ;
+        }
         nta_leg_server_route( a_leg, sip->sip_record_route, sip->sip_contact ) ;
         
         const char* a_tag = nta_incoming_tag( irq, NULL) ;
@@ -748,6 +767,11 @@ namespace ssp {
                                             SIPTAG_FROM(from),
                                             SIPTAG_TO(to),
                                             TAG_END());
+        if( NULL == b_leg ) {
+            SSP_LOG(log_error) << "Error creating b leg for origination" << endl ;
+            nta_leg_destroy(a_leg) ;
+            return 503 ;
+        }
         
         const char* b_tag = nta_agent_newtag(m_home, "tag=%s", m_nta) ;
         nta_leg_tag( b_leg, b_tag ) ;
@@ -783,9 +807,15 @@ namespace ssp {
                                                    SIPTAG_UNKNOWN_STR(carrierString.str().c_str()),
                                                    SIPTAG_UNKNOWN_STR(carrierTrunk.str().c_str()),
                                                    TAG_END());
+        if( NULL == orq ) {
+            SSP_LOG(log_error) << "Error creating outgoing transaction for origination" << endl ;
+            nta_leg_destroy(a_leg) ;
+            nta_leg_destroy(b_leg) ;
+            return 503 ;
+        }
         
-        /* save the associated transactions, so that we can look up incoming given outgoing or vice versa */
         this->addTransactions( irq, orq) ;
+        this->addDialogs( a_leg, b_leg ) ;
         
         return 0 ;
         
@@ -837,34 +867,50 @@ namespace ssp {
         }
         
         boost::shared_ptr<TerminationAttempt> t = boost::make_shared<TerminationAttempt>(url, sip, from, to, contact, chargeInfoHeader.str()  ) ;
-        nta_outgoing_t* orq = this->generateTerminationRequest( t, irq ) ;
+        nta_outgoing_t* orq ;
+        nta_leg_t* b_leg ;
+        if( !this->generateTerminationRequest( t, irq, orq, b_leg ) ) {
+            nta_leg_destroy( a_leg ) ;
+            return 503 ;
+        }
  
-        this->addTransactions( irq, orq) ;
         
         if( m_nTerminationRetries > 1 ) {
             /* save information for retrying another trunk (no need it there is only one outbound trunk( */
             m_mapTerminationAttempts.insert( mapTerminationAttempts::value_type( orq, t )) ;
         }
         
+        this->addTransactions( irq, orq) ;
+        this->addDialogs( a_leg, b_leg ) ;
+
         return 0 ;
     }
-    nta_outgoing_t* SipLbController::generateTerminationRequest( boost::shared_ptr<TerminationAttempt>& t, nta_incoming_t* irq ) {
+    bool SipLbController::generateTerminationRequest( boost::shared_ptr<TerminationAttempt>& t, nta_incoming_t* irq, nta_outgoing_t*& orq, nta_leg_t*& b_leg ) {
         sip_t const *sip = t->getSip() ;
-        nta_leg_t* b_leg =  nta_leg_tcreate(m_nta,
-                                            legCallback, this,
-                                            SIPTAG_FROM(t->getFrom()),
-                                            SIPTAG_TO(t->getTo()),
-                                            TAG_END());
-        
+        b_leg =  nta_leg_tcreate(m_nta,
+                                        legCallback, this,
+                                        SIPTAG_FROM(t->getFrom()),
+                                        SIPTAG_TO(t->getTo()),
+                                        TAG_END());
+        if( NULL == b_leg ) {
+            SSP_LOG(log_error) << "Failure creating outgoing leg for termination request" << endl ;
+            return false ;
+        }
+
         const char* b_tag = nta_agent_newtag(m_home, "tag=%s", m_nta) ;
         nta_leg_tag( b_leg, b_tag ) ;
         SSP_LOG(log_debug) << "outgoing leg " << b_leg << endl ;
         
         /* send the outbound INVITE */
-        nta_outgoing_t* orq = nta_outgoing_tcreate(b_leg, response_to_invite, this,
+        const string& url = t->getUrl() ;
+        char str[URL_MAXLEN] ;
+        memset(str, 0, URL_MAXLEN) ;
+        strncpy( str, url.c_str(), url.length() ) ;
+        
+        orq = nta_outgoing_tcreate(b_leg, response_to_invite, this,
                                                    NULL,
                                                    SIP_METHOD_INVITE,
-                                                   URL_STRING_MAKE(t->getUrl().c_str()),
+                                                   URL_STRING_MAKE(str),
                                                    SIPTAG_CONTACT(t->getContact()),
                                                    SIPTAG_CONTENT_TYPE(sip->sip_content_type),
                                                    SIPTAG_CONTENT_DISPOSITION(sip->sip_content_disposition),
@@ -878,11 +924,16 @@ namespace ssp {
                                                    SIPTAG_ALLOW(sip->sip_allow),
                                                    SIPTAG_PRIVACY(sip->sip_privacy),
                                                    SIPTAG_P_ASSERTED_IDENTITY(sip_p_asserted_identity( sip )),
-                                                   SIPTAG_UNKNOWN(sip_unknown(sip)),
+                                                   //SIPTAG_UNKNOWN(sip_unknown(sip)),
                                                    SIPTAG_UNKNOWN_STR(t->getPChargeInfoHeader().c_str()),
                                                    TAG_END());
         
-        return orq; 
+        if( NULL == orq ) {
+            SSP_LOG(log_error) << "Failure creating outgoing transaction for termination request" << endl ;
+            nta_leg_destroy(b_leg) ;
+            return false ;            
+        }
+        return true;
         
     }
 
@@ -890,10 +941,14 @@ namespace ssp {
         SSP_LOG(log_debug) << "processInviteResponseInsideDialog, orq " << orq << endl ;
         
         bool bClearTransaction = false ;
+        bool bDestroyLegs = false ;
         bool bProxyResponse = true ;
         
         nta_incoming_t* irq = this->getAssociatedTransaction( orq) ;
         assert( NULL != irq ) ;
+
+        nta_leg_t* outgoing_leg = nta_leg_by_dialog( m_nta, NULL, sip->sip_call_id , NULL, NULL, sip->sip_from->a_tag, NULL );
+        assert(NULL != outgoing_leg) ;
         
         int status = sip->sip_status->st_status ;
 
@@ -902,31 +957,19 @@ namespace ssp {
         }
         else if( status >= 200 ) {
             bClearTransaction = true ;
-            
-            nta_leg_t* incoming_leg = this->getLegFromTransaction( irq ) ;
-            assert( NULL != incoming_leg ) ;
-            SSP_LOG(log_debug) << "incoming leg " << incoming_leg << endl ;
-            
+            bDestroyLegs = true; 
+                        
             if( 200 == status ) {
                 /* we need to send the ACK to a success final response */
-                SSP_LOG(log_debug) << "looking for B leg using callid: " << sip->sip_call_id << " with local tag " << sip->sip_from->a_tag << endl ;
-                nta_leg_t* outgoing_leg = nta_leg_by_dialog( m_nta, NULL, sip->sip_call_id , NULL, NULL, sip->sip_from->a_tag, NULL );
-                assert( NULL != outgoing_leg ) ;
-                SSP_LOG(log_debug) << "outgoing leg " << outgoing_leg << endl ;
+                bDestroyLegs = false ;
                 nta_leg_rtag( outgoing_leg, sip->sip_to->a_tag) ;
-                
                 nta_outgoing_t* ack_request = nta_outgoing_tcreate(outgoing_leg, NULL, NULL, NULL,
                                                                    SIP_METHOD_ACK,
                                                                    (url_string_t*) sip->sip_contact->m_url ,
-                                                                   //SIPTAG_CSEQ(sip->sip_cseq),
-                                                                   //SIPTAG_TO(sip->sip_to),
-                                                                   //SIPTAG_FROM(sip->sip_from),
                                                                    TAG_END());
                 nta_outgoing_destroy( ack_request ) ;
                 nta_leg_client_reroute( outgoing_leg, NULL, sip->sip_contact, true );
-                
-                this->addDialogs( incoming_leg, outgoing_leg ) ;
-                
+                                
             }
             else if( 503 == status || 480 == status ) {
                 
@@ -938,20 +981,27 @@ namespace ssp {
                     if( nAttempt < m_nTerminationRetries - 1 ) {
                         string terminationSipAddress, carrier, chargeNumber ;
                         if( m_Config->getTerminationRoute( terminationSipAddress, carrier, chargeNumber) ) {
-                            bClearTransaction = false ;
-                            bProxyResponse = false ;
                             ostringstream dest ;
                             dest << "sip:" << sip->sip_to->a_url[0].url_user << "@" << terminationSipAddress ;
                             
                             SSP_LOG(log_debug) << "Attempting next route: " << dest.str() << endl ;
                             
                             t->crankback( dest.str() ) ;
-                            nta_outgoing_t* orqNew = this->generateTerminationRequest( t, irq ) ;
-                            this->updateOutgoingTransaction( irq, orq, orqNew ) ;
-                            if( t->getAttemptCount() >= m_nTerminationRetries - 1 ) {
-                                m_mapTerminationAttempts.erase( it ) ;
+                            
+                            nta_leg_t* b_legNew ;
+                            nta_outgoing_t* orqNew ;
+                            if( this->generateTerminationRequest( t, irq, orqNew, b_legNew ) ) {
+                                bClearTransaction = false ;
+                                bProxyResponse = false ;
+                                bDestroyLegs = false ;
+                                this->updateOutgoingTransaction( irq, orq, orqNew ) ;
+                                this->updateDialog( outgoing_leg, b_legNew ) ;
+                                
+                                if( t->getAttemptCount() >= m_nTerminationRetries - 1 ) {
+                                    m_mapTerminationAttempts.erase( it ) ;
+                                }
                             }
-                        }                        
+                        }
                     }
                     else {
                         m_mapTerminationAttempts.erase( it ) ;
@@ -972,6 +1022,9 @@ namespace ssp {
         if( bClearTransaction ) {
             this->clearTransaction( orq ) ;   
         }
+        if( bDestroyLegs ) {
+            this->clearDialog( outgoing_leg ) ;
+        }
 
         return 0 ;
     }
@@ -982,9 +1035,12 @@ namespace ssp {
         if( sip->sip_request->rq_method == sip_method_cancel ) {
             nta_outgoing_t* orq = this->getAssociatedTransaction( irq ) ;
             assert( NULL != orq ) ;
+            nta_leg_t* leg = this->getLegFromTransaction( irq ) ;
+            assert( NULL != leg ) ;
             nta_outgoing_cancel( orq ) ;
             nta_outgoing_destroy( orq ) ;
             this->clearTransaction( orq ) ;
+            this->clearDialog( leg ) ;
         }
         else if( sip->sip_request->rq_method == sip_method_ack ) {
             /* we only get here in the case of a non-success response, and nta has already generated an ACK to B */
@@ -1088,6 +1144,13 @@ namespace ssp {
             m_dialogs.right.erase(leg) ;
         }
         SSP_LOG(log_debug) << "after clearing dialogs there are " << m_dialogs.size() << " dialogs remainining" << endl ;
+    }
+    void SipLbController::updateDialog( nta_leg_t* oldBLeg, nta_leg_t* newBLeg) {
+        assert( oldBLeg && newBLeg ) ;
+        nta_leg_t* a_leg = this->getAssociatedDialog( oldBLeg ) ;
+        m_dialogs.right.erase( oldBLeg ) ;
+        this->addDialogs( a_leg, newBLeg );
+        nta_leg_destroy( oldBLeg ) ;
     }
     nta_leg_t* SipLbController::getAssociatedDialog( nta_leg_t* leg ) {
         bimapDialogs::left_const_iterator it = m_dialogs.left.find(leg);

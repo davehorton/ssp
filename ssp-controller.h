@@ -92,7 +92,7 @@ namespace ssp {
         src::severity_logger_mt< severity_levels >* createLogger() ;
         
         int statelessCallback( msg_t *msg, sip_t *sip ) ;
-        int processTimer() ;
+        int processWatchdogTimer() ;
         
         /* stateful */
         int processRequestOutsideDialog( nta_leg_t* leg, nta_incoming_t* irq, sip_t const *sip) ;
@@ -110,7 +110,7 @@ namespace ssp {
         
         call_type_t determineCallType( sip_t const *sip, string& carrier ) ;
 
-        nta_outgoing_t* generateTerminationRequest( boost::shared_ptr<TerminationAttempt>& t, nta_incoming_t* irq ) ;
+        bool generateTerminationRequest( boost::shared_ptr<TerminationAttempt>& t, nta_incoming_t* irq, nta_outgoing_t*& orq, nta_leg_t*& b_leg ) ;
         
         sip_request_t* generateInboundRequestUri( sip_request_t* const oruri, const string& address, unsigned int port ) ;
         sip_from_t* generateOutgoingFrom( sip_from_t* const incomingFrom ) ;
@@ -130,6 +130,7 @@ namespace ssp {
         void addDialogs( nta_leg_t* a_leg, nta_leg_t* b_leg ) ;
         void clearDialog( nta_leg_t* leg ) ;
         nta_leg_t* getAssociatedDialog( nta_leg_t* leg ) ;
+        void updateDialog( nta_leg_t* oldBLeg, nta_leg_t* newBLeg) ;
         
         
         void setCompleted( iip_map_t::const_iterator& it ) ;
