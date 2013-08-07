@@ -85,6 +85,12 @@ namespace ssp {
         agent_mode_stateful
     } ;
     
+    enum call_type_t {
+        unknown_call_type,
+        origination_call_type,
+        termination_call_type
+    } ;
+    
 }
 
 #ifdef SSP_MAIN

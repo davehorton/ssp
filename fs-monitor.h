@@ -12,6 +12,7 @@
 #include <iostream>
 #include <boost/thread.hpp>
 #include <boost/asio.hpp>
+#include <boost/unordered_set.hpp>
 
 #include "ssp.h"
 #include "fs-instance.h"
@@ -35,6 +36,7 @@ namespace ssp {
         
         bool getAvailableServers( deque< boost::shared_ptr<FsInstance> >& servers ) ;
         
+        bool isAppserver( const string& sourceAddress ) { return m_setServers.end() != m_setServers.find( sourceAddress ) ; }
         
     protected:
         void threadFunc() ;
@@ -53,6 +55,8 @@ namespace ssp {
         unsigned int                m_RRInterval ;
         unsigned int                m_nLastServer ;
         unsigned int                m_nLastRR ;
+        
+        boost::unordered_set< std::string > m_setServers ;
         
     } ;
     

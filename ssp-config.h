@@ -26,14 +26,12 @@ namespace ssp {
         
         bool isValid() ;
 
-        bool getInboundSipUrl( std::string& sipUrl ) const ;
-        bool getOutboundSipUrl( std::string& sipUrl ) const ;
+        bool getSipUrl( std::string& sipUrl ) const ;
         bool getSyslogTarget( std::string& address, unsigned int& port ) const ;
         bool getSyslogFacility( sinks::syslog::facility& facility ) const ;
         bool getCustomer( const std::string& dnis, std::string& customer) const ;
         bool getCarrier( const std::string& sourceAddress, std::string& carrier) const ;
-        bool getInboundRoutes( const std::string& sourceAddress, const std::string& dnis, const std::string& ani, std::vector<std::string>& routes, routing_strategy& strategy, routing_error& error ) const ;
-        bool getOutboundRoutes( const std::string& dnis, const std::string& ani, std::vector<std::string>& routes, routing_strategy& strategy, routing_error& error ) const ;
+        bool getTerminationRoute( std::string& destAddress, std::string& carrier, std::string& chargeNumber ) ;
         
         void getAppservers( deque<string>& servers) ;
         
@@ -42,6 +40,10 @@ namespace ssp {
         unsigned int getMaxRoundRobins(void) ;
         bool getAcl( string& getAcl ) ;
         bool isAcl( const string& s ) ;
+        bool isActive(void) ;
+        
+        unsigned int getCountOfOutboundTrunks(void) ;
+        unsigned int getMaxTerminationAttempts(void) ;
         
         void Log() const ;
         

@@ -57,6 +57,7 @@ namespace ssp {
         
         //TODO: destroy existing servers ?  Or add new ones, drop only missing ones?
         m_servers.clear() ;
+        m_setServers.clear() ;
         
         boost::char_separator<char> sep(":");
         string strAddress ;
@@ -72,6 +73,8 @@ namespace ssp {
             boost::shared_ptr<FsInstance> ptr( new FsInstance( m_ioService, strAddress, nPort ) )  ;
             ptr->start() ;
             m_servers.push_back( ptr ) ;
+            
+            m_setServers.insert( strAddress ) ;
         }
     }
 
