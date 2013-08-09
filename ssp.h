@@ -37,6 +37,7 @@ namespace src = boost::log::sources;
 namespace sinks = boost::log::sinks;
 namespace fmt = boost::log::formatters;
 namespace keywords = boost::log::keywords;
+namespace filters = boost::log::filters ;
 
 
 namespace ssp {

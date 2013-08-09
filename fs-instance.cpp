@@ -58,7 +58,7 @@ namespace ssp {
             SSP_LOG(log_error) << MY_COORDS << "Unable to resolve FS at " << m_strAddress << ":" << m_nEventSocketPort << " --> " << ec.message() << endl;
             
             m_state = resolve_failed ;
-            start_timer( 5 ) ;
+            start_timer( 5000 ) ;
          }
     }
     
@@ -81,7 +81,7 @@ namespace ssp {
             SSP_LOG(log_error) << MY_COORDS << "Unable to connect to FS at " << m_strAddress << ":" << m_nEventSocketPort << " --> " << ec.message() << endl;
     
             m_state = connect_failed ;
-            start_timer( 5 ) ;
+            start_timer( 5000 ) ;
          }
        
     }
@@ -112,7 +112,7 @@ namespace ssp {
                 m_socket.close();
                 m_bDisconnected = true ;
                 m_state = starting ;
-                start_timer(1) ;
+                start_timer(1000) ;
                 throw FsDisconnectException( m_strAddress, m_nEventSocketPort, "Disconnected; freeswitch was shut down") ;
             }
             
@@ -190,7 +190,7 @@ namespace ssp {
                                          boost::bind( &FsInstance::read_handler, shared_from_this(), boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred ) ) ;
             }
             if( bSetTimer ) {
-                start_timer( 5 ) ;
+                start_timer( querying_status == m_state ? theOneAndOnlyController->getFSHealthCheckTimerTimeMsecs() : 5000 ) ;
             }
             if( bNotifyReconnect ) throw FsReconnectException( m_strAddress, m_nEventSocketPort, "Reconnected") ;
         }
@@ -201,7 +201,6 @@ namespace ssp {
     
     void FsInstance::timer_handler(const boost::system::error_code& ec) {
         bool bReadAgain = false ;
-        bool bSetTimer = false ;
         string out ;
         if( !ec ) {
             SSP_LOG(log_debug) << "FsInstance timer went off " << m_strAddress << ":" << m_nEventSocketPort << " state is: " << m_state << endl ;
@@ -240,17 +239,14 @@ namespace ssp {
                 m_socket.async_read_some(boost::asio::buffer(m_buffer),
                                          boost::bind( &FsInstance::read_handler, shared_from_this(), boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred ) ) ;
             }
-            if( bSetTimer ) {
-                start_timer( 5 ) ;
-            }
         }
         else {
             SSP_LOG(log_error) << MY_COORDS << "FsInstance timer error " << m_strAddress << ":" << m_nEventSocketPort << " --> " << ec.message() << endl;
         }
     }
 
-    void FsInstance::start_timer( unsigned int nSeconds ) {
-        m_timer.expires_from_now(boost::posix_time::seconds(nSeconds));
+    void FsInstance::start_timer( unsigned long nMilliseconds ) {
+        m_timer.expires_from_now(boost::posix_time::milliseconds(nMilliseconds));
         m_timer.async_wait( boost::bind( &FsInstance::timer_handler, shared_from_this(), boost::asio::placeholders::error )) ;
     }
     

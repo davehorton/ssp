@@ -38,13 +38,13 @@ namespace ssp {
         agent_mode getAgentMode(void) ;
         unsigned int getSofiaLogLevel(void) ;
         unsigned int getMaxRoundRobins(void) ;
-        bool getAcl( string& getAcl ) ;
-        bool isAcl( const string& s ) ;
         bool isActive(void) ;
         
         unsigned int getCountOfOutboundTrunks(void) ;
         unsigned int getMaxTerminationAttempts(void) ;
         unsigned long getOriginationSessionTimer(void) ;
+        unsigned long getFSHealthCheckTimerTimeMsecs(void) ;
+        severity_levels getLoglevel() ;
         
         void Log() const ;
         

@@ -54,7 +54,8 @@ namespace ssp {
         m_nAttemptCount(0), m_sip(sip), m_from(from), m_to(to), m_contact(contact), m_p_charge_info_header(p_charge_info_header), m_url(url), m_carrier(carrier), m_sipTrunk(sipTrunk) {
             
         }
-        ~TerminationAttempt() {}
+        ~TerminationAttempt() {
+        }
         
         void crankback( const string& url, const string& carrier, const string& sipTrunk ) {
             m_url = url ;
@@ -90,13 +91,19 @@ namespace ssp {
     public:
         SipDialogInfo( nta_leg_t* leg, bool bOrigination, unsigned long nSessionTimer = 0 ) : m_leg(leg), m_bOrigination( bOrigination ), m_nSessionTimer(nSessionTimer), m_timerSessionRefresh(NULL) {
         }
-        ~SipDialogInfo() {}
+        ~SipDialogInfo() {
+            if( m_timerSessionRefresh ) {
+                su_timer_destroy( m_timerSessionRefresh ) ;
+                m_timerSessionRefresh = NULL ;
+            }
+        }
         
         nta_leg_t* getLeg(void) const { return m_leg; }
         void setLeg( nta_leg_t* leg ) { m_leg = leg; }
         bool isOrigination(void) { return m_bOrigination; }
         unsigned int getSessionTimerSecs(void) { return m_nSessionTimer; }
         su_timer_t* getSessionTimerTimer(void) { return m_timerSessionRefresh; }
+        void setSessionTimerTimer( su_timer_t* t ) {m_timerSessionRefresh; }
         const string& getLocalSdp(void) { return m_localSdp; }
         void setLocalSdp( char* pl_data, usize_t pl_size ) {
             m_localSdp.assign( pl_data, pl_size ) ;
@@ -131,9 +138,14 @@ namespace ssp {
         int processRequestInsideDialog( nta_leg_t* leg, nta_incoming_t* irq, sip_t const *sip) ;
         int processInviteResponseInsideDialog(  nta_outgoing_t* request, sip_t const* sip ) ;
         int processAckOrCancel( nta_incoming_t* irq, sip_t const *sip );
+        int processSessionRefreshTimer( nta_leg_t* leg ) ;
         
         bool isInboundProxy() { return m_bInbound; }
         bool isOutboundProxy() { return m_bOutbound; }
+        
+        unsigned long getFSHealthCheckTimerTimeMsecs(void) {
+            return m_nFSTimerMsecs ;
+        }
         
 	private:
 		SipLbController() {} ;
@@ -146,6 +158,7 @@ namespace ssp {
         sip_from_t* generateOutgoingFrom( sip_from_t* const incomingFrom ) ;
         sip_to_t* generateOutgoingTo( sip_to_t* const incomingTo ) ;
         sip_contact_t* generateOutgoingContact( sip_contact_t* const incomingContact ) ;
+        bool terminateLeg( nta_leg_t* leg ) ;
 
         nta_leg_t* getLegFromTransaction( nta_outgoing_t* orq ) ;
         nta_leg_t* getLegFromTransaction( nta_incoming_t* irq ) ;
@@ -171,7 +184,8 @@ namespace ssp {
 		void daemonize() ;
 		void initializeLogging() ;
 		void deinitializeLogging() ;
-		bool readConfig( void ) ;
+		bool installConfig() ;
+		void logConfig() ;
 	
 		scoped_ptr< src::severity_logger_mt<severity_levels> > m_logger ;
 		boost::mutex m_mutexGlobal ;
@@ -180,11 +194,12 @@ namespace ssp {
 		string m_configFilename ;
         
         shared_ptr< sinks::synchronous_sink< sinks::syslog_backend > > m_sink ;
-        scoped_ptr<SspConfig> m_Config ;
+        scoped_ptr<SspConfig> m_Config, m_ConfigNew ;
         int m_bDaemonize ;
         int m_bInbound ;
         int m_bOutbound ;
         int m_nIterationCount ;
+        severity_levels m_current_severity_threshold ;
         
         su_home_t* 	m_home ;
         su_root_t* 	m_root ;
@@ -199,6 +214,7 @@ namespace ssp {
 
         /* freeswitch monitor */
         FsMonitor       m_fsMonitor ;
+        unsigned long   m_nFSTimerMsecs ;
         
         /* stateless */
         iip_map_t   m_mapInvitesInProgress ;    //invites without a final response, or (in the case of a non-success final response)

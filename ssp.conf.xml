@@ -26,6 +26,8 @@
         
         <session-timer>1800</session-timer>
         
+        <freeswitch-health-check-interval>5000</freeswitch-health-check-interval>
+        
         
         <!-- freeswitch servers that we distribute calls across -->
         <appserver event-socket-port="8021">localhost</appserver>
@@ -51,6 +53,9 @@
             <facility>local6</facility>
         </syslog>
         <sofia-loglevel>7</sofia-loglevel>
+        
+        <!-- notice, warning, error, info, debug.  Default: info -->
+        <loglevel>debug</loglevel>
     </logging>
     
     <!-- grouping of external sip endpoints into carriers/service providers -->

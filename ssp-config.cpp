@@ -238,6 +238,15 @@ namespace ssp {
                 m_syslogFacility = pt.get<string>("ssp.logging.syslog.facility","local7") ;
                 m_nSofiaLogLevel = pt.get<unsigned int>("ssp.logging.sofia-loglevel", 1) ;
                 
+                string loglevel = pt.get<string>("ssp.logging.loglevel", "info") ;
+                
+                if( 0 == loglevel.compare("notice") ) m_loglevel = log_notice ;
+                else if( 0 == loglevel.compare("error") ) m_loglevel = log_error ;
+                else if( 0 == loglevel.compare("warning") ) m_loglevel = log_warning ;
+                else if( 0 == loglevel.compare("info") ) m_loglevel = log_info ;
+                else if( 0 == loglevel.compare("debug") ) m_loglevel = log_debug ;
+                else m_loglevel = log_info ;
+                
                 /* sip configuration */
                 m_sipUrl = pt.get<string>("ssp.sip.contact", "sip:*") ;
                 
@@ -254,8 +263,8 @@ namespace ssp {
                 /* routing strategy: round robin for a configurable interval (0=always), then send the next call to least loaded server */
                 m_nMaxRoundRobins = pt.get<unsigned int>("ssp.inbound.max-round-robins", 0) ;
                 m_nMaxTerminationAttempts = pt.get<unsigned int>("ssp.outbound.max-termination-attempts", 1) ;
+                m_nFSTimerMsecs = pt.get<unsigned long>("ssp.inbound.freeswitch-health-check-interval", 5000) ;
                 
-                m_strAcl = pt.get<string>("ssp.inbound.acl","carrier") ;
                 
                 string ibStrategy = pt.get<string>("ssp.routing.inbound.<xmlattr>.strategy", "") ;
                 string ibTarget = pt.get<string>("ssp.routing.inbound.<xmlattr>.target", "") ;
@@ -474,8 +483,6 @@ namespace ssp {
         
         agent_mode getAgentMode(void) { return m_agent_mode; }
         
-        bool getAcl(string& strAcl) { strAcl =  m_strAcl ;}
-
         bool getTerminationRoute( std::string& destAddress, std::string& carrier, std::string& chargeNumber ) {
             if( m_vecTerminationCarrier.empty() ) return false ;
             carrier = m_vecTerminationCarrier.at( m_nCurrentTerminationCarrier ) ;
@@ -503,6 +510,12 @@ namespace ssp {
         }
         unsigned long getOriginationSessionTimer() {
             return m_nOriginationSessionTimer ;
+        }
+        unsigned long getFSHealthCheckTimerTimeMsecs() {
+            return m_nFSTimerMsecs ;
+        }
+        severity_levels getLoglevel() {
+            return m_loglevel ;
         }
     private:
         
@@ -539,7 +552,8 @@ namespace ssp {
         unsigned int m_nMaxRoundRobins ;
         unsigned int m_nMaxTerminationAttempts;
         unsigned long m_nOriginationSessionTimer ;
-        string m_strAcl ;
+        unsigned long m_nFSTimerMsecs ;
+        severity_levels m_loglevel ;
     } ;
     
     /*
@@ -588,17 +602,7 @@ namespace ssp {
     unsigned int SspConfig::getMaxRoundRobins() {
         return m_pimpl->getMaxRoundRobins() ;
     }
-    bool SspConfig::getAcl( string& strAcl ) {
-        m_pimpl->getAcl( strAcl ) ;
-        return true ;
-    }
-    bool SspConfig::isAcl( const string& s ) {
-        string strAcl ;
-        m_pimpl->getAcl( strAcl ) ;
-        return 0 == s.compare( strAcl ) ;
-    }
     bool SspConfig::getTerminationRoute( std::string& destAddress, std::string& carrier, std::string& chargeNumber ) {
-        
         return m_pimpl->getTerminationRoute( destAddress, carrier, chargeNumber ) ;
     }
     bool SspConfig::isActive() {
@@ -613,8 +617,15 @@ namespace ssp {
     unsigned long SspConfig::getOriginationSessionTimer() {
         return m_pimpl->getOriginationSessionTimer() ;
     }
+    unsigned long SspConfig::getFSHealthCheckTimerTimeMsecs(void) {
+        return m_pimpl->getFSHealthCheckTimerTimeMsecs() ;
+    }
 
     void SspConfig::Log() const {
         SSP_LOG(log_notice) << "Configuration:" << endl ;
     }
+    severity_levels SspConfig::getLoglevel() {
+        return m_pimpl->getLoglevel() ;
+    }
+    
 }

@@ -68,7 +68,7 @@ namespace ssp {
             disconnecting
         } ;
         
-        void start_timer( unsigned int nSeconds ) ;
+        void start_timer( unsigned long nMilliseconds ) ;
         
     private:
         string          m_strAddress ;

@@ -9,6 +9,21 @@
 #include <boost/function.hpp>
 #include <boost/bind.hpp>
 
+#include <boost/log/trivial.hpp>
+#include <boost/log/filters.hpp>
+
+#include <boost/phoenix/bind.hpp>
+#include <boost/date_time/posix_time/posix_time.hpp>
+#include <boost/log/core.hpp>
+#include <boost/log/attributes.hpp>
+#include <boost/log/sources/basic_logger.hpp>
+#include <boost/log/sources/severity_logger.hpp>
+#include <boost/log/sources/severity_channel_logger.hpp>
+#include <boost/log/sources/record_ostream.hpp>
+#include <boost/log/sinks/sync_frontend.hpp>
+#include <boost/log/sinks/text_ostream_backend.hpp>
+#include <boost/log/attributes/scoped_attribute.hpp>
+
 namespace ssp {
     class SipLbController ;
 }
@@ -18,7 +33,7 @@ namespace ssp {
 #define NTA_LEG_MAGIC_T ssp::SipLbController
 #define NTA_INCOMING_MAGIC_T ssp::SipLbController
 #define NTA_OUTGOING_MAGIC_T ssp::SipLbController
-#define SU_TIMER_ARG_T ssp::SipLbController
+//#define SU_TIMER_ARG_T ssp::SipLbController
 
 #define COMPLETED_TRANSACTION_HOLD_TIME_IN_SECS (32)
 
@@ -39,7 +54,7 @@ using namespace std ;
 namespace {
     
     int counter = 5 ;
-    
+        
 	/* sofia logging is redirected to this function */
 	static void __sofiasip_logger_func(void *logarg, char const *fmt, va_list ap) {
         
@@ -121,8 +136,11 @@ namespace {
         return controller->statelessCallback( msg, sip ) ;
     }
     
-    void watchdogTimerHandler(su_root_magic_t *magic, su_timer_t *timer, su_timer_arg_t *controller) {
-        controller->processWatchdogTimer() ;
+    void watchdogTimerHandler(su_root_magic_t *magic, su_timer_t *timer, su_timer_arg_t *arg) {
+        theOneAndOnlyController->processWatchdogTimer() ;
+    }
+    void sessionTimerHandler(su_root_magic_t *magic, su_timer_t *timer, su_timer_arg_t *arg) {
+        theOneAndOnlyController->processSessionRefreshTimer( static_cast<nta_leg_t*>( arg ) ) ;
     }
 
     /* needed to be able to live in a boost unordered container */
@@ -157,18 +175,51 @@ namespace ssp {
         if( !m_Config->isValid() ) {
             exit(-1) ;
         }
-            m_nTerminationRetries = min( m_Config->getCountOfOutboundTrunks(), m_Config->getMaxTerminationAttempts() ) ; ;
-        
+        this->installConfig() ;
+            
         /* now we can initialize logging */
         m_logger.reset( this->createLogger() ) ;
+            
             
     }
 
     SipLbController::~SipLbController() {
     }
+    
+    bool SipLbController::installConfig() {
+
+        if( m_ConfigNew ) {
+            m_Config.swap( m_ConfigNew ) ;
+            m_ConfigNew.reset() ;
+        }
+        
+        m_nTerminationRetries = min( m_Config->getCountOfOutboundTrunks(), m_Config->getMaxTerminationAttempts() ) ;
+        m_nFSTimerMsecs = m_Config->getFSHealthCheckTimerTimeMsecs() ;
+        m_current_severity_threshold = m_Config->getLoglevel() ;
+        
+        return true ;
+        
+    }
+    void SipLbController::logConfig() {
+        SSP_LOG(log_notice) << "Logging threshold:                     " << (int) m_current_severity_threshold << endl ;
+        SSP_LOG(log_notice) << "Freeswitch health check timer (msecs): " << m_nFSTimerMsecs << endl ;
+        SSP_LOG(log_notice) << "Number of termination routes to try:   " << m_nTerminationRetries << endl ;
+    }
 
     void SipLbController::handleSigHup( int signal ) {
-        //TODO: re-read config file
+        
+        if( !m_ConfigNew ) {
+            SSP_LOG(log_notice) << "Re-reading configuration file" << endl ;
+            m_ConfigNew.reset( new SspConfig( m_configFilename.c_str() ) ) ;
+            if( !m_ConfigNew->isValid() ) {
+                SSP_LOG(log_error) << "Error reading configuration file; no changes will be made.  Please correct the configuration file and try to reload again" << endl ;
+                m_ConfigNew.reset() ;
+            }
+        }
+        else {
+            SSP_LOG(log_error) << "Ignoring signal; already have a new configuration file to install" << endl ;
+        }
+        
     
     }
 
@@ -317,6 +368,13 @@ namespace ssp {
 
             // Set the remote address to sent syslog messages to
             m_sink->locked_backend()->set_target_address( syslogAddress.c_str() );
+            
+            logging::core::get()->add_global_attribute("RecordID", attrs::counter< unsigned int >());
+            
+            m_sink->set_filter(
+               filters::attr<severity_levels>("Severity") <= m_current_severity_threshold
+            ) ;
+
 
             // Add the sink to the core
             logging::core::get()->add_sink(m_sink);
@@ -484,7 +542,7 @@ namespace ssp {
         }
         else {
             /* stateful */
-            SSP_LOG(log_info) << m_dialogs.size() << "/" << m_mapTerminationAttempts.size() << "/" << m_transactions.size() << "/" << m_mapDialogInfo.size() << " (dialogs/transactions/termination attempts/dialog info)" << endl ;
+            SSP_LOG(log_debug) << m_dialogs.size() << "/" << m_mapTerminationAttempts.size() << "/" << m_transactions.size() << "/" << m_mapDialogInfo.size() << " (dialogs/transactions/termination attempts/dialog info)" << endl ;
             
             if( 0 == m_nIterationCount && 0 == m_dialogs.size() && 0 == m_mapTerminationAttempts.size() && 0 == m_transactions.size() ) {
                 
@@ -498,6 +556,15 @@ namespace ssp {
                     m_timer = NULL ;
                 }
             }
+        }
+        
+        /* check if new configuration file needs to be installed */
+        if( m_ConfigNew ) {
+            SSP_LOG(log_notice) << "Installing new configuration file" << endl ;
+
+            
+            m_ConfigNew.reset() ;
+            SSP_LOG(log_notice) << "New configuration file successfully installed" << endl ;
         }
         
         
@@ -827,6 +894,7 @@ namespace ssp {
             nSessionTimer = max( minSE, m_Config->getOriginationSessionTimer() ) ;
         }
 
+        /* save information about the a leg so we can respond to re-INVITEs from the origination carrier */
         boost::shared_ptr<SipDialogInfo> p = boost::make_shared<SipDialogInfo>( a_leg, true, nSessionTimer ) ;
         m_mapDialogInfo.insert( mapDialogInfo::value_type( a_leg, p ) ) ;
 
@@ -892,6 +960,7 @@ namespace ssp {
  
         m_mapTerminationAttempts.insert( mapTerminationAttempts::value_type( orq, t )) ;
         
+        /* save information about the b leg so we can respond to re-INVITEs from the termination carrier */
         boost::shared_ptr<SipDialogInfo> p = boost::make_shared<SipDialogInfo>( b_leg, false ) ;
         p->setLocalSdp( sip->sip_payload->pl_data, sip->sip_payload->pl_len ) ;
         m_mapDialogInfo.insert( mapDialogInfo::value_type( b_leg, p ) ) ;
@@ -994,11 +1063,19 @@ namespace ssp {
                 mapDialogInfo::iterator it = m_mapDialogInfo.find( a_leg ) ;
                 if( m_mapDialogInfo.end() != it ) {
                     boost::shared_ptr<SipDialogInfo> p = it->second ;
+                    p->setLocalSdp( sip->sip_payload->pl_data, sip->sip_payload->pl_len ) ;
                     if( p->getSessionTimerSecs() > 0 ) {
                         bSessionTimer = true ;
-                        p->setLocalSdp( sip->sip_payload->pl_data, sip->sip_payload->pl_len ) ;
-                        ostrSessionTimer << p->getSessionTimerSecs() << endl ;
-                    }
+                        su_timer_t*  t = su_timer_create( su_root_task(m_root), p->getSessionTimerSecs() * 1000) ;
+                        if( NULL == t ) {
+                            SSP_LOG(log_error) << "Error setting Session-Expires timer" << endl ;
+                        }
+                        else {
+                            ostrSessionTimer <<  p->getSessionTimerSecs() ;
+                            p->setSessionTimerTimer( t ) ;
+                            su_timer_set(t, sessionTimerHandler, a_leg ) ;
+                        }
+                   }
                 }
                                 
             }
@@ -1140,6 +1217,33 @@ namespace ssp {
         return 0 ;
     }
     
+    int SipLbController::processSessionRefreshTimer( nta_leg_t* leg ) {
+        SSP_LOG(log_error) << "processSessionTimerRefresh: session timer expired for leg, tearing down call" << endl ;
+        mapDialogInfo::iterator it = m_mapDialogInfo.find( leg ) ;
+        if( m_mapDialogInfo.end() != it ) {
+            boost::shared_ptr<SipDialogInfo> p = it->second ;
+            su_timer_t* t = p->getSessionTimerTimer() ;
+            if( t ) {
+                su_timer_destroy( t ) ;
+                p->setSessionTimerTimer( NULL ) ;
+            }
+            
+            this->terminateLeg( leg ) ;
+            nta_leg_t* other = this->getAssociatedDialog( leg ) ;
+            assert( other ) ;
+            if( other ) {
+                this->terminateLeg( other ) ;
+            }
+            this->clearDialog( leg ) ;
+        }
+    }
+
+    bool SipLbController::terminateLeg( nta_leg_t* leg ) {
+        //TODO: implement this (needed for session timer support)
+        return true; 
+        
+    }
+
     nta_incoming_t* SipLbController::getAssociatedTransaction( nta_outgoing_t* orq ) {
         bimapTxns::right_const_iterator it = m_transactions.right.find(orq);
         if( it == m_transactions.right.end() ) return NULL ;
@@ -1197,18 +1301,23 @@ namespace ssp {
         SSP_LOG(log_debug) << "after adding dialogs there are " << m_dialogs.size() << " dialogs remainining" << endl ;
     }
     void SipLbController::clearDialog( nta_leg_t* leg ) {
+        SSP_LOG(log_error) << "clearDialog; count of SipDialogs before update: " << m_mapDialogInfo.size() << endl ;
+        nta_leg_t* other = this->getAssociatedDialog( leg ) ;
+
         nta_leg_destroy( leg ) ;
         m_dialogs.left.erase(leg) ;
         m_dialogs.right.erase(leg) ;
         m_mapDialogInfo.erase( leg ) ;
-        nta_leg_t* other = this->getAssociatedDialog( leg ) ;
+        assert( other ) ;
         if( other ) {
             nta_leg_destroy( other ) ;
             m_mapDialogInfo.erase( other ) ;
         }
+        SSP_LOG(log_error) << "clearDialog; count of SipDialogs before update: " << m_mapDialogInfo.size() << endl ;
         SSP_LOG(log_debug) << "after clearing dialogs there are " << m_dialogs.size() << " dialogs remainining" << endl ;
     }
     void SipLbController::updateDialog( nta_leg_t* oldBLeg, nta_leg_t* newBLeg) {
+        SSP_LOG(log_error) << "updateDialog; count of SipDialogs before update: " << m_mapDialogInfo.size() << endl ;
         assert( oldBLeg && newBLeg ) ;
         nta_leg_t* a_leg = this->getAssociatedDialog( oldBLeg ) ;
         m_dialogs.right.erase( oldBLeg ) ;
@@ -1216,12 +1325,14 @@ namespace ssp {
         nta_leg_destroy( oldBLeg ) ;
         
         mapDialogInfo::iterator it = m_mapDialogInfo.find( oldBLeg ) ;
+        assert( m_mapDialogInfo.end() != it ) ;
         if( m_mapDialogInfo.end() != it ) {
             boost::shared_ptr<SipDialogInfo> p = it->second ;
             p->setLeg( newBLeg ) ;
             m_mapDialogInfo.insert( mapDialogInfo::value_type( newBLeg, p)) ;
             m_mapDialogInfo.erase( oldBLeg ) ;
-        }        
+            SSP_LOG(log_error) << "updateDialog; count of SipDialogs after update: " << m_mapDialogInfo.size() << endl ;
+        }
     }
     nta_leg_t* SipLbController::getAssociatedDialog( nta_leg_t* leg ) {
         bimapDialogs::left_const_iterator it = m_dialogs.left.find(leg);
