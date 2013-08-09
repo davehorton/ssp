@@ -194,7 +194,7 @@ namespace ssp {
 		string m_configFilename ;
         
         shared_ptr< sinks::synchronous_sink< sinks::syslog_backend > > m_sink ;
-        scoped_ptr<SspConfig> m_Config, m_ConfigNew ;
+        shared_ptr<SspConfig> m_Config, m_ConfigNew ;
         int m_bDaemonize ;
         int m_bInbound ;
         int m_bOutbound ;

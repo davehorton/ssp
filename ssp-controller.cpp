@@ -171,7 +171,8 @@ namespace ssp {
             exit(-1) ;
         }
         
-        m_Config.reset( new SspConfig( m_configFilename.c_str() ) ) ;
+        m_Config = boost::make_shared<SspConfig>( m_configFilename.c_str() ) ;
+
         if( !m_Config->isValid() ) {
             exit(-1) ;
         }
@@ -189,14 +190,23 @@ namespace ssp {
     bool SipLbController::installConfig() {
 
         if( m_ConfigNew ) {
+<<<<<<< HEAD
             m_Config.swap( m_ConfigNew ) ;
             m_ConfigNew.reset() ;
+=======
+            m_Config = m_ConfigNew ;
+            m_ConfigNew.reset();
+>>>>>>> start of re-read config file on SIGHUP
         }
         
         m_nTerminationRetries = min( m_Config->getCountOfOutboundTrunks(), m_Config->getMaxTerminationAttempts() ) ;
         m_nFSTimerMsecs = m_Config->getFSHealthCheckTimerTimeMsecs() ;
         m_current_severity_threshold = m_Config->getLoglevel() ;
+<<<<<<< HEAD
         
+=======
+
+>>>>>>> start of re-read config file on SIGHUP
         return true ;
         
     }
@@ -371,7 +381,12 @@ namespace ssp {
             
             logging::core::get()->add_global_attribute("RecordID", attrs::counter< unsigned int >());
             
+<<<<<<< HEAD
             m_sink->set_filter(
+=======
+            //m_sink->set_filter(
+            logging::core::get()->set_filter(
+>>>>>>> start of re-read config file on SIGHUP
                filters::attr<severity_levels>("Severity") <= m_current_severity_threshold
             ) ;
 
@@ -395,6 +410,7 @@ namespace ssp {
         if( m_bDaemonize ) {
             daemonize() ;
         }
+        this->logConfig() ;
         
         string url ;
         m_Config->getSipUrl( url ) ;
@@ -500,7 +516,7 @@ namespace ssp {
         su_home_unref( m_home ) ;
         su_deinit() ;
 
-        m_Config.reset(0) ;
+        m_Config.reset();
         this->deinitializeLogging() ;
    }
 
@@ -562,9 +578,13 @@ namespace ssp {
         if( m_ConfigNew ) {
             SSP_LOG(log_notice) << "Installing new configuration file" << endl ;
 
-            
+            this->installConfig() ;
+            logging::core::get()->set_filter(
+             filters::attr<severity_levels>("Severity") <= m_current_severity_threshold
+            ) ;
             m_ConfigNew.reset() ;
             SSP_LOG(log_notice) << "New configuration file successfully installed" << endl ;
+            this->logConfig() ;
         }
         
         
