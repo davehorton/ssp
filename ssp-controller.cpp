@@ -58,6 +58,8 @@ namespace {
 	/* sofia logging is redirected to this function */
 	static void __sofiasip_logger_func(void *logarg, char const *fmt, va_list ap) {
         
+        if( theOneAndOnlyController->getCurrentLoglevel() < ssp::log_error ) return ;
+        
         static bool loggingSipMsg = false ;
         static ostringstream sipMsg ;
  
@@ -190,23 +192,13 @@ namespace ssp {
     bool SipLbController::installConfig() {
 
         if( m_ConfigNew ) {
-<<<<<<< HEAD
-            m_Config.swap( m_ConfigNew ) ;
-            m_ConfigNew.reset() ;
-=======
             m_Config = m_ConfigNew ;
             m_ConfigNew.reset();
->>>>>>> start of re-read config file on SIGHUP
         }
         
         m_nTerminationRetries = min( m_Config->getCountOfOutboundTrunks(), m_Config->getMaxTerminationAttempts() ) ;
         m_nFSTimerMsecs = m_Config->getFSHealthCheckTimerTimeMsecs() ;
         m_current_severity_threshold = m_Config->getLoglevel() ;
-<<<<<<< HEAD
-        
-=======
-
->>>>>>> start of re-read config file on SIGHUP
         return true ;
         
     }
@@ -381,15 +373,9 @@ namespace ssp {
             
             logging::core::get()->add_global_attribute("RecordID", attrs::counter< unsigned int >());
             
-<<<<<<< HEAD
-            m_sink->set_filter(
-=======
-            //m_sink->set_filter(
             logging::core::get()->set_filter(
->>>>>>> start of re-read config file on SIGHUP
                filters::attr<severity_levels>("Severity") <= m_current_severity_threshold
             ) ;
-
 
             // Add the sink to the core
             logging::core::get()->add_sink(m_sink);
@@ -579,17 +565,20 @@ namespace ssp {
             SSP_LOG(log_notice) << "Installing new configuration file" << endl ;
 
             this->installConfig() ;
+            
+            /* this has to be done outside of installConfig, because that method is also called during startup when logging is not initialized */
             logging::core::get()->set_filter(
              filters::attr<severity_levels>("Severity") <= m_current_severity_threshold
             ) ;
+            
             m_ConfigNew.reset() ;
             SSP_LOG(log_notice) << "New configuration file successfully installed" << endl ;
             this->logConfig() ;
         }
         
+        this->logAgentStats();
         
-        //TODO: check if new config file needs to be inserted
-        
+                
         return 0 ;
     }
     
@@ -799,6 +788,9 @@ namespace ssp {
                 if( m_nIterationCount > 0 ) m_nIterationCount-- ;
                 return rc ;
             }
+                
+            case sip_method_bye:
+                return 481 ;
                 
             default:
                 nta_incoming_destroy( irq ) ;
@@ -1189,6 +1181,7 @@ namespace ssp {
         }
         else if( sip->sip_request->rq_method == sip_method_ack ) {
             /* we only get here in the case of a non-success response, and nta has already generated an ACK to B */
+            
         }
         
         return 0 ;
@@ -1210,7 +1203,8 @@ namespace ssp {
                 
                 
                 this->clearDialog( leg ) ;
-                return 200 ;
+                nta_incoming_destroy( irq ) ;
+               return 200 ;
             }
             case sip_method_invite:
             {
@@ -1321,7 +1315,7 @@ namespace ssp {
         SSP_LOG(log_debug) << "after adding dialogs there are " << m_dialogs.size() << " dialogs remainining" << endl ;
     }
     void SipLbController::clearDialog( nta_leg_t* leg ) {
-        SSP_LOG(log_error) << "clearDialog; count of SipDialogs before update: " << m_mapDialogInfo.size() << endl ;
+        SSP_LOG(log_debug) << "clearDialog; count of SipDialogs before update: " << m_mapDialogInfo.size() << endl ;
         nta_leg_t* other = this->getAssociatedDialog( leg ) ;
 
         nta_leg_destroy( leg ) ;
@@ -1333,11 +1327,11 @@ namespace ssp {
             nta_leg_destroy( other ) ;
             m_mapDialogInfo.erase( other ) ;
         }
-        SSP_LOG(log_error) << "clearDialog; count of SipDialogs before update: " << m_mapDialogInfo.size() << endl ;
+        SSP_LOG(log_debug) << "clearDialog; count of SipDialogs before update: " << m_mapDialogInfo.size() << endl ;
         SSP_LOG(log_debug) << "after clearing dialogs there are " << m_dialogs.size() << " dialogs remainining" << endl ;
     }
     void SipLbController::updateDialog( nta_leg_t* oldBLeg, nta_leg_t* newBLeg) {
-        SSP_LOG(log_error) << "updateDialog; count of SipDialogs before update: " << m_mapDialogInfo.size() << endl ;
+        SSP_LOG(log_debug) << "updateDialog; count of SipDialogs before update: " << m_mapDialogInfo.size() << endl ;
         assert( oldBLeg && newBLeg ) ;
         nta_leg_t* a_leg = this->getAssociatedDialog( oldBLeg ) ;
         m_dialogs.right.erase( oldBLeg ) ;
@@ -1351,7 +1345,7 @@ namespace ssp {
             p->setLeg( newBLeg ) ;
             m_mapDialogInfo.insert( mapDialogInfo::value_type( newBLeg, p)) ;
             m_mapDialogInfo.erase( oldBLeg ) ;
-            SSP_LOG(log_error) << "updateDialog; count of SipDialogs after update: " << m_mapDialogInfo.size() << endl ;
+            SSP_LOG(log_debug) << "updateDialog; count of SipDialogs after update: " << m_mapDialogInfo.size() << endl ;
         }
     }
     nta_leg_t* SipLbController::getAssociatedDialog( nta_leg_t* leg ) {
@@ -1374,6 +1368,88 @@ namespace ssp {
         return unknown_call_type ;
     }
 
+   void SipLbController::logAgentStats() {
+       usize_t irq_hash = -1, orq_hash = -1, leg_hash = -1;
+       usize_t irq_used = -1, orq_used = -1, leg_used = -1 ;
+       usize_t recv_msg = -1, sent_msg = -1;
+       usize_t recv_request = -1, recv_response = -1;
+       usize_t bad_message = -1, bad_request = -1, bad_response = -1;
+       usize_t drop_request = -1, drop_response = -1;
+       usize_t client_tr = -1, server_tr = -1, dialog_tr = -1;
+       usize_t acked_tr = -1, canceled_tr = -1;
+       usize_t trless_request = -1, trless_to_tr = -1, trless_response = -1;
+       usize_t trless_200 = -1, merged_request = -1;
+       usize_t sent_request = -1, sent_response = -1;
+       usize_t retry_request = -1, retry_response = -1, recv_retry = -1;
+       usize_t tout_request = -1, tout_response = -1;
 
+       nta_agent_get_stats(m_nta,
+                                NTATAG_S_IRQ_HASH_REF(irq_hash),
+                                NTATAG_S_ORQ_HASH_REF(orq_hash),
+                                NTATAG_S_LEG_HASH_REF(leg_hash),
+                                NTATAG_S_IRQ_HASH_USED_REF(irq_used),
+                                NTATAG_S_ORQ_HASH_USED_REF(orq_used),
+                                NTATAG_S_LEG_HASH_USED_REF(leg_used),
+                                NTATAG_S_RECV_MSG_REF(recv_msg),
+                                NTATAG_S_SENT_MSG_REF(sent_msg),
+                                NTATAG_S_RECV_REQUEST_REF(recv_request),
+                                NTATAG_S_RECV_RESPONSE_REF(recv_response),
+                                NTATAG_S_BAD_MESSAGE_REF(bad_message),
+                                NTATAG_S_BAD_REQUEST_REF(bad_request),
+                                NTATAG_S_BAD_RESPONSE_REF(bad_response),
+                                NTATAG_S_DROP_REQUEST_REF(drop_request),
+                                NTATAG_S_DROP_RESPONSE_REF(drop_response),
+                                NTATAG_S_CLIENT_TR_REF(client_tr),
+                                NTATAG_S_SERVER_TR_REF(server_tr),
+                                NTATAG_S_DIALOG_TR_REF(dialog_tr),
+                                NTATAG_S_ACKED_TR_REF(acked_tr),
+                                NTATAG_S_CANCELED_TR_REF(canceled_tr),
+                                NTATAG_S_TRLESS_REQUEST_REF(trless_request),
+                                NTATAG_S_TRLESS_TO_TR_REF(trless_to_tr),
+                                NTATAG_S_TRLESS_RESPONSE_REF(trless_response),
+                                NTATAG_S_TRLESS_200_REF(trless_200),
+                                NTATAG_S_MERGED_REQUEST_REF(merged_request),
+                                NTATAG_S_SENT_REQUEST_REF(sent_request),
+                                NTATAG_S_SENT_RESPONSE_REF(sent_response),
+                                NTATAG_S_RETRY_REQUEST_REF(retry_request),
+                                NTATAG_S_RETRY_RESPONSE_REF(retry_response),
+                                NTATAG_S_RECV_RETRY_REF(recv_retry),
+                                NTATAG_S_TOUT_REQUEST_REF(tout_request),
+                                NTATAG_S_TOUT_RESPONSE_REF(tout_response),
+                           TAG_END()) ;
+       
+       SSP_LOG(log_info) << "size of hash table for server-side transactions                  " << irq_hash << endl ;
+       SSP_LOG(log_info) << "size of hash table for client-side transactions                  " << orq_hash << endl ;
+       SSP_LOG(log_info) << "size of hash table for dialogs                                   " << leg_hash << endl ;
+       SSP_LOG(log_info) << "number of server-side transactions in the hash table             " << irq_used << endl ;
+       SSP_LOG(log_info) << "number of client-side transactions in the hash table             " << orq_used << endl ;
+       SSP_LOG(log_info) << "number of dialogs in the hash table                              " << leg_used << endl ;
+       SSP_LOG(log_info) << "number of sip messages received                                  " << recv_msg << endl ;
+       SSP_LOG(log_info) << "number of sip messages sent                                      " << sent_msg << endl ;
+       SSP_LOG(log_info) << "number of sip requests received                                  " << recv_request << endl ;
+       SSP_LOG(log_info) << "number of sip requests sent                                      " << sent_request << endl ;
+       SSP_LOG(log_debug) << "number of bad sip messages received                              " << bad_message << endl ;
+       SSP_LOG(log_debug) << "number of bad sip requests received                              " << bad_request << endl ;
+       SSP_LOG(log_debug) << "number of bad sip requests received                              " << drop_request << endl ;
+       SSP_LOG(log_debug) << "number of bad sip reponses dropped                               " << drop_response << endl ;
+       SSP_LOG(log_info) << "number of client transactions created                            " << client_tr << endl ;
+       SSP_LOG(log_info) << "number of server transactions created                            " << server_tr << endl ;
+       SSP_LOG(log_info) << "number of in-dialog server transactions created                  " << dialog_tr << endl ;
+       SSP_LOG(log_debug) << "number of server transactions that have received ack             " << acked_tr << endl ;
+       SSP_LOG(log_debug) << "number of server transactions that have received cancel          " << canceled_tr << endl ;
+       SSP_LOG(log_debug) << "number of requests that were processed stateless                 " << trless_request << endl ;
+       SSP_LOG(log_debug) << "number of requests converted to transactions by message callback " << trless_to_tr << endl ;
+       SSP_LOG(log_debug) << "number of responses without matching request                     " << trless_response << endl ;
+       SSP_LOG(log_debug) << "number of successful responses missing INVITE client transaction " << trless_200 << endl ;
+       SSP_LOG(log_debug) << "number of requests merged by UAS                                 " << merged_request << endl ;
+       SSP_LOG(log_info) << "number of SIP requests sent by stack                             " << sent_request << endl ;
+       SSP_LOG(log_info) << "number of SIP responses sent by stack                            " << sent_response << endl ;
+       SSP_LOG(log_info) << "number of SIP requests retransmitted by stack                    " << retry_request << endl ;
+       SSP_LOG(log_info) << "number of SIP responses retransmitted by stack                   " << retry_response << endl ;
+       SSP_LOG(log_info) << "number of retransmitted SIP requests received by stack           " << recv_retry << endl ;
+       SSP_LOG(log_debug) << "number of SIP client transactions that has timeout               " << tout_request << endl ;
+       SSP_LOG(log_debug) << "number of SIP server transactions that has timeout               " << tout_response << endl ;
+              
+   }
 
 }

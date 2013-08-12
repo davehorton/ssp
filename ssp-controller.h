@@ -147,6 +147,8 @@ namespace ssp {
             return m_nFSTimerMsecs ;
         }
         
+        enum severity_levels getCurrentLoglevel() { return m_current_severity_threshold; }
+        
 	private:
 		SipLbController() {} ;
         
@@ -175,6 +177,7 @@ namespace ssp {
         nta_leg_t* getAssociatedDialog( nta_leg_t* leg ) ;
         void updateDialog( nta_leg_t* oldBLeg, nta_leg_t* newBLeg) ;
         
+        void logAgentStats(void) ;
         
         void setCompleted( iip_map_t::const_iterator& it ) ;
 
