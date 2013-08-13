@@ -220,7 +220,6 @@ namespace ssp {
     class SspConfig::Impl {
     public:
         Impl( const char* szFilename) : m_bIsValid(false), m_agent_mode(agent_mode_stateless), m_nCurrentTerminationCarrier(0), m_bIsActive(true) {
-            cout << "reading configuration file: " << szFilename << endl ;
             try {
                 std::filebuf fb;
                 if( !fb.open (szFilename,std::ios::in) ) {

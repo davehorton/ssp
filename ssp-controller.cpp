@@ -307,6 +307,7 @@ namespace ssp {
         /* If we got a good PID, then
          we can exit the parent process. */
         if (pid > 0) {
+            cout << pid << endl ;
             exit(EXIT_SUCCESS);
         }
         if( !m_user.empty() ) {
