@@ -5,6 +5,7 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <sys/types.h>
+
 #include <sofia-sip/su_wait.h>
 #include <sofia-sip/nta.h>
 #include <sofia-sip/sip_status.h>
@@ -195,6 +196,8 @@ namespace ssp {
 		boost::shared_mutex m_mutexConfig ; 
 		bool m_bLoggingInitialized ;
 		string m_configFilename ;
+        
+        string  m_user ;
         
         shared_ptr< sinks::synchronous_sink< sinks::syslog_backend > > m_sink ;
         shared_ptr<SspConfig> m_Config, m_ConfigNew ;

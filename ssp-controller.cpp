@@ -2,6 +2,7 @@
 #include <fstream>
 #include <getopt.h>
 #include <assert.h>
+#include <pwd.h>
 
 #include <boost/property_tree/xml_parser.hpp>
 #include <boost/property_tree/ptree.hpp>
@@ -179,11 +180,6 @@ namespace ssp {
             exit(-1) ;
         }
         this->installConfig() ;
-            
-        /* now we can initialize logging */
-        m_logger.reset( this->createLogger() ) ;
-            
-            
     }
 
     SipLbController::~SipLbController() {
@@ -232,12 +228,13 @@ namespace ssp {
             static struct option long_options[] =
             {
                 /* These options set a flag. */
-                {"nc", no_argument,       &m_bDaemonize, true},
+                {"daemon", no_argument,       &m_bDaemonize, true},
                 
                 /* These options don't set a flag.
                  We distinguish them by their indices. */
                 {"file",    required_argument, 0, 'f'},
                 {"iterations",    required_argument, 0, 'i'},
+                {"user",    required_argument, 0, 'u'},
                 {0, 0, 0, 0}
             };
             /* getopt_long stores the option index here. */
@@ -265,7 +262,11 @@ namespace ssp {
                 case 'f':
                     m_configFilename = optarg ;
                     break;
-                    
+
+                case 'u':
+                    m_user = optarg ;
+                    break;
+                                        
                 case 'i':
                     m_nIterationCount = ::atoi( optarg ) ;
                     cout << "option iteration count set; program will exit after handling " << m_nIterationCount << " INVITES !!" << endl ;
@@ -308,9 +309,21 @@ namespace ssp {
         if (pid > 0) {
             exit(EXIT_SUCCESS);
         }
-        
+        if( !m_user.empty() ) {
+            struct passwd *pw = getpwnam( m_user.c_str() );
+            
+            if( pw ) {
+                int rc = setuid( pw->pw_uid ) ;
+                if( 0 != rc ) {
+                    cerr << "Error setting userid to user " << m_user << ": " << errno << endl ;
+                }
+            }
+            
+            
+            
+            
+        }
         /* Change the file mode mask */
-        SSP_LOG(log_notice) << "Startup; process detached" ;
         umask(0);
             
         /* Create a new SID for the child process */
@@ -396,7 +409,12 @@ namespace ssp {
         if( m_bDaemonize ) {
             daemonize() ;
         }
-        this->logConfig() ;
+
+        /* now we can initialize logging */
+        m_logger.reset( this->createLogger() ) ;
+        
+        
+       this->logConfig() ;
         
         string url ;
         m_Config->getSipUrl( url ) ;
