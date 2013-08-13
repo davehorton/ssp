@@ -51,7 +51,7 @@ namespace ssp {
 
     class TerminationAttempt {
     public:
-        TerminationAttempt(const string& url, const sip_t * const& sip, sip_from_t * const& from,  sip_to_t * const& to,  sip_contact_t * const& contact, const string& p_charge_info_header, const string& carrier, const string& sipTrunk) :
+        TerminationAttempt(const string& url, const sip_t * const& sip, const string& from,  const string& to,  const string& contact, const string& p_charge_info_header, const string& carrier, const string& sipTrunk) :
         m_nAttemptCount(0), m_sip(sip), m_from(from), m_to(to), m_contact(contact), m_p_charge_info_header(p_charge_info_header), m_url(url), m_carrier(carrier), m_sipTrunk(sipTrunk) {
             
         }
@@ -69,19 +69,19 @@ namespace ssp {
         
         string& getUrl(void) { return m_url; }
         string& getPChargeInfoHeader(void) { return m_p_charge_info_header; }
-        sip_from_t const* getFrom(void) const   { return m_from; }
-        sip_to_t const* getTo(void) const   { return m_to; }
-        sip_contact_t const* getContact(void) const   { return m_contact; }
-        sip_t const* getSip(void) const   { return m_sip; }
+        const string& getFrom(void) const   { return m_from; }
+        const string& getTo(void) const   { return m_to; }
+        const string& getContact(void) const   { return m_contact; }
+        sip_t const *  getSip(void) const   { return m_sip; }
         string& getCarrier(void) { return m_carrier; }
         string& getSipTrunk(void) { return m_sipTrunk; }
         
     private:
         unsigned int            m_nAttemptCount ;
         sip_t const *           m_sip ;
-        sip_from_t const*       m_from ;
-        sip_to_t const*         m_to ;
-        sip_contact_t const*    m_contact ;
+        string                  m_from ;
+        string                  m_to ;
+        string                  m_contact ;
         string                  m_p_charge_info_header;
         string                  m_url;
         string                  m_carrier ;
@@ -158,9 +158,10 @@ namespace ssp {
         bool generateTerminationRequest( boost::shared_ptr<TerminationAttempt>& t, nta_incoming_t* irq, nta_outgoing_t*& orq, nta_leg_t*& b_leg ) ;
         
         sip_request_t* generateInboundRequestUri( sip_request_t* const oruri, const string& address, unsigned int port ) ;
-        sip_from_t* generateOutgoingFrom( sip_from_t* const incomingFrom ) ;
-        sip_to_t* generateOutgoingTo( sip_to_t* const incomingTo ) ;
-        sip_contact_t* generateOutgoingContact( sip_contact_t* const incomingContact ) ;
+        
+        void generateOutgoingFrom( sip_from_t* const incomingFrom, string& strFrom ) ;
+        void generateOutgoingTo( sip_to_t* const incomingTo, string& strTo ) ;
+        void generateOutgoingContact( sip_contact_t* const incomingContact, string& strContact ) ;
         bool terminateLeg( nta_leg_t* leg ) ;
 
         nta_leg_t* getLegFromTransaction( nta_outgoing_t* orq ) ;

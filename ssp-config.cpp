@@ -441,8 +441,6 @@ namespace ssp {
         
         bool getSyslogFacility( sinks::syslog::facility& facility ) const {
         
-	    std::cout << "syslog facility " << m_syslogFacility << endl ;
-
             if( m_syslogFacility.empty() ) return false ;
             
             if( m_syslogFacility == "local0" ) facility = sinks::syslog::local0 ;

@@ -149,8 +149,8 @@ namespace {
     /* needed to be able to live in a boost unordered container */
     size_t hash_value( const ssp::TerminationAttempt& t) {
         std::size_t seed = 0;
-        boost::hash_combine(seed, t.getFrom()->a_url[0].url_user);
-        boost::hash_combine(seed, t.getFrom()->a_tag);
+        boost::hash_combine(seed, t.getFrom().c_str());
+        boost::hash_combine(seed, t.getFrom().c_str());
         return seed;
     }
     /* needed to be able to live in a boost unordered container */
@@ -396,8 +396,6 @@ namespace ssp {
             
             m_bLoggingInitialized = true ;
 
-            std::cout << "Created logger" << endl ;
-            
         }
         catch (std::exception& e) {
             std::cout << "FAILURE creating logger: " << e.what() << std::endl;
@@ -723,46 +721,80 @@ namespace ssp {
         m_deqCompletedCallIds.push_back( iip->getCallId() ) ;
     }
 
-    sip_from_t* SipLbController::generateOutgoingFrom( sip_from_t* const incomingFrom ) {
-        sip_from_t f0[1];
-        sip_from_init( f0 ) ;
-        f0->a_display = incomingFrom->a_display;
-        *f0->a_url = *incomingFrom->a_url;
-
-        sip_contact_t* contact = nta_agent_contact( m_nta ) ;
-        f0->a_url[0].url_host = contact->m_url[0].url_host ;
-        f0->a_url[0].url_port = contact->m_url[0].url_port ;
+    void SipLbController::generateOutgoingFrom( sip_from_t* const incomingFrom, string& strFrom ) {
+        ostringstream o ;
         
-        return sip_from_dup(m_home, f0);
+        if( incomingFrom->a_display && *incomingFrom->a_display ) {
+            o << incomingFrom->a_display ;
+        }
+        o << "<sip:" ;
+        
+        if( incomingFrom->a_url[0].url_user ) {
+            o << incomingFrom->a_url[0].url_user ;
+            o << "@" ;
+        }
+        sip_contact_t* contact = nta_agent_contact( m_nta ) ;
+        o << contact->m_url[0].url_host ;
+        if( contact->m_url[0].url_port && *contact->m_url[0].url_port ) {
+            o << ":" ;
+            o << contact->m_url[0].url_port ;
+        }
+        o << ">" ;
+ 
+        SSP_LOG(log_debug) << "generated From: " << o.str() << endl ;
+        
+        strFrom = o.str() ;
     }
     sip_request_t* SipLbController::generateInboundRequestUri( sip_request_t* const oruri, const string& address, unsigned int port ) {
         return NULL;
     }
-    sip_to_t* SipLbController::generateOutgoingTo( sip_to_t* const incomingTo ) {
-        sip_to_t f0[1];
-        sip_to_init( f0 ) ;
-        f0->a_display = incomingTo->a_display;
-        *f0->a_url = *incomingTo->a_url;
+    void SipLbController::generateOutgoingTo( sip_to_t* const incomingTo, string& strTo ) {
+        ostringstream o ;
         
-        /* change out host part of url to the local host */
+        if( incomingTo->a_display && *incomingTo->a_display ) {
+            o << incomingTo->a_display ;
+        }
+        o << "<sip:" ;
+        
+        if( incomingTo->a_url[0].url_user ) {
+            o << incomingTo->a_url[0].url_user ;
+            o << "@" ;
+        }
         sip_contact_t* contact = nta_agent_contact( m_nta ) ;
-        f0->a_url[0].url_host = contact->m_url[0].url_host ;
-        f0->a_url[0].url_port = contact->m_url[0].url_port ;
+        o << contact->m_url[0].url_host ;
+        if( contact->m_url[0].url_port && *contact->m_url[0].url_port ) {
+            o << ":" ;
+            o << contact->m_url[0].url_port ;
+        }
+        o << ">" ;
         
-        return sip_to_dup(m_home, f0);
+        SSP_LOG(log_debug) << "generated To: " << o.str() << endl ;
+        
+        strTo = o.str() ;
     }
-    sip_contact_t* SipLbController::generateOutgoingContact( sip_contact_t* const incomingContact ) {
-        sip_contact_t f0[1];
-        sip_contact_init( f0 ) ;
-        f0->m_display = incomingContact->m_display;
-        *f0->m_url = *incomingContact->m_url;
+    void SipLbController::generateOutgoingContact( sip_contact_t* const incomingContact, string& strContact ) {
+        ostringstream o ;
         
-        /* change out host part of url to the local host */
+        if( incomingContact->m_display && *incomingContact->m_display ) {
+            o << incomingContact->m_display ;
+        }
+        o << "<sip:" ;
+        
+        if( incomingContact->m_url[0].url_user ) {
+            o << incomingContact->m_url[0].url_user ;
+            o << "@" ;
+        }
         sip_contact_t* contact = nta_agent_contact( m_nta ) ;
-        f0->m_url[0].url_host = contact->m_url[0].url_host ;
-        f0->m_url[0].url_port = contact->m_url[0].url_port ;
+        o << contact->m_url[0].url_host ;
+        if( contact->m_url[0].url_port && *contact->m_url[0].url_port ) {
+            o << ":" ;
+            o << contact->m_url[0].url_port ;
+        }
+        o << ">" ;
         
-        return sip_contact_dup(m_home, f0);
+        SSP_LOG(log_debug) << "generated Contact: " << o.str() << endl ;
+        
+        strContact = o.str() ;
     }
     
     /* stateful */
@@ -862,14 +894,15 @@ namespace ssp {
         nta_incoming_bind( irq, handleAckOrCancel, this ) ;
         
         /* create the B leg.  Let nta generate a Call-ID for us */
-        sip_from_t* from = generateOutgoingFrom( sip->sip_from ) ;
-        sip_to_t* to = generateOutgoingTo( sip->sip_to ) ;
-        sip_contact_t* contact = generateOutgoingContact( sip->sip_contact ) ;
+        string fromStr, toStr, contactStr ;
+        generateOutgoingFrom( sip->sip_from, fromStr ) ;
+        generateOutgoingTo( sip->sip_to, toStr ) ;
+        generateOutgoingContact( sip->sip_contact, contactStr ) ;
         
         nta_leg_t* b_leg =  nta_leg_tcreate(m_nta,
                                             legCallback, this,
-                                            SIPTAG_FROM(from),
-                                            SIPTAG_TO(to),
+                                            SIPTAG_FROM_STR(fromStr.c_str()),
+                                            SIPTAG_TO_STR(toStr.c_str()),
                                             TAG_END());
         if( NULL == b_leg ) {
             SSP_LOG(log_error) << "Error creating b leg for origination" << endl ;
@@ -877,8 +910,7 @@ namespace ssp {
             return 503 ;
         }
         
-        const char* b_tag = nta_agent_newtag(m_home, "tag=%s", m_nta) ;
-        nta_leg_tag( b_leg, b_tag ) ;
+        nta_leg_tag( b_leg, NULL ) ;
         SSP_LOG(log_debug) << "outgoing leg " << b_leg << endl ;
         
         std::stringstream carrierString ;
@@ -894,7 +926,7 @@ namespace ssp {
                                                    NULL,
                                                    SIP_METHOD_INVITE,
                                                    URL_STRING_MAKE(str),
-                                                   SIPTAG_CONTACT(contact),
+                                                   SIPTAG_CONTACT_STR(contactStr.c_str()),
                                                    SIPTAG_CONTENT_TYPE(sip->sip_content_type),
                                                    SIPTAG_CONTENT_DISPOSITION(sip->sip_content_disposition),
                                                    SIPTAG_CONTENT_LENGTH(sip->sip_content_length),
@@ -973,15 +1005,17 @@ namespace ssp {
         nta_incoming_bind( irq, handleAckOrCancel, this ) ;
         
         /* create the B leg.  Let nta generate a Call-ID for us */
-        sip_from_t* from = generateOutgoingFrom( sip->sip_from ) ;
-        sip_to_t* to = generateOutgoingTo( sip->sip_to ) ;
-        sip_contact_t* contact = generateOutgoingContact( sip->sip_contact ) ;
+        string fromStr, toStr, contactStr ;
+        generateOutgoingFrom( sip->sip_from, fromStr ) ;
+        generateOutgoingTo( sip->sip_to, toStr ) ;
+        generateOutgoingContact( sip->sip_contact, contactStr ) ;
+
         ostringstream chargeInfoHeader ;
         if( !chargeNumber.empty() ) {
             chargeInfoHeader << "P-Charge-Info: <sip:" << chargeNumber << "@" << terminationSipAddress << ">" ;
         }
         
-        boost::shared_ptr<TerminationAttempt> t = boost::make_shared<TerminationAttempt>(url, sip, from, to, contact, chargeInfoHeader.str(), carrier, terminationSipAddress ) ;
+        boost::shared_ptr<TerminationAttempt> t = boost::make_shared<TerminationAttempt>(url, sip, fromStr, toStr, contactStr, chargeInfoHeader.str(), carrier, terminationSipAddress ) ;
         nta_outgoing_t* orq ;
         nta_leg_t* b_leg ;
         if( !this->generateTerminationRequest( t, irq, orq, b_leg ) ) {
@@ -1005,16 +1039,15 @@ namespace ssp {
         sip_t const *sip = t->getSip() ;
         b_leg =  nta_leg_tcreate(m_nta,
                                         legCallback, this,
-                                        SIPTAG_FROM(t->getFrom()),
-                                        SIPTAG_TO(t->getTo()),
+                                        SIPTAG_FROM_STR(t->getFrom().c_str()),
+                                        SIPTAG_TO_STR(t->getTo().c_str()),
                                         TAG_END());
         if( NULL == b_leg ) {
             SSP_LOG(log_error) << "Failure creating outgoing leg for termination request" << endl ;
             return false ;
         }
 
-        const char* b_tag = nta_agent_newtag(m_home, "tag=%s", m_nta) ;
-        nta_leg_tag( b_leg, b_tag ) ;
+        nta_leg_tag( b_leg, NULL ) ;
         SSP_LOG(log_debug) << "outgoing leg " << b_leg << endl ;
         
         /* send the outbound INVITE */
@@ -1027,7 +1060,7 @@ namespace ssp {
                                                    NULL,
                                                    SIP_METHOD_INVITE,
                                                    URL_STRING_MAKE(str),
-                                                   SIPTAG_CONTACT(t->getContact()),
+                                                   SIPTAG_CONTACT_STR(t->getContact().c_str()),
                                                    SIPTAG_CONTENT_TYPE(sip->sip_content_type),
                                                    SIPTAG_CONTENT_DISPOSITION(sip->sip_content_disposition),
                                                    SIPTAG_CONTENT_LENGTH(sip->sip_content_length),
