@@ -77,9 +77,14 @@ namespace ssp {
             
 
             if( !brief ) {
-                unsigned int max = p->getMaxSessions() ;
-                unsigned int current = p->getCurrentSessions() ;
-                ol << p->getAddress() << "," << p->getSipAddress() << ":" << p->getSipPort() << "," << current << "," << max << endl ;
+                if( p->isOnline() ) {
+                    unsigned int max = p->getMaxSessions() ;
+                    unsigned int current = p->getCurrentSessions() ;
+                    ol << "online," <<  p->getAddress() << "," << p->getSipAddress() << ":" << p->getSipPort() << "," << current << "," << max << endl ;
+                }
+                else {
+                    ol << "offline" << p->getAddress() << ",,," << endl ;
+                }
             }
         }
         
