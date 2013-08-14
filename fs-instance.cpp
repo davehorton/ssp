@@ -155,6 +155,7 @@ namespace ssp {
                             out = "api status\r\n\r\n" ;
                             m_state = querying_status ; //we've reached the "normal" querying state
                             bReadAgain = true ;
+                            m_pMonitor->notifySipServerAddress( m_strAddress, m_strSipAddress, m_nSipPort ) ;
                         }
                      }
                     break ;
