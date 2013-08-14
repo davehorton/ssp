@@ -39,6 +39,7 @@
 #include "ssp-config.h"
 #include "fs-monitor.h"
 #include "sip-inbound-call.h"
+#include "nagios-connector.h"
 
 using namespace std ;
 
@@ -150,6 +151,14 @@ namespace ssp {
         
         enum severity_levels getCurrentLoglevel() { return m_current_severity_threshold; }
         
+        bool getAvailableServers( deque< boost::shared_ptr<FsInstance> >& servers ) {
+            return m_fsMonitor.getAvailableServers( servers ) ;
+        }
+        
+        unsigned int getCountOfDialogs() { return m_dialogs.size(); }
+
+        bool getSipStats( usize_t& nDialogs, usize_t& nMsgsReceived, usize_t& nMsgsSent, usize_t& nBadMsgsReceived, usize_t& nRetransmitsSent, usize_t& nRetransmitsReceived ) ;
+        
 	private:
 		SipLbController() {} ;
         
@@ -198,7 +207,9 @@ namespace ssp {
 		bool m_bLoggingInitialized ;
 		string m_configFilename ;
         
-        string  m_user ;
+        string  m_user ;    //system user to run as
+        
+        shared_ptr< NagiosConnector > m_stats ;
         
         shared_ptr< sinks::synchronous_sink< sinks::syslog_backend > > m_sink ;
         shared_ptr<SspConfig> m_Config, m_ConfigNew ;

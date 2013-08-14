@@ -219,7 +219,7 @@ namespace ssp {
     */
     class SspConfig::Impl {
     public:
-        Impl( const char* szFilename) : m_bIsValid(false), m_agent_mode(agent_mode_stateless), m_nCurrentTerminationCarrier(0), m_bIsActive(true) {
+        Impl( const char* szFilename) : m_bIsValid(false), m_agent_mode(agent_mode_stateless), m_nCurrentTerminationCarrier(0), m_bIsActive(true), m_statsPort(0) {
             try {
                 std::filebuf fb;
                 if( !fb.open (szFilename,std::ios::in) ) {
@@ -230,6 +230,14 @@ namespace ssp {
                 
                 ptree pt;
                 read_xml(is, pt);
+                
+                /* stats configuration */
+                try {
+                    pt.get_child("ssp.stats") ; // will throw if doesn't exist
+                    m_statsPort = pt.get<unsigned int>("ssp.stats.<xmlattr>.port", 8022) ;
+                    m_statsAddress = pt.get<string>("ssp.stats") ;
+                } catch( boost::property_tree::ptree_bad_path& e ) {
+                }
                 
                 /* logging configuration  */
                 m_syslogAddress = pt.get<string>("ssp.logging.syslog.address", "localhost") ;
@@ -514,6 +522,11 @@ namespace ssp {
         severity_levels getLoglevel() {
             return m_loglevel ;
         }
+        unsigned int getStatsPort( string& address ) {
+            address = m_statsAddress ;
+            return m_statsPort ;
+        }
+
     private:
         
         bool getXmlAttribute( ptree::value_type const& v, const string& attrName, string& value ) {
@@ -551,6 +564,8 @@ namespace ssp {
         unsigned long m_nOriginationSessionTimer ;
         unsigned long m_nFSTimerMsecs ;
         severity_levels m_loglevel ;
+        string m_statsAddress ;
+        unsigned int m_statsPort ;
     } ;
     
     /*
@@ -624,5 +639,8 @@ namespace ssp {
     severity_levels SspConfig::getLoglevel() {
         return m_pimpl->getLoglevel() ;
     }
-    
+    unsigned int SspConfig::getStatsPort( string& address ) {
+        return m_pimpl->getStatsPort( address ) ;
+    }
+
 }

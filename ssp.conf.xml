@@ -5,6 +5,8 @@
     If no other configuration is supplied, inbound routing is round-robin and outbound routing is same-in-same-out-ip-address
     -->
     
+    <stats port="8022">localhost</stats>
+    
     <sip status="active">
         <!-- local sip address to bind to.  Default: 'sip:*' -->
         <contact>sip:209.251.49.135</contact>

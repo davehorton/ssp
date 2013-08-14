@@ -46,6 +46,8 @@ namespace ssp {
         unsigned long getFSHealthCheckTimerTimeMsecs(void) ;
         severity_levels getLoglevel() ;
         
+        unsigned int getStatsPort( string& address ) ;
+        
         void Log() const ;
         
     private:

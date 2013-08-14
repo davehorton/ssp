@@ -32,7 +32,7 @@ namespace ssp {
     }
     
     FsMonitor::~FsMonitor() {
-        
+        this->stop() ;
     }
     
     void FsMonitor::run() {
@@ -70,7 +70,7 @@ namespace ssp {
                 if( 1 == i ) nPort = ::atoi( token.c_str() ) ;
                 i++ ;
             }
-            boost::shared_ptr<FsInstance> ptr( new FsInstance( m_ioService, strAddress, nPort ) )  ;
+            boost::shared_ptr<FsInstance> ptr( new FsInstance( this, m_ioService, strAddress, nPort ) )  ;
             ptr->start() ;
             m_servers.push_back( ptr ) ;
             
@@ -155,6 +155,10 @@ namespace ssp {
         SSP_LOG(log_debug) << "Available freeswitch servers " << (doLeastLoaded ? "(least loaded): " : "(round robin): ") << s.str() << endl ;        
         
         return true ;
+    }
+    void FsMonitor::notifySipServerAddress( const string& fsAddress, const string& sipAddress, unsigned int& sipPort ) {
+        m_setServers.erase( fsAddress ) ;
+        m_setServers.insert( sipAddress ) ;
     }
 
     void FsMonitor::toString( deque< boost::shared_ptr<FsInstance> >& d, std::stringstream& s ) {

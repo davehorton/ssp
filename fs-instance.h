@@ -23,9 +23,11 @@ using  boost::asio::ip::tcp ;
 
 namespace ssp {
     
+    class FsMonitor ;
+    
     class FsInstance : public boost::enable_shared_from_this<FsInstance> {
     public:
-        FsInstance( boost::asio::io_service& ioService, const string& strAddress, unsigned int port, bool busyOut = false) ;
+        FsInstance( FsMonitor* pMonitor, boost::asio::io_service& ioService, const string& strAddress, unsigned int port, bool busyOut = false) ;
         ~FsInstance() ;
         bool operator==(FsInstance& other) { return m_strAddress == other.m_strAddress && m_nEventSocketPort == other.m_nEventSocketPort ; }
         
@@ -71,6 +73,7 @@ namespace ssp {
         void start_timer( unsigned long nMilliseconds ) ;
         
     private:
+        FsMonitor*      m_pMonitor;
         string          m_strAddress ;
         unsigned int    m_nEventSocketPort ;
         time_t          m_lastCheck ;

@@ -11,6 +11,7 @@
 #include "fs-instance.h"
 #include "fs-exception.h"
 #include "ssp-controller.h"
+#include "fs-monitor.h"
 
 #define MY_COORDS   m_strAddress << ":" << m_nEventSocketPort << " - "
 #define MY_SIP_COORDS   m_strSipAddress << ":" << m_nSipPort << " - "
@@ -18,8 +19,8 @@
 namespace ssp {
  
  
-    FsInstance::FsInstance( boost::asio::io_service& ioService, const string& address, unsigned int port, bool busyOut ):
-        m_ioService(ioService), m_socket(ioService), m_resolver(ioService), m_timer(ioService),
+    FsInstance::FsInstance( FsMonitor* pMonitor, boost::asio::io_service& ioService, const string& address, unsigned int port, bool busyOut ):
+        m_pMonitor(pMonitor), m_ioService(ioService), m_socket(ioService), m_resolver(ioService), m_timer(ioService),
         m_strAddress(address), m_nEventSocketPort(port), m_lastCheck(0), m_nSipPort(0),
         m_bConnected(false), m_nMaxSessions(0), m_nCurrentSessions(0), m_bBusyOut(busyOut), m_state(starting),m_bDisconnected(false) {
             

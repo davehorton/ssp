@@ -38,6 +38,8 @@ namespace ssp {
         
         bool isAppserver( const string& sourceAddress ) { return m_setServers.end() != m_setServers.find( sourceAddress ) ; }
         
+        void notifySipServerAddress( const string& fsAddress, const string& sipAddress, unsigned int& sipPort ) ;
+        
     protected:
         void threadFunc() ;
         

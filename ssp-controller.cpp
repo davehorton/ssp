@@ -195,6 +195,7 @@ namespace ssp {
         m_nTerminationRetries = min( m_Config->getCountOfOutboundTrunks(), m_Config->getMaxTerminationAttempts() ) ;
         m_nFSTimerMsecs = m_Config->getFSHealthCheckTimerTimeMsecs() ;
         m_current_severity_threshold = m_Config->getLoglevel() ;
+        
         return true ;
         
     }
@@ -411,9 +412,13 @@ namespace ssp {
 
         /* now we can initialize logging */
         m_logger.reset( this->createLogger() ) ;
-        
-        
        this->logConfig() ;
+        
+        /* open stats connection */
+        string statsAddress ;
+        unsigned int statsPort = m_Config->getStatsPort( statsAddress ) ;
+        m_stats.reset( new NagiosConnector( statsAddress, statsPort )) ;
+
         
         string url ;
         m_Config->getSipUrl( url ) ;
@@ -588,7 +593,12 @@ namespace ssp {
              filters::attr<severity_levels>("Severity") <= m_current_severity_threshold
             ) ;
             
-            m_ConfigNew.reset() ;
+            /* open stats connection */
+            string statsAddress ;
+            unsigned int statsPort = m_Config->getStatsPort( statsAddress ) ;
+            m_stats.reset( new NagiosConnector( statsAddress, statsPort )) ;
+
+            
             SSP_LOG(log_notice) << "New configuration file successfully installed" << endl ;
             this->logConfig() ;
         }
@@ -1419,7 +1429,26 @@ namespace ssp {
         
         return unknown_call_type ;
     }
-
+    bool SipLbController::getSipStats( usize_t& nDialogs, usize_t& nMsgsReceived, usize_t& nMsgsSent, usize_t& nBadMsgsReceived, usize_t& nRetransmitsSent, usize_t& nRetransmitsReceived ) {
+        usize_t retry_request, retry_response ;
+        
+        if( NULL == m_nta ) return false ;
+        
+        nta_agent_get_stats(m_nta,
+                            NTATAG_S_LEG_HASH_USED_REF(nDialogs),
+                            NTATAG_S_RECV_MSG_REF(nMsgsReceived),
+                            NTATAG_S_SENT_MSG_REF(nMsgsSent),
+                            NTATAG_S_BAD_MESSAGE_REF(nBadMsgsReceived),
+                             NTATAG_S_RETRY_REQUEST_REF(retry_request),
+                            NTATAG_S_RETRY_RESPONSE_REF(retry_response),
+                            NTATAG_S_RECV_RETRY_REF(nRetransmitsReceived),
+                            TAG_END()) ;
+        nRetransmitsSent = retry_request + retry_response ;
+        
+        return true ;
+        
+    }
+    
    void SipLbController::logAgentStats() {
        usize_t irq_hash = -1, orq_hash = -1, leg_hash = -1;
        usize_t irq_used = -1, orq_used = -1, leg_used = -1 ;
