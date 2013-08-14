@@ -35,6 +35,10 @@ namespace ssp {
         void setRoundRobinInterval( unsigned int nInterval ) { m_RRInterval = nInterval; }
         
         bool getAvailableServers( deque< boost::shared_ptr<FsInstance> >& servers ) ;
+
+        bool getAllServers( deque< boost::shared_ptr<FsInstance> >& servers ) {
+            servers = m_servers ;
+        }
         
         bool isAppserver( const string& sourceAddress ) { return m_setServers.end() != m_setServers.find( sourceAddress ) ; }
         

@@ -9,10 +9,6 @@
 #ifndef __ssp__nagios_connector__
 #define __ssp__nagios_connector__
 
-#include <iostream>
-#include <fstream>
-#include <getopt.h>
-
 #include <boost/asio.hpp>
 #include <boost/thread.hpp>
 #include <boost/enable_shared_from_this.hpp>
@@ -44,7 +40,7 @@ namespace ssp {
             void start(); 
             void read_handler( const boost::system::error_code& ec, std::size_t bytes_transferred ) ;
             void write_handler( const boost::system::error_code& ec, std::size_t bytes_transferred );
-            void processSummaryRequest() ;
+            void processNagiosRequest( bool brief = true ) ;
             
         protected:
             

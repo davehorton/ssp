@@ -149,10 +149,12 @@ namespace ssp {
             return m_nFSTimerMsecs ;
         }
         
+        boost::shared_ptr<SspConfig> getConfig(void) { return m_Config; }
+        
         enum severity_levels getCurrentLoglevel() { return m_current_severity_threshold; }
         
-        bool getAvailableServers( deque< boost::shared_ptr<FsInstance> >& servers ) {
-            return m_fsMonitor.getAvailableServers( servers ) ;
+        bool getAllServers( deque< boost::shared_ptr<FsInstance> >& servers ) {
+            return m_fsMonitor.getAllServers( servers ) ;
         }
         
         unsigned int getCountOfDialogs() { return m_dialogs.size(); }

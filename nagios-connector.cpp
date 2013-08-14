@@ -5,6 +5,8 @@
 //  Created by Dave Horton on 8/13/13.
 //  Copyright (c) 2013 Beachdog Networks. All rights reserved.
 //
+#include <iostream>
+
 #include <boost/bind.hpp>
 #include <boost/tokenizer.hpp>
 #include <boost/foreach.hpp>
@@ -12,7 +14,7 @@
 
 #include "nagios-connector.h"
 #include "ssp-controller.h"
-
+#include "fs-instance.h"
 
 namespace ssp {
     
@@ -42,18 +44,52 @@ namespace ssp {
         }
         
         SSP_LOG(log_debug) << "NagiosConnector StatsSession read_handler " << s << ", command: " << command << endl ;
-        if( 0 == command.compare("summary") ) {
-            processSummaryRequest();
+        if( 0 == command.compare("nagios-short") ) {
+            processNagiosRequest();
+        }
+        else if( 0 == command.compare("nagios-long") ) {
+            processNagiosRequest( false );
         }
     }
     void NagiosConnector::StatsSession::write_handler( const boost::system::error_code& ec, std::size_t bytes_transferred ) {
         SSP_LOG(log_debug) << "NagiosConnector write_handler" ;
     }
     
-    void NagiosConnector::StatsSession::processSummaryRequest() {
+    void NagiosConnector::StatsSession::processNagiosRequest( bool brief ) {
         SSP_LOG(log_debug) << "NagiosConnector processSummaryRequest" ;
-        string response = "+OK" ;
-        boost::asio::async_write( m_sock, boost::asio::buffer(response), boost::bind( &StatsSession::write_handler, shared_from_this(), boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred ) ) ;
+
+        boost::shared_ptr<SspConfig> pConfig = theOneAndOnlyController->getConfig();
+        ostringstream o ;
+        ostringstream ol ;
+        
+        o << (pConfig->isActive() ? "System Active" : "System Inactive") ;
+        
+        o << theOneAndOnlyController->getCountOfDialogs() << " call legs " ;
+        
+        
+        deque< boost::shared_ptr<FsInstance> > servers ;
+        unsigned int nActiveServers = 0 ;
+        
+        theOneAndOnlyController->getAllServers( servers ) ;
+        for( deque< boost::shared_ptr<FsInstance> >::const_iterator it = servers.begin(); it != servers.end(); it++ ) {
+            boost::shared_ptr<FsInstance> p = *it ;
+            if( p->isOnline() ) nActiveServers++ ;
+            
+
+            if( !brief ) {
+                unsigned int max = p->getMaxSessions() ;
+                unsigned int current = p->getCurrentSessions() ;
+                ol << p->getAddress() << "," << p->getSipAddress() << ":" << p->getSipPort() << "," << current << "," << max << endl ;
+            }
+        }
+        
+        o << " | " << nActiveServers << " of " << servers.size() << " freeswitch servers active" << endl ;
+        if( !brief ) {
+            o << "|" << endl << ol.str() << endl ;
+        }
+        
+        
+        boost::asio::async_write( m_sock, boost::asio::buffer(o.str()   ), boost::bind( &StatsSession::write_handler, shared_from_this(), boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred ) ) ;
     }
 
 
