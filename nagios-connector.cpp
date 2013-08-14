@@ -83,7 +83,7 @@ namespace ssp {
                     ol << "online," <<  p->getAddress() << "," << p->getSipAddress() << ":" << p->getSipPort() << "," << current << "," << max << endl ;
                 }
                 else {
-                    ol << "offline" << p->getAddress() << ",,," << endl ;
+                    ol << "offline," << p->getAddress() << ",,," << endl ;
                 }
             }
         }
