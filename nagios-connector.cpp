@@ -62,7 +62,7 @@ namespace ssp {
         ostringstream o ;
         ostringstream ol ;
         
-        o << (pConfig->isActive() ? "System Active" : "System Inactive") ;
+        o << (pConfig->isActive() ? "System Active " : "System Inactive ") ;
         
         o << theOneAndOnlyController->getCountOfDialogs() << " call legs " ;
         
