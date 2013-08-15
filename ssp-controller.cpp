@@ -817,13 +817,19 @@ namespace ssp {
         SSP_LOG(log_debug) << "processRequestOutsideDialog" << endl ;
         switch (sip->sip_request->rq_method ) {
             case sip_method_options:
+            {
                 if( !m_Config->isActive() ) {
                     nta_incoming_destroy( irq ) ;
                     return 0 ;
                 }
-                nta_incoming_destroy( irq ) ;
-                return 200 ;
-                
+
+                string carrier ;
+                call_type_t call_type = this->determineCallType( sip, carrier ) ;
+                if( origination_call_type == call_type ) {
+                    return 200 ;
+                }
+                return 403 ;
+            }
             case sip_method_ack:
                 /* success case: call has been established */
                 SSP_LOG(log_debug) << "Received ACK for 200 OK" << endl ;
