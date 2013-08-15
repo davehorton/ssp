@@ -16,6 +16,13 @@
 #include "ssp-controller.h"
 #include "fs-instance.h"
 
+namespace {
+    struct name_sorter {
+        bool operator ()( const boost::shared_ptr<ssp::FsInstance>& a, const  boost::shared_ptr<ssp::FsInstance>& b) {
+            return a->getAddress().compare( b->getAddress() ) ;
+        }
+    };
+}
 namespace ssp {
     
     NagiosConnector::StatsSession::StatsSession( boost::asio::io_service& io_service ) : m_sock(io_service) {
@@ -71,6 +78,11 @@ namespace ssp {
         unsigned int nActiveServers = 0 ;
         
         theOneAndOnlyController->getAllServers( servers ) ;
+        
+        /* sort by name/address */
+        name_sorter ns ;
+        std::sort( servers.begin(), servers.end(), ns ) ;
+        
         for( deque< boost::shared_ptr<FsInstance> >::const_iterator it = servers.begin(); it != servers.end(); it++ ) {
             boost::shared_ptr<FsInstance> p = *it ;
             if( p->isOnline() ) nActiveServers++ ;
@@ -80,10 +92,10 @@ namespace ssp {
                 if( p->isOnline() ) {
                     unsigned int max = p->getMaxSessions() ;
                     unsigned int current = p->getCurrentSessions() ;
-                    ol << "online," <<  p->getAddress() << "," << p->getSipAddress() << ":" << p->getSipPort() << "," << current << "," << max << endl ;
+                    ol << p->getAddress() << ",online," << p->getSipAddress() << ":" << p->getSipPort() << "," << current << "," << max << endl ;
                 }
                 else {
-                    ol << "offline," << p->getAddress() << ",,," << endl ;
+                    ol << p->getAddress() << ",offline,,," << endl ;
                 }
             }
         }
