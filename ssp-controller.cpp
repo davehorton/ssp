@@ -1158,6 +1158,32 @@ namespace ssp {
                 }
                                 
             }
+            else if( status >= 300 && status <= 399 ) {
+                mapTerminationAttempts::iterator it = m_mapTerminationAttempts.find( orq ) ;
+                if( m_mapTerminationAttempts.end() != it ) {
+                    boost::shared_ptr<TerminationAttempt> t = it->second ;
+
+                    ostringstream dest ;
+                    dest << "sip:" << sip->sip_contact->m_url[0].url_user << "@" << sip->sip_contact->m_url[0].url_host;
+                    if( sip->sip_contact->m_url[0].url_port ) {
+                        dest << ":" <<  sip->sip_contact->m_url[0].url_port ;
+                    }
+                    SSP_LOG(log_debug) << "Attempting route from Contact header: " << dest.str() << endl ;
+                    
+                    t->crankback( dest.str() ) ;
+                    nta_leg_t* b_legNew ;
+                    nta_outgoing_t* orqNew ;
+                    if( this->generateTerminationRequest( t, irq, orqNew, b_legNew ) ) {
+                        bClearTransaction = false ;
+                        bProxyResponse = false ;
+                        bDestroyLegs = false ;
+                        this->updateOutgoingTransaction( irq, orq, orqNew ) ;
+                        m_mapTerminationAttempts.erase( it ) ;
+                        m_mapTerminationAttempts.insert( mapTerminationAttempts::value_type( orqNew, t) ) ;
+                        this->updateDialog( outgoing_leg, b_legNew ) ;
+                    }
+                }
+            }
             else if( 503 == status || 480 == status ) {
                 
                 /* crank back to the next route, if there is a next route */

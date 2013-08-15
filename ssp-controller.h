@@ -65,6 +65,10 @@ namespace ssp {
             m_sipTrunk = sipTrunk ;
             m_nAttemptCount++ ;
         }
+
+        void crankback( const string& url ) {
+            m_url = url ;
+        }
         unsigned int getAttemptCount(void) { return m_nAttemptCount; }
         unsigned int incrementAttemptCount(void) { return ++m_nAttemptCount; }
         
