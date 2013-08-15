@@ -19,7 +19,7 @@
 namespace {
     struct name_sorter {
         bool operator ()( const boost::shared_ptr<ssp::FsInstance>& a, const  boost::shared_ptr<ssp::FsInstance>& b) {
-            return a->getAddress().compare( b->getAddress() ) ;
+            return a->getAddress().compare( b->getAddress() ) < 0 ;
         }
     };
 }
