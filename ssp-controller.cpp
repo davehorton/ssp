@@ -417,7 +417,9 @@ namespace ssp {
         /* open stats connection */
         string statsAddress ;
         unsigned int statsPort = m_Config->getStatsPort( statsAddress ) ;
-        m_stats.reset( new NagiosConnector( statsAddress, statsPort )) ;
+        if( 0 != statsPort ) {
+            m_stats.reset( new NagiosConnector( statsAddress, statsPort )) ;
+        }
 
         
         string url ;
@@ -594,10 +596,12 @@ namespace ssp {
             ) ;
             
             /* open stats connection */
-            m_stats.reset() ;
             string statsAddress ;
             unsigned int statsPort = m_Config->getStatsPort( statsAddress ) ;
-            m_stats.reset( new NagiosConnector( statsAddress, statsPort )) ;
+            m_stats.reset() ;
+            if( 0 != statsPort ) {
+                m_stats.reset( new NagiosConnector( statsAddress, statsPort )) ;
+            }
 
             
             SSP_LOG(log_notice) << "New configuration file successfully installed" << endl ;
