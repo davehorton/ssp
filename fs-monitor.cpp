@@ -127,6 +127,9 @@ namespace ssp {
                 results.push_back( m_servers[current] ) ;
                 
             }
+            else if( m_nLastServer == current ) {
+                m_nLastServer++ ;
+            }
             current = ++current < total_servers ? current: 0 ;
             if( current == start ) exhaustedServers = true ;
             

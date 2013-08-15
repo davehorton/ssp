@@ -594,6 +594,7 @@ namespace ssp {
             ) ;
             
             /* open stats connection */
+            m_stats.reset() ;
             string statsAddress ;
             unsigned int statsPort = m_Config->getStatsPort( statsAddress ) ;
             m_stats.reset( new NagiosConnector( statsAddress, statsPort )) ;

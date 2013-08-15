@@ -138,6 +138,7 @@ namespace ssp {
     }
     
     void NagiosConnector::stop() {
+        m_acceptor.cancel() ;
         m_ioservice.stop() ;
         m_thread.join() ;
         SSP_LOG(log_debug) << "NagiosConnector stop" << endl ;
