@@ -55,6 +55,7 @@ using namespace std ;
 namespace {
     
     int counter = 5 ;
+    usize_t timerCount = 0 ;
         
 	/* sofia logging is redirected to this function */
 	static void __sofiasip_logger_func(void *logarg, char const *fmt, va_list ap) {
@@ -117,10 +118,16 @@ namespace {
     }
 
     int response_to_invite( nta_outgoing_magic_t* controller,
-                    nta_outgoing_t* request,
-                    sip_t const* sip ) {
+                           nta_outgoing_t* request,
+                           sip_t const* sip ) {
         
         return controller->processInviteResponseInsideDialog( request, sip ) ;
+    }
+    int response_to_request_inside_dialog( nta_outgoing_magic_t* controller,
+                           nta_outgoing_t* request,
+                           sip_t const* sip ) {
+        
+        return controller->processResponseInsideDialog( request, sip ) ;
     }
     int handleAckOrCancel( nta_incoming_magic_t* controller, nta_incoming_t* irq, sip_t const *sip ) {
         return controller->processAckOrCancel( irq, sip ) ;
@@ -150,7 +157,13 @@ namespace {
     size_t hash_value( const ssp::TerminationAttempt& t) {
         std::size_t seed = 0;
         boost::hash_combine(seed, t.getFrom().c_str());
-        boost::hash_combine(seed, t.getFrom().c_str());
+        boost::hash_combine(seed, t.getTo().c_str());
+        return seed;
+    }
+    /* needed to be able to live in a boost unordered container */
+    size_t hash_value( const ssp::TrunkStats& t) {
+        std::size_t seed = 0;
+        boost::hash_combine(seed, t.getAddress().c_str());
         return seed;
     }
     /* needed to be able to live in a boost unordered container */
@@ -567,8 +580,6 @@ namespace ssp {
             }            
         }
         else {
-            /* stateful */
-            SSP_LOG(log_debug) << m_dialogs.size() << "/" << m_mapTerminationAttempts.size() << "/" << m_transactions.size() << "/" << m_mapDialogInfo.size() << " (dialogs/transactions/termination attempts/dialog info)" << endl ;
             
             if( 0 == m_nIterationCount && 0 == m_dialogs.size() && 0 == m_mapTerminationAttempts.size() && 0 == m_transactions.size() ) {
                 
@@ -608,7 +619,10 @@ namespace ssp {
             this->logConfig() ;
         }
         
-        this->logAgentStats();
+        /* stateful */
+        if( 0 == timerCount++ % 5 ) {
+            this->logAgentStats();
+        }
         
                 
         return 0 ;
@@ -959,6 +973,7 @@ namespace ssp {
                                                    SIPTAG_USER_AGENT(sip->sip_user_agent),
                                                    SIPTAG_ALLOW(sip->sip_allow),
                                                    SIPTAG_PRIVACY(sip->sip_privacy),
+                                                   SIPTAG_SESSION_EXPIRES(sip->sip_session_expires),
                                                    SIPTAG_P_ASSERTED_IDENTITY(sip_p_asserted_identity( sip )),
                                                    SIPTAG_UNKNOWN(sip_unknown(sip)),
                                                    SIPTAG_UNKNOWN_STR(carrierString.str().c_str()),
@@ -1103,6 +1118,17 @@ namespace ssp {
             nta_leg_destroy(b_leg) ;
             return false ;            
         }
+        mapTrunkStats::iterator it = m_mapTrunkStats.find( t->getSipTrunk() ) ;
+        if( m_mapTrunkStats.end() != it ) {
+            boost::shared_ptr<TrunkStats> tr = it->second ;
+            tr->incrementAttemptCount() ;
+        }
+        else {
+            boost::shared_ptr<TrunkStats> tr = boost::make_shared<TrunkStats>( t->getSipTrunk(), t->getCarrier() ) ;
+            tr->incrementAttemptCount() ;
+            m_mapTrunkStats.insert( mapTrunkStats::value_type( t->getSipTrunk(), tr ) ) ;
+        }
+
         return true;
         
     }
@@ -1130,17 +1156,34 @@ namespace ssp {
         else if( status >= 200 ) {
             bClearTransaction = true ;
             bDestroyLegs = true; 
-                        
+
+            /* log and report failures */
+            if( status >= 400 && status <= 700 ) {
+                mapTerminationAttempts::iterator it = m_mapTerminationAttempts.find( orq ) ;
+                if( m_mapTerminationAttempts.end() != it ) {
+                    boost::shared_ptr<TerminationAttempt> t = it->second ;
+                    mapTrunkStats::iterator it = m_mapTrunkStats.find( t->getSipTrunk() ) ;
+                    if( m_mapTrunkStats.end() != it ) {
+                        boost:shared_ptr<TrunkStats> tr = it->second ;
+                        tr->incrementFailureCount( status ) ;
+                    }
+                    
+                    SSP_LOG(log_error) << "Failure connecting outbound leg through sip gateway: " << t->getSipTrunk() << " (" << t->getCarrier() << ") status code: " << status << endl ;
+                }
+                
+            }
+            
             if( 200 == status ) {
                 /* we need to send the ACK to a success final response */
                 bDestroyLegs = false ;
                 nta_leg_rtag( outgoing_leg, sip->sip_to->a_tag) ;
+                nta_leg_client_reroute( outgoing_leg, sip->sip_record_route, sip->sip_contact, true );
+
                 nta_outgoing_t* ack_request = nta_outgoing_tcreate(outgoing_leg, NULL, NULL, NULL,
                                                                    SIP_METHOD_ACK,
                                                                    (url_string_t*) sip->sip_contact->m_url ,
                                                                    TAG_END());
                 nta_outgoing_destroy( ack_request ) ;
-                nta_leg_client_reroute( outgoing_leg, NULL, sip->sip_contact, true );
                 
                 /* check if we want to set a session timer on this leg */
                 nta_leg_t* a_leg = this->getLegFromTransaction( irq ) ;
@@ -1203,7 +1246,7 @@ namespace ssp {
                             ostringstream dest ;
                             dest << "sip:" << sip->sip_to->a_url[0].url_user << "@" << terminationSipAddress ;
                             
-                            SSP_LOG(log_debug) << "Attempting next route: " << terminationSipAddress << " using carrier " << carrier << endl ;
+                            SSP_LOG(log_info) << "Attempting next route: " << terminationSipAddress << " using carrier " << carrier << endl ;
                             
                             t->crankback( dest.str(), carrier, terminationSipAddress ) ;
                             
@@ -1222,7 +1265,7 @@ namespace ssp {
                         }
                     }
                 }
-            }
+            }            
         }
         if( bProxyResponse ) {
             ostringstream carrierString, carrierTrunk ;
@@ -1240,7 +1283,6 @@ namespace ssp {
                     SSP_LOG(log_debug) << "Returning final termination response from carrier " <<  t->getCarrier() << endl ;
                     m_mapTerminationAttempts.erase( it ) ;
                 }
-
             }
 
             nta_incoming_treply( irq, status, sip->sip_status->st_phrase,
@@ -1249,7 +1291,11 @@ namespace ssp {
                                 SIPTAG_CONTENT_DISPOSITION(sip->sip_content_disposition),
                                 SIPTAG_CONTENT_LENGTH(sip->sip_content_length),
                                 SIPTAG_PAYLOAD(sip->sip_payload),
+                                SIPTAG_ACCEPT(sip->sip_accept),
+                                SIPTAG_REQUIRE(sip->sip_require),
+                                SIPTAG_SUPPORTED(sip->sip_supported),
                                 TAG_IF( bSessionTimer, SIPTAG_SESSION_EXPIRES_STR(ostrSessionTimer.str().c_str())),
+                                TAG_IF( !bSessionTimer, SIPTAG_SESSION_EXPIRES(sip->sip_session_expires)),
                                 TAG_IF( bHaveCarrierInfo, SIPTAG_UNKNOWN_STR(carrierString.str().c_str())),
                                 TAG_IF( bHaveCarrierInfo, SIPTAG_UNKNOWN_STR(carrierTrunk.str().c_str())),
                                 TAG_END() ) ;
@@ -1293,43 +1339,87 @@ namespace ssp {
             case sip_method_bye:
             {
                 
-                nta_outgoing_t* cancel = nta_outgoing_tcreate( other, NULL, NULL,
+                nta_outgoing_t* bye = nta_outgoing_tcreate( other, NULL, NULL,
                                      NULL,
                                      SIP_METHOD_BYE,
                                      NULL,
                                      TAG_END() ) ;
-                nta_outgoing_destroy(cancel) ;
+                nta_outgoing_destroy(bye) ;
                 
                 
                 this->clearDialog( leg ) ;
                 nta_incoming_destroy( irq ) ;
                return 200 ;
             }
-            case sip_method_invite:
-            {
-                /* re-INVITE */
-                mapDialogInfo::iterator it = m_mapDialogInfo.find( leg ) ;
-                if( m_mapDialogInfo.end() != it ) {
-                    boost::shared_ptr<SipDialogInfo> p = it->second ;
-                    
-                    //TODO: if session timers are on, kill the timer, set Session-Expires, restart the timer
-                    nta_incoming_treply( irq, SIP_200_OK,
-                                        SIPTAG_CONTACT(m_my_contact),
-                                        SIPTAG_PAYLOAD_STR(p->getLocalSdp().c_str()),
-                                        SIPTAG_CONTENT_TYPE_STR("application/sdp"),
-                                        TAG_END() ) ;
-                }
-            }
-                
-            default:
+            case sip_method_ack:
+                SSP_LOG(log_debug) << "processRequestInsideDialog, leg " << leg << "; discarding ack" << endl ;
                 nta_incoming_destroy( irq ) ;
                 break ;
+                
+            default:
+            {
+                /* send on to other side */
+                
+                nta_outgoing_t* orq = nta_outgoing_tcreate( other, response_to_request_inside_dialog, this,
+                                                           NULL,
+                                                           sip->sip_request->rq_method, sip->sip_request->rq_method_name,
+                                                           NULL,
+                                                           SIPTAG_CONTENT_TYPE(sip->sip_content_type),
+                                                           SIPTAG_CONTENT_DISPOSITION(sip->sip_content_disposition),
+                                                           SIPTAG_CONTENT_LENGTH(sip->sip_content_length),
+                                                           SIPTAG_PAYLOAD(sip->sip_payload),
+                                                           SIPTAG_ACCEPT(sip->sip_accept),
+                                                           SIPTAG_REQUIRE(sip->sip_require),
+                                                           SIPTAG_SUPPORTED(sip->sip_supported),
+                                                           SIPTAG_SESSION_EXPIRES(sip->sip_session_expires),
+                                                           TAG_END() ) ;
+                this->addTransactions( irq, orq ) ;
+
+            }                
         }
        
         
         return 0 ;
     }
-    
+    int SipLbController::processResponseInsideDialog( nta_outgoing_t* orq, sip_t const* sip ) {
+        SSP_LOG(log_debug) << "processResponseInsideDialog" << endl ;
+        
+        nta_incoming_t* irq = this->getAssociatedTransaction( orq ) ;
+        
+        assert( irq ) ;
+
+        /* send the response back to the originator of the original request */
+        nta_incoming_treply( irq, sip->sip_status->st_status, sip->sip_status->st_phrase,
+                            SIPTAG_CONTACT(m_my_contact),
+                            SIPTAG_CONTENT_TYPE(sip->sip_content_type),
+                            SIPTAG_CONTENT_DISPOSITION(sip->sip_content_disposition),
+                            SIPTAG_CONTENT_LENGTH(sip->sip_content_length),
+                            SIPTAG_PAYLOAD(sip->sip_payload),
+                            SIPTAG_ACCEPT(sip->sip_accept),
+                            SIPTAG_REQUIRE(sip->sip_require),
+                            SIPTAG_SUPPORTED(sip->sip_supported),
+                            SIPTAG_SESSION_EXPIRES(sip->sip_session_expires),
+                            TAG_END() ) ;
+        
+        /* send ACK to success INVITE response */
+        if( sip_method_invite == sip->sip_cseq->cs_method ) {
+            
+            if( 200 == sip->sip_status->st_status ) {
+                nta_leg_t* outgoing_leg = this->getLegFromTransaction( orq ) ;
+                assert( outgoing_leg ) ;
+                nta_outgoing_t* ack_request = nta_outgoing_tcreate(outgoing_leg, NULL, NULL, NULL,
+                                                                   SIP_METHOD_ACK,
+                                                                   (url_string_t*) sip->sip_contact->m_url ,
+                                                                   TAG_END());
+                nta_outgoing_destroy( ack_request ) ;
+                
+            }
+        }
+
+        if( sip->sip_status->st_status >= 200 ) this->clearTransaction( orq ) ;
+        
+        return 0 ;
+    }
     int SipLbController::processSessionRefreshTimer( nta_leg_t* leg ) {
         SSP_LOG(log_error) << "processSessionTimerRefresh: session timer expired for leg, tearing down call" << endl ;
         mapDialogInfo::iterator it = m_mapDialogInfo.find( leg ) ;
@@ -1353,8 +1443,7 @@ namespace ssp {
 
     bool SipLbController::terminateLeg( nta_leg_t* leg ) {
         //TODO: implement this (needed for session timer support)
-        return true; 
-        
+        return true;
     }
 
     nta_incoming_t* SipLbController::getAssociatedTransaction( nta_outgoing_t* orq ) {
@@ -1536,8 +1625,8 @@ namespace ssp {
                                 NTATAG_S_TOUT_RESPONSE_REF(tout_response),
                            TAG_END()) ;
        
-       SSP_LOG(log_info) << "size of hash table for server-side transactions                  " << irq_hash << endl ;
-       SSP_LOG(log_info) << "size of hash table for client-side transactions                  " << orq_hash << endl ;
+       SSP_LOG(log_debug) << "size of hash table for server-side transactions                  " << irq_hash << endl ;
+       SSP_LOG(log_debug) << "size of hash table for client-side transactions                  " << orq_hash << endl ;
        SSP_LOG(log_info) << "size of hash table for dialogs                                   " << leg_hash << endl ;
        SSP_LOG(log_info) << "number of server-side transactions in the hash table             " << irq_used << endl ;
        SSP_LOG(log_info) << "number of client-side transactions in the hash table             " << orq_used << endl ;
@@ -1550,8 +1639,8 @@ namespace ssp {
        SSP_LOG(log_debug) << "number of bad sip requests received                              " << bad_request << endl ;
        SSP_LOG(log_debug) << "number of bad sip requests received                              " << drop_request << endl ;
        SSP_LOG(log_debug) << "number of bad sip reponses dropped                               " << drop_response << endl ;
-       SSP_LOG(log_info) << "number of client transactions created                            " << client_tr << endl ;
-       SSP_LOG(log_info) << "number of server transactions created                            " << server_tr << endl ;
+       SSP_LOG(log_debug) << "number of client transactions created                            " << client_tr << endl ;
+       SSP_LOG(log_debug) << "number of server transactions created                            " << server_tr << endl ;
        SSP_LOG(log_info) << "number of in-dialog server transactions created                  " << dialog_tr << endl ;
        SSP_LOG(log_debug) << "number of server transactions that have received ack             " << acked_tr << endl ;
        SSP_LOG(log_debug) << "number of server transactions that have received cancel          " << canceled_tr << endl ;
@@ -1567,7 +1656,15 @@ namespace ssp {
        SSP_LOG(log_info) << "number of retransmitted SIP requests received by stack           " << recv_retry << endl ;
        SSP_LOG(log_debug) << "number of SIP client transactions that has timeout               " << tout_request << endl ;
        SSP_LOG(log_debug) << "number of SIP server transactions that has timeout               " << tout_response << endl ;
-              
+  
+       SSP_LOG(log_info) << m_dialogs.size() << "/" << m_mapTerminationAttempts.size() << "/" << m_transactions.size() << "/" <<
+        m_mapDialogInfo.size() << " (dialogs/transactions/termination attempts/dialog info)" << endl ;
+       
+       for( mapTrunkStats::iterator it = m_mapTrunkStats.begin(); it != m_mapTrunkStats.end(); it++ ) {
+           boost::shared_ptr<TrunkStats> tr = it->second ;
+           SSP_LOG(log_info) << "Outbound trunk attempts/failures: " << tr->getAddress() << " (" << tr->getCarrier() << "): " << tr->getAttemptCount() << "/" << tr->getFailureCount() << endl ;
+       }
+
    }
 
 }

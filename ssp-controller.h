@@ -93,6 +93,45 @@ namespace ssp {
         string                  m_sipTrunk ;
     } ;
     
+    class TrunkStats {
+    public:
+        TrunkStats( const string& strAddress, const string& strCarrier ) : m_strAddress(strAddress), m_strCarrier(strCarrier), m_attempts(0) {
+            memset( m_fails, 0, sizeof( m_fails ) ) ;
+        }
+        void incrementAttemptCount() {
+            if( 0 == ++m_attempts ) {
+                memset( m_fails, 0, sizeof( m_fails ) ) ;                
+            }
+        }
+        void incrementFailureCount( unsigned int status ) {
+            assert( status < 700 ) ;
+            if( status < 700 ) {
+                m_fails[status]++ ;
+            }
+        }
+        usize_t getAttemptCount() { return m_attempts; }
+        usize_t getFailureCount() {
+            usize_t total = 0 ;
+            for( unsigned int i = 0; i < 700; i++ ) {
+                total += m_fails[i] ;
+            }
+            return total ;
+        }
+        usize_t getFailureCount( unsigned int status ) {
+            if( status >= 700 ) return -1 ;
+            return m_fails[status] ;
+        }
+        
+        const string& getAddress() const { return m_strAddress; }
+        const string& getCarrier() const { return m_strCarrier; }
+        
+    private:
+        string                  m_strAddress;
+        string                  m_strCarrier ;
+        usize_t                 m_attempts ;
+        usize_t                 m_fails[700] ;
+    } ;
+    
     class SipDialogInfo {
     public:
         SipDialogInfo( nta_leg_t* leg, bool bOrigination, unsigned long nSessionTimer = 0 ) : m_leg(leg), m_bOrigination( bOrigination ), m_nSessionTimer(nSessionTimer), m_timerSessionRefresh(NULL) {
@@ -143,6 +182,7 @@ namespace ssp {
         int processTerminationRequest( nta_incoming_t* irq, sip_t const *sip ) ;
         int processRequestInsideDialog( nta_leg_t* leg, nta_incoming_t* irq, sip_t const *sip) ;
         int processInviteResponseInsideDialog(  nta_outgoing_t* request, sip_t const* sip ) ;
+        int processResponseInsideDialog(  nta_outgoing_t* request, sip_t const* sip ) ;
         int processAckOrCancel( nta_incoming_t* irq, sip_t const *sip );
         int processSessionRefreshTimer( nta_leg_t* leg ) ;
         
@@ -262,8 +302,9 @@ namespace ssp {
         
         typedef boost::unordered_map<nta_leg_t*, boost::shared_ptr<SipDialogInfo> > mapDialogInfo ;
         mapDialogInfo m_mapDialogInfo ;
-        
 
+        typedef boost::unordered_map<string, boost::shared_ptr<TrunkStats> > mapTrunkStats ;
+        mapTrunkStats m_mapTrunkStats ;
 	} ;
 }
 

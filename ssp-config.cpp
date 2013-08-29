@@ -91,7 +91,8 @@ namespace ssp {
 
     class CarrierAddressSpace_t {
     public:
-        CarrierAddressSpace_t( const string& carrier, const string& address, unsigned int port = 5060, const string& netmask = "255.255.255.255") : m_address(address), m_netmask(netmask), m_port(port), m_carrier(carrier) {}
+        CarrierAddressSpace_t( const string& carrier, const string& address, unsigned int port = 5060, const string& netmask = "255.255.255.255") : m_address(address), m_netmask(netmask), m_port(port), m_carrier(carrier) {
+        }
         ~CarrierAddressSpace_t() {}
         
         bool operator==( const CarrierAddressSpace_t& other ) const {
