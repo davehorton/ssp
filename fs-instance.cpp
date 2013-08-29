@@ -27,7 +27,7 @@ namespace ssp {
     }
     
     FsInstance::~FsInstance() {
-        SSP_LOG(log_notice) << "Destroying FsInstance" << endl ;
+        SSP_LOG(log_debug) << "Destroying FsInstance" << endl ;
     }
     
     void FsInstance::start() {
@@ -167,7 +167,7 @@ namespace ssp {
                             bSetTimer = true ;
                         }
                         else {
-                            SSP_LOG(log_info) << MY_SIP_COORDS << "FS at " << m_strSipAddress << ":" << m_nSipPort << " has active sessions: " << m_nCurrentSessions << ", max sessions: " << m_nMaxSessions << endl ;
+                            SSP_LOG(log_debug) << m_strSipAddress << ":" << m_nSipPort << " (" << m_nCurrentSessions << "/" << m_nMaxSessions << ")" << endl ;
                             bSetTimer = true ;
                             if( m_bDisconnected ) {
                                 m_bDisconnected = false ;
