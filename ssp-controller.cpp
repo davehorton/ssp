@@ -1315,9 +1315,19 @@ namespace ssp {
         
         if( sip->sip_request->rq_method == sip_method_cancel ) {
             nta_outgoing_t* orq = this->getAssociatedTransaction( irq ) ;
-            assert( NULL != orq ) ;
+            if( NULL == orq ) {
+                SSP_LOG(log_error) << "Received CANCEL from A but B leg has already terminated" << endl ;
+                nta_leg_t* leg = this->getLegFromTransaction( irq ) ;
+                if( NULL != leg ) {
+                    this->clearDialog( leg ) ;
+                }
+                return 0;
+            }
             nta_leg_t* leg = this->getLegFromTransaction( irq ) ;
-            assert( NULL != leg ) ;
+            if( NULL == leg ) {
+                SSP_LOG(log_error) << "Received CANCEL from A but leg has already terminated" << endl ;
+                return 481 ;
+            }
             nta_outgoing_cancel( orq ) ;
             nta_outgoing_destroy( orq ) ;
             this->clearTransaction( orq ) ;
