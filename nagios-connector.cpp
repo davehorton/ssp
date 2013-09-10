@@ -26,20 +26,16 @@ namespace {
 namespace ssp {
     
     NagiosConnector::StatsSession::StatsSession( boost::asio::io_service& io_service ) : m_sock(io_service) {
-        SSP_LOG(log_debug) << "NagiosConnector StatsSession ctor" << endl ;
     }
     NagiosConnector::StatsSession::~StatsSession() {
-        SSP_LOG(log_debug) << "NagiosConnect StatsSession dtor" << endl ;        
     }
 
     void NagiosConnector::StatsSession::start() {
-        SSP_LOG(log_debug) << "StatsSession::start" << endl ;
         m_sock.async_read_some(boost::asio::buffer(m_readBuf),
                                 boost::bind( &StatsSession::read_handler, shared_from_this(), boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred ) ) ;
         
     }
     void NagiosConnector::StatsSession::read_handler( const boost::system::error_code& ec, std::size_t bytes_transferred ) {
-        SSP_LOG(log_debug) << "StatsSession read_handler" << endl ;
         string s( m_readBuf.data(), bytes_transferred ) ;
         
         string command ;
@@ -50,7 +46,6 @@ namespace ssp {
             break ;
         }
         
-        SSP_LOG(log_debug) << "NagiosConnector StatsSession read_handler " << s << ", command: " << command << endl ;
         if( 0 == command.compare("nagios-short") ) {
             processNagiosRequest();
         }
@@ -71,11 +66,9 @@ namespace ssp {
         }
     }
     void NagiosConnector::StatsSession::write_handler( const boost::system::error_code& ec, std::size_t bytes_transferred ) {
-        SSP_LOG(log_debug) << "NagiosConnector write_handler" ;
     }
     
     void NagiosConnector::StatsSession::processNagiosRequest( bool brief ) {
-        SSP_LOG(log_debug) << "NagiosConnector processSummaryRequest" ;
 
         boost::shared_ptr<SspConfig> pConfig = theOneAndOnlyController->getConfig();
         ostringstream o ;
@@ -151,6 +144,7 @@ namespace ssp {
         ostringstream o ;
         SipLbController::mapTrunkStats stats ;
         theOneAndOnlyController->getOutboundTrunkStats( stats ) ;
+        bool bHaveTrunks = false ;
         for( SipLbController::mapTrunkStats::iterator it = stats.begin(); it != stats.end(); it++ ) {
             boost::shared_ptr<TrunkStats> tr = it->second ;
             
@@ -163,9 +157,11 @@ namespace ssp {
                     }
                 }
             }
-            boost::asio::async_write( m_sock, boost::asio::buffer(o.str()), boost::bind( &StatsSession::write_handler, shared_from_this(),
-                                                                                        boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred ) ) ;
+            bHaveTrunks = true ;
         }
+        if( !bHaveTrunks ) o << "No outbound trunks have been utilized for calling yet" << endl ;
+        boost::asio::async_write( m_sock, boost::asio::buffer(o.str()), boost::bind( &StatsSession::write_handler, shared_from_this(),
+                                                                                    boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred ) ) ;
     }
     void NagiosConnector::StatsSession::processResetOutboundStatsRequest() {
         theOneAndOnlyController->resetOutboundTrunkStats() ;
@@ -187,7 +183,6 @@ namespace ssp {
     }
     NagiosConnector::~NagiosConnector() {
         this->stop() ;
-        SSP_LOG(log_debug) << "NagiosConnector dtor" << endl ;
    }
     void NagiosConnector::threadFunc() {
         
@@ -219,11 +214,9 @@ namespace ssp {
         m_acceptor.cancel() ;
         m_ioservice.stop() ;
         m_thread.join() ;
-        SSP_LOG(log_debug) << "NagiosConnector stop" << endl ;
     }
     
     void NagiosConnector::accept_handler( stats_session_ptr session, const boost::system::error_code& ec) {
-        SSP_LOG(log_debug) << "NagiosConnector accept_handler" ;
         if(!ec) {
             session->start() ;
         }
