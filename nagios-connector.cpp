@@ -205,7 +205,6 @@ namespace ssp {
     }
 
     void NagiosConnector::start_accept() {
-        SSP_LOG(log_debug) << "NagiosConnector start_accept" ;
         stats_session_ptr new_session( new StatsSession( m_ioservice ) ) ;
         m_acceptor.async_accept( new_session->socket(), boost::bind(&NagiosConnector::accept_handler, this, new_session, boost::asio::placeholders::error));
     }
