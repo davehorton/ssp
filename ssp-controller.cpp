@@ -1143,10 +1143,18 @@ namespace ssp {
         ostringstream ostrSessionTimer ;
         
         nta_incoming_t* irq = this->getAssociatedTransaction( orq) ;
-        assert( NULL != irq ) ;
+        if( NULL == irq ) {
+            SSP_LOG(log_error) << "Received INVITE response on B leg but A leg transaction is gone" << endl ;
+            assert( false ) ;
+            return 0 ;
+        }
 
         nta_leg_t* outgoing_leg = nta_leg_by_dialog( m_nta, NULL, sip->sip_call_id , NULL, NULL, sip->sip_from->a_tag, NULL );
-        assert(NULL != outgoing_leg) ;
+        if( NULL == outgoing_leg ) {
+            SSP_LOG(log_error) << "Received INVITE response on B leg transaction, but B leg has been destroyed - possibly late-arriving response" << endl;
+            assert(false );
+            return 0 ;
+        }
         
         int status = sip->sip_status->st_status ;
 
@@ -1395,9 +1403,12 @@ namespace ssp {
         SSP_LOG(log_debug) << "processResponseInsideDialog" << endl ;
         
         nta_incoming_t* irq = this->getAssociatedTransaction( orq ) ;
+        if( NULL == irq ) {
+            SSP_LOG(log_error) << "Received response from B request but A leg transaction is gone" << endl ;
+            assert( false ) ;
+            return 0 ;
+        }
         
-        assert( irq ) ;
-
         /* send the response back to the originator of the original request */
         nta_incoming_treply( irq, sip->sip_status->st_status, sip->sip_status->st_phrase,
                             SIPTAG_CONTACT(m_my_contact),
