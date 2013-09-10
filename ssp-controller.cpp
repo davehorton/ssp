@@ -876,10 +876,12 @@ namespace ssp {
             }
                 
             case sip_method_bye:
+                SSP_LOG(log_error) << "Received BYE for unknown dialog: " << sip->sip_call_id->i_id << endl ;
                 return 481 ;
                 
             default:
-                nta_incoming_destroy( irq ) ;
+                SSP_LOG(log_error) << "Received unsupported method type: " << sip->sip_request->rq_method_name << ": " << sip->sip_call_id->i_id << endl ;
+                return 501 ;
                 break ;
                 
         }
@@ -892,7 +894,7 @@ namespace ssp {
         string strCallId( sip->sip_call_id->i_id, strlen(sip->sip_call_id->i_id) ) ;
         deque< boost::shared_ptr<FsInstance> > servers ;
         if( !m_fsMonitor.getAvailableServers( servers ) ) {
-            SSP_LOG(log_warning) << "No available server for incoming call; returning to carrier for busy handling " << strCallId << endl ;
+            SSP_LOG(log_error) << "No available server for incoming call; returning to carrier for busy handling " << strCallId << endl ;
             return 486 ;
         }
         
@@ -1225,7 +1227,7 @@ namespace ssp {
                     if( sip->sip_contact->m_url[0].url_port ) {
                         dest << ":" <<  sip->sip_contact->m_url[0].url_port ;
                     }
-                    SSP_LOG(log_debug) << "Attempting route from Contact header: " << dest.str() << endl ;
+                    SSP_LOG(log_info) << "Attempting route from Contact header: " << dest.str() << endl ;
                     
                     t->crankback( dest.str() ) ;
                     nta_leg_t* b_legNew ;
@@ -1254,7 +1256,7 @@ namespace ssp {
                             ostringstream dest ;
                             dest << "sip:" << sip->sip_to->a_url[0].url_user << "@" << terminationSipAddress ;
                             
-                            SSP_LOG(log_info) << "Attempting next route: " << terminationSipAddress << " using carrier " << carrier << endl ;
+                            SSP_LOG(log_info) << "Attempting alternate route due to outbound failure: " << sip->sip_call_id->i_id << ": " << terminationSipAddress << " (" << carrier << ")" << endl ;
                             
                             t->crankback( dest.str(), carrier, terminationSipAddress ) ;
                             
@@ -1352,17 +1354,21 @@ namespace ssp {
     int SipLbController::processRequestInsideDialog( nta_leg_t* leg, nta_incoming_t* irq, sip_t const *sip) {
         SSP_LOG(log_debug) << "processRequestInsideDialog, leg " << leg << endl ;
         nta_leg_t* other = this->getAssociatedDialog( leg ) ;
-        assert( NULL != other ) ;
+        if( NULL == other ) {
+            SSP_LOG(log_error) << "Unable to find other leg for leg with callid " << sip->sip_call_id->i_id << endl ;
+            assert(false );
+        }
         switch (sip->sip_request->rq_method ) {
             case sip_method_bye:
             {
-                
-                nta_outgoing_t* bye = nta_outgoing_tcreate( other, NULL, NULL,
-                                     NULL,
-                                     SIP_METHOD_BYE,
-                                     NULL,
-                                     TAG_END() ) ;
-                nta_outgoing_destroy(bye) ;
+                if( NULL != other ) {
+                    nta_outgoing_t* bye = nta_outgoing_tcreate( other, NULL, NULL,
+                                                               NULL,
+                                                               SIP_METHOD_BYE,
+                                                               NULL,
+                                                               TAG_END() ) ;
+                    nta_outgoing_destroy(bye) ;                    
+                }
                 
                 
                 this->clearDialog( leg ) ;
@@ -1378,21 +1384,26 @@ namespace ssp {
             {
                 /* send on to other side */
                 
-                nta_outgoing_t* orq = nta_outgoing_tcreate( other, response_to_request_inside_dialog, this,
-                                                           NULL,
-                                                           sip->sip_request->rq_method, sip->sip_request->rq_method_name,
-                                                           NULL,
-                                                           SIPTAG_CONTENT_TYPE(sip->sip_content_type),
-                                                           SIPTAG_CONTENT_DISPOSITION(sip->sip_content_disposition),
-                                                           SIPTAG_CONTENT_LENGTH(sip->sip_content_length),
-                                                           SIPTAG_PAYLOAD(sip->sip_payload),
-                                                           SIPTAG_ACCEPT(sip->sip_accept),
-                                                           SIPTAG_REQUIRE(sip->sip_require),
-                                                           SIPTAG_SUPPORTED(sip->sip_supported),
-                                                           SIPTAG_SESSION_EXPIRES(sip->sip_session_expires),
-                                                           TAG_END() ) ;
-                this->addTransactions( irq, orq ) ;
-
+                if( NULL != other ) {
+                    nta_outgoing_t* orq = nta_outgoing_tcreate( other, response_to_request_inside_dialog, this,
+                                                               NULL,
+                                                               sip->sip_request->rq_method, sip->sip_request->rq_method_name,
+                                                               NULL,
+                                                               SIPTAG_CONTENT_TYPE(sip->sip_content_type),
+                                                               SIPTAG_CONTENT_DISPOSITION(sip->sip_content_disposition),
+                                                               SIPTAG_CONTENT_LENGTH(sip->sip_content_length),
+                                                               SIPTAG_PAYLOAD(sip->sip_payload),
+                                                               SIPTAG_ACCEPT(sip->sip_accept),
+                                                               SIPTAG_REQUIRE(sip->sip_require),
+                                                               SIPTAG_SUPPORTED(sip->sip_supported),
+                                                               SIPTAG_SESSION_EXPIRES(sip->sip_session_expires),
+                                                               TAG_END() ) ;
+                    this->addTransactions( irq, orq ) ;                   
+                }
+                else {
+                    return 481 ;
+                }
+ 
             }                
         }
        
@@ -1427,12 +1438,17 @@ namespace ssp {
             
             if( 200 == sip->sip_status->st_status ) {
                 nta_leg_t* outgoing_leg = this->getLegFromTransaction( orq ) ;
-                assert( outgoing_leg ) ;
-                nta_outgoing_t* ack_request = nta_outgoing_tcreate(outgoing_leg, NULL, NULL, NULL,
-                                                                   SIP_METHOD_ACK,
-                                                                   (url_string_t*) sip->sip_contact->m_url ,
-                                                                   TAG_END());
-                nta_outgoing_destroy( ack_request ) ;
+                if( NULL == outgoing_leg ) {
+                    SSP_LOG(log_error) << "Unable to find leg for callid " << sip->sip_call_id->i_id << endl ;
+                    assert(false) ;
+                }
+                else {
+                    nta_outgoing_t* ack_request = nta_outgoing_tcreate(outgoing_leg, NULL, NULL, NULL,
+                                                                       SIP_METHOD_ACK,
+                                                                       (url_string_t*) sip->sip_contact->m_url ,
+                                                                       TAG_END());
+                    nta_outgoing_destroy( ack_request ) ;                    
+                }
                 
             }
         }
@@ -1454,12 +1470,16 @@ namespace ssp {
             
             this->terminateLeg( leg ) ;
             nta_leg_t* other = this->getAssociatedDialog( leg ) ;
-            assert( other ) ;
-            if( other ) {
-                this->terminateLeg( other ) ;
+            if( NULL == other ) {
+                SSP_LOG(log_error) << "Unable to find matching leg for session refresh" << endl ;
+                assert(false) ;
+            }
+            else {
+                this->terminateLeg( other ) ;                
             }
             this->clearDialog( leg ) ;
         }
+        return 0 ;
     }
 
     bool SipLbController::terminateLeg( nta_leg_t* leg ) {

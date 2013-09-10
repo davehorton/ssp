@@ -48,7 +48,7 @@ namespace ssp {
         unsigned int getSipPort() const { return m_nSipPort ; }
         bool isAvailable() const { return querying_status == m_state && m_nCurrentSessions < m_nMaxSessions - 2 ;}
         bool isOnline() const { return querying_status == m_state ;}
-        
+        void reloadxml() ;
         
         void resolve_handler( const boost::system::error_code& ec, boost::asio::ip::tcp::resolver::iterator it) ;
         void connect_handler( const boost::system::error_code& ec, boost::asio::ip::tcp::resolver::iterator it ) ;
@@ -80,6 +80,7 @@ namespace ssp {
         time_t          m_lastCheck ;
         bool            m_bDisconnected ;
         bool            m_bConnected ;
+        bool            m_bReloadingXml ;
         unsigned int    m_nMaxSessions ;
         unsigned int    m_nCurrentSessions ;
         string          m_strSipAddress ;

@@ -57,6 +57,18 @@ namespace ssp {
         else if( 0 == command.compare("nagios-long") ) {
             processNagiosRequest( false );
         }
+        else if( 0 == command.compare("outbound-stats-short")) {
+            processOutboundTrunkStatsRequest() ;
+        }
+        else if( 0 == command.compare("outbound-stats-long")) {
+            processOutboundTrunkStatsRequest( false ) ;
+        }
+        else if( 0 == command.compare("outbound-stats-reset")) {
+            processResetOutboundStatsRequest() ;
+        }
+        else if( 0 == command.compare("fs-reloadxml")) {
+            processFsReloadxml() ;
+        }
     }
     void NagiosConnector::StatsSession::write_handler( const boost::system::error_code& ec, std::size_t bytes_transferred ) {
         SSP_LOG(log_debug) << "NagiosConnector write_handler" ;
@@ -83,6 +95,7 @@ namespace ssp {
         name_sorter ns ;
         std::sort( servers.begin(), servers.end(), ns ) ;
         
+        unsigned int total = 0 ;
         for( deque< boost::shared_ptr<FsInstance> >::const_iterator it = servers.begin(); it != servers.end(); it++ ) {
             boost::shared_ptr<FsInstance> p = *it ;
             if( p->isOnline() ) nActiveServers++ ;
@@ -92,12 +105,16 @@ namespace ssp {
                 if( p->isOnline() ) {
                     unsigned int max = p->getMaxSessions() ;
                     unsigned int current = p->getCurrentSessions() ;
+                    total += current ;
                     ol << p->getAddress() << ",online," << p->getSipAddress() << ":" << p->getSipPort() << "," << current << "," << max << endl ;
                 }
                 else {
                     ol << p->getAddress() << ",offline,,," << endl ;
                 }
             }
+        }
+        if( !brief ) {
+            ol << "total active freeswitch session count: "<< total << endl ;
         }
         
         o << " | " << nActiveServers << " of " << servers.size() << " freeswitch servers active" << endl ;
@@ -106,7 +123,56 @@ namespace ssp {
         }
         
         
-        boost::asio::async_write( m_sock, boost::asio::buffer(o.str()   ), boost::bind( &StatsSession::write_handler, shared_from_this(), boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred ) ) ;
+        boost::asio::async_write( m_sock, boost::asio::buffer(o.str()   ), boost::bind( &StatsSession::write_handler, shared_from_this(),
+                                                                                       boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred ) ) ;
+    }
+    void NagiosConnector::StatsSession::processFsReloadxml() {
+        deque< boost::shared_ptr<FsInstance> > servers ;
+        
+        theOneAndOnlyController->getAllServers( servers ) ;
+        
+        /* sort by name/address */
+        name_sorter ns ;
+        std::sort( servers.begin(), servers.end(), ns ) ;
+        
+        for( deque< boost::shared_ptr<FsInstance> >::const_iterator it = servers.begin(); it != servers.end(); it++ ) {
+            boost::shared_ptr<FsInstance> p = *it ;
+            if( p->isOnline() ) {
+                p->reloadxml(); 
+            }
+        }
+        ostringstream o ;
+        o << "OK" << endl ;
+        boost::asio::async_write( m_sock, boost::asio::buffer(o.str()), boost::bind( &StatsSession::write_handler, shared_from_this(),
+                                                                                    boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred ) ) ;
+    }
+    
+    void NagiosConnector::StatsSession::processOutboundTrunkStatsRequest(bool brief) {
+        ostringstream o ;
+        SipLbController::mapTrunkStats stats ;
+        theOneAndOnlyController->getOutboundTrunkStats( stats ) ;
+        for( SipLbController::mapTrunkStats::iterator it = stats.begin(); it != stats.end(); it++ ) {
+            boost::shared_ptr<TrunkStats> tr = it->second ;
+            
+            o << tr->getAddress() << " (" << tr->getCarrier() << ") attempts/failures: " << tr->getAttemptCount() << "/" << tr->getFailureCount() << endl ;
+            if( !brief ) {
+                for( unsigned int i = 400; i < 700; i++ ) {
+                    usize_t count =  tr->getFailureCount(i) ;
+                    if( count > 0 ) {
+                        o << "   " << i << ": " << count << endl ;
+                    }
+                }
+            }
+            boost::asio::async_write( m_sock, boost::asio::buffer(o.str()), boost::bind( &StatsSession::write_handler, shared_from_this(),
+                                                                                        boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred ) ) ;
+        }
+    }
+    void NagiosConnector::StatsSession::processResetOutboundStatsRequest() {
+        theOneAndOnlyController->resetOutboundTrunkStats() ;
+        ostringstream o ;
+        o << "OK" << endl ;
+        boost::asio::async_write( m_sock, boost::asio::buffer(o.str()), boost::bind( &StatsSession::write_handler, shared_from_this(),
+                                                                                    boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred ) ) ;
     }
 
 

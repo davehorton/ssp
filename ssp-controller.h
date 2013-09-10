@@ -98,6 +98,18 @@ namespace ssp {
         TrunkStats( const string& strAddress, const string& strCarrier ) : m_strAddress(strAddress), m_strCarrier(strCarrier), m_attempts(0) {
             memset( m_fails, 0, sizeof( m_fails ) ) ;
         }
+        TrunkStats( const TrunkStats& other ) {
+            m_strAddress = other.m_strAddress ;
+            m_strCarrier = other.m_strCarrier;
+            m_attempts = other.m_attempts ;
+            memcpy( m_fails, other.m_fails, sizeof( m_fails) ) ;
+        }
+        TrunkStats& operator=( const TrunkStats& other ) {
+            m_strAddress = other.m_strAddress ;
+            m_strCarrier = other.m_strCarrier;
+            m_attempts = other.m_attempts ;
+            memcpy( m_fails, other.m_fails, sizeof( m_fails) ) ;
+        }
         void incrementAttemptCount() {
             if( 0 == ++m_attempts ) {
                 memset( m_fails, 0, sizeof( m_fails ) ) ;                
@@ -120,6 +132,10 @@ namespace ssp {
         usize_t getFailureCount( unsigned int status ) {
             if( status >= 700 ) return -1 ;
             return m_fails[status] ;
+        }
+        void reset() {
+            m_attempts = 0 ;
+            memset( m_fails, 0, sizeof( m_fails ) ) ;           
         }
         
         const string& getAddress() const { return m_strAddress; }
@@ -204,7 +220,20 @@ namespace ssp {
         unsigned int getCountOfDialogs() { return m_dialogs.size(); }
 
         bool getSipStats( usize_t& nDialogs, usize_t& nMsgsReceived, usize_t& nMsgsSent, usize_t& nBadMsgsReceived, usize_t& nRetransmitsSent, usize_t& nRetransmitsReceived ) ;
+ 
+        typedef boost::unordered_map<string, boost::shared_ptr<TrunkStats> > mapTrunkStats ;
         
+        void getOutboundTrunkStats( mapTrunkStats& stats ) {
+            stats = m_mapTrunkStats ;
+        }
+        void resetOutboundTrunkStats() {
+            for( mapTrunkStats::iterator it = m_mapTrunkStats.begin(); it != m_mapTrunkStats.end(); it++ ) {
+                boost::shared_ptr<TrunkStats> tr = it->second ;
+                tr->reset() ;
+            }           
+        }
+        
+
 	private:
 		SipLbController() {} ;
         
@@ -303,7 +332,6 @@ namespace ssp {
         typedef boost::unordered_map<nta_leg_t*, boost::shared_ptr<SipDialogInfo> > mapDialogInfo ;
         mapDialogInfo m_mapDialogInfo ;
 
-        typedef boost::unordered_map<string, boost::shared_ptr<TrunkStats> > mapTrunkStats ;
         mapTrunkStats m_mapTrunkStats ;
 	} ;
 }

@@ -40,7 +40,11 @@ namespace ssp {
             void start(); 
             void read_handler( const boost::system::error_code& ec, std::size_t bytes_transferred ) ;
             void write_handler( const boost::system::error_code& ec, std::size_t bytes_transferred );
+            
             void processNagiosRequest( bool brief = true ) ;
+            void processOutboundTrunkStatsRequest( bool brief = true ) ;
+            void processResetOutboundStatsRequest() ;
+            void processFsReloadxml() ;
             
         protected:
             

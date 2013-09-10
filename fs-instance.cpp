@@ -22,7 +22,7 @@ namespace ssp {
     FsInstance::FsInstance( FsMonitor* pMonitor, boost::asio::io_service& ioService, const string& address, unsigned int port, bool busyOut ):
         m_pMonitor(pMonitor), m_ioService(ioService), m_socket(ioService), m_resolver(ioService), m_timer(ioService),
         m_strAddress(address), m_nEventSocketPort(port), m_lastCheck(0), m_nSipPort(0),
-        m_bConnected(false), m_nMaxSessions(0), m_nCurrentSessions(0), m_bBusyOut(busyOut), m_state(starting),m_bDisconnected(false) {
+        m_bConnected(false), m_nMaxSessions(0), m_nCurrentSessions(0), m_bBusyOut(busyOut), m_state(starting),m_bDisconnected(false), m_bReloadingXml(false) {
             
     }
     
@@ -162,7 +162,10 @@ namespace ssp {
                     
                 case querying_status:
                     if( FsMessage::api == m_fsMsg.getCategory() && FsMessage::response == m_fsMsg.getType() ) {
-                        if( !m_fsMsg.getFsStatus( m_nCurrentSessions, m_nMaxSessions ) ) {
+                        if( m_bReloadingXml ) {
+                            m_bReloadingXml = false ;
+                        }
+                        else if( !m_fsMsg.getFsStatus( m_nCurrentSessions, m_nMaxSessions ) ) {
                             SSP_LOG(log_error) << MY_SIP_COORDS << "Failed to parse freeswitch status from response: " << data << endl ;
                             bSetTimer = true ;
                         }
@@ -250,6 +253,18 @@ namespace ssp {
     void FsInstance::start_timer( unsigned long nMilliseconds ) {
         m_timer.expires_from_now(boost::posix_time::milliseconds(nMilliseconds));
         m_timer.async_wait( boost::bind( &FsInstance::timer_handler, shared_from_this(), boost::asio::placeholders::error )) ;
+    }
+    
+    void FsInstance::reloadxml() {
+        if( m_state != querying_status ) return ;
+        
+        string out = "api reloadxml\r\n\r\n" ;
+        if( m_strSipAddress.length() > 0 )  SSP_LOG(log_debug) <<  MY_SIP_COORDS  << "Write " << out.length() << " bytes" << endl << out << endl ;
+        else SSP_LOG(log_debug) <<  MY_COORDS  << "Write " << out.length() << " bytes" << endl << out << endl ;
+        boost::asio::write( m_socket, boost::asio::buffer(out) ) ;
+        m_bReloadingXml = true ;
+        m_socket.async_read_some(boost::asio::buffer(m_buffer),
+                                 boost::bind( &FsInstance::read_handler, shared_from_this(), boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred ) ) ;
     }
     
     FsInstance::operator const char * () {
