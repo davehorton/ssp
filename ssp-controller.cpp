@@ -349,7 +349,7 @@ namespace ssp {
         }
         
         /* Change the current working directory */
-        if ((chdir("/")) < 0) {
+        if ((chdir("~")) < 0) {
             /* Log the failure */
             exit(EXIT_FAILURE);
         }
