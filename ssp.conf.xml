@@ -73,7 +73,7 @@
     </carrier>
     <carrier name="intermetro">
         <outbound qty="3" charge-number="6172375089">
-            <address>10.10.10.1</address>
+            <address qty="2">10.10.10.1</address>
             <address>10.10.10.2</address>
             <address>10.10.10.3</address>
             <address status="inactive">10.10.10.4</address>
