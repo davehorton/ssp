@@ -32,7 +32,8 @@ namespace ssp {
         bool getCustomer( const std::string& dnis, std::string& customer) const ;
         bool getCarrier( const std::string& sourceAddress, std::string& carrier) const ;
         bool getTerminationRoute( std::string& destAddress, std::string& carrier, std::string& chargeNumber ) ;
-        
+        bool getTerminationRouteForAltCarrier( const std::string& failedCarrier, std::string& destAddress, std::string& carrier, std::string& chargeNumber ) ;
+       
         void getAppservers( deque<string>& servers) ;
         
         agent_mode getAgentMode(void) ;

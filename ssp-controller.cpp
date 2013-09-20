@@ -1252,7 +1252,7 @@ namespace ssp {
                     unsigned int nAttempt = t->getAttemptCount() ;
                     if( nAttempt < m_nTerminationRetries - 1 ) {
                         string terminationSipAddress, carrier, chargeNumber ;
-                        if( m_Config->getTerminationRoute( terminationSipAddress, carrier, chargeNumber) ) {
+                        if( m_Config->getTerminationRouteForAltCarrier( t->getCarrier(), terminationSipAddress, carrier, chargeNumber) ) {
                             ostringstream dest ;
                             dest << "sip:" << sip->sip_to->a_url[0].url_user << "@" << terminationSipAddress ;
                             

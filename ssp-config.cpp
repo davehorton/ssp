@@ -528,6 +528,21 @@ namespace ssp {
             if( ++m_nCurrentTerminationCarrier >= m_vecTerminationCarrier.size() ) m_nCurrentTerminationCarrier = 0 ;
             return true;
         }
+
+        /* try to find a different carrier for a failed attempt */
+        bool getTerminationRouteForAltCarrier( const std::string& failedCarrier, std::string& destAddress, std::string& carrier, std::string& chargeNumber ) {
+            for( TerminationCarrierMap_t::iterator it = m_mapTerminationCarrierByName.begin(); it != m_mapTerminationCarrierByName.end(); it++ ) {
+                carrier = it->first ;
+                if( 0 != carrier.compare(failedCarrier) ) {
+                    boost::shared_ptr<TerminationRoute_t>& route = it->second ;
+                    route->getNextTrunk( destAddress, chargeNumber ) ;   
+                    return true ;             
+                }
+            }
+
+            /* may not have multiple carriers, just return the next route */
+            return getTerminationRoute( destAddress, carrier, chargeNumber ) ;
+        }
         
         bool isActive() {
             return m_bIsActive ;
@@ -646,6 +661,9 @@ namespace ssp {
     }
     bool SspConfig::getTerminationRoute( std::string& destAddress, std::string& carrier, std::string& chargeNumber ) {
         return m_pimpl->getTerminationRoute( destAddress, carrier, chargeNumber ) ;
+    }
+    bool SspConfig::getTerminationRouteForAltCarrier( const std::string& failedCarrier, std::string& destAddress, std::string& carrier, std::string& chargeNumber ) {
+        return m_pimpl->getTerminationRouteForAltCarrier( failedCarrier, destAddress, carrier, chargeNumber ) ;
     }
     bool SspConfig::isActive() {
         return m_pimpl->isActive() ;
