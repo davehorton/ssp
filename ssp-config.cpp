@@ -91,7 +91,9 @@ namespace ssp {
 
     class CarrierAddressSpace_t {
     public:
-        CarrierAddressSpace_t( const string& carrier, const string& address, unsigned int port = 5060, const string& netmask = "255.255.255.255") : m_address(address), m_netmask(netmask), m_port(port), m_carrier(carrier) {
+        CarrierAddressSpace_t( const string& carrier, const string& address, unsigned int port = 5060, 
+            const string& netmask = "255.255.255.255", unsigned int qty = 1) : m_address(address), m_netmask(netmask), m_port(port), m_carrier(carrier), 
+            m_qty(qty), m_selectCount(0) {
         }
         ~CarrierAddressSpace_t() {}
         
@@ -110,6 +112,14 @@ namespace ssp {
         const string& getAddress() const { return m_address; }
         const string& getNetmask() const { return m_netmask; }
         unsigned int getPort() const { return m_port; }
+        bool haveAdvancedToEnd() {
+            if( m_selectCount == m_qty ) {
+                m_selectCount = 0 ;
+                return true ;
+            }
+            m_selectCount++ ;
+            return false ;
+        }
         
     private:
         CarrierAddressSpace_t() ;
@@ -118,6 +128,8 @@ namespace ssp {
         string m_address ;
         string m_netmask ;
         unsigned int m_port ;
+        unsigned int m_qty ;
+        unsigned int m_selectCount ;
     } ;
     /* needed to be able to live in a boost unordered container */
     size_t hash_value( const CarrierAddressSpace_t& c) {
@@ -135,15 +147,25 @@ namespace ssp {
         TerminationRoute_t(const vector<CarrierAddressSpace_t>& v, const string& chargeNumber) : m_currentTrunk(0), m_vecTrunks(v), m_chargeNumber(chargeNumber) {}
         ~TerminationRoute_t() {}
         
-        void getNextTrunk( string& trunk, string& chargeNumber, bool advance = true ) {
+        void advanceTrunk() {
+            if( ++m_currentTrunk >= m_vecTrunks.size() ) m_currentTrunk = 0 ;
+        }
+        void getNextTrunk( string& trunk, string& chargeNumber ) {
             stringstream s ;
             CarrierAddressSpace_t& c = m_vecTrunks.at( m_currentTrunk ) ;
-            s << c.getAddress() << ":" << c.getPort() ;
+
+            if( c.haveAdvancedToEnd() ) {
+                this->advanceTrunk() ;
+                CarrierAddressSpace_t& d = m_vecTrunks.at( m_currentTrunk ) ;
+                d.haveAdvancedToEnd() ;
+                s << d.getAddress() << ":" << d.getPort() ;
+            }
+            else {
+                s << c.getAddress() << ":" << c.getPort() ;
+            }
+
             trunk = s.str() ;
             chargeNumber = m_chargeNumber ;
-            if( advance ) {
-                if( ++m_currentTrunk >= m_vecTrunks.size() ) m_currentTrunk = 0 ;
-            }
         }
         unsigned int getCountOfTrunks() {
             return m_vecTrunks.size() ;
@@ -388,7 +410,8 @@ namespace ssp {
                                 BOOST_FOREACH( ptree::value_type const& v2, v.second.get_child("outbound") ) {
                                     if( v2.first == "address") {
                                         if( 0 == v2.second.get<string>("<xmlattr>.status","active").compare("inactive") ) continue ;
-                                        CarrierAddressSpace_t c( carrierName, v2.second.data(), v2.second.get("<xmlattr>.port", 5060), "255.255.255.255")  ;
+                                        CarrierAddressSpace_t c( carrierName, v2.second.data(), v2.second.get("<xmlattr>.port", 5060), "255.255.255.255", 
+                                            v2.second.get<unsigned int>("<xmlattr>.qty",1) )  ;
                                         vecTrunks.push_back( c ) ;
                                     }
                                 }
@@ -404,7 +427,10 @@ namespace ssp {
                     }
                 }
                 fb.close() ;
-                
+                if( 0 == m_vecTerminationCarrier.size() ) {
+                    cerr << "Must have at least one termination carrier specified in the configuration file " << endl ;
+                    return ;
+                }
                 if( 0 == m_mapAppserver.size() ) {
                     cerr << "Must have at least one appserver defined in the configuration file" << endl ;
                     return ;
@@ -493,7 +519,10 @@ namespace ssp {
             if( m_vecTerminationCarrier.empty() ) return false ;
             carrier = m_vecTerminationCarrier.at( m_nCurrentTerminationCarrier ) ;
             TerminationCarrierMap_t::iterator it = m_mapTerminationCarrierByName.find( carrier ) ;
-            if( m_mapTerminationCarrierByName.end() == it ) return false ;
+            if( m_mapTerminationCarrierByName.end() == it ) {
+                assert(false) ;
+                return false ;
+            }
             boost::shared_ptr<TerminationRoute_t>& route = it->second ;
             route->getNextTrunk( destAddress, chargeNumber ) ;
             if( ++m_nCurrentTerminationCarrier >= m_vecTerminationCarrier.size() ) m_nCurrentTerminationCarrier = 0 ;
