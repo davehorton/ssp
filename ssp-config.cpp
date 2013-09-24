@@ -587,6 +587,7 @@ namespace ssp {
             s << "tcp://" << m_cdrHost << ":" << m_cdrPort ;
             dbUrl = s.str() ;
             poolsize = m_poolsize ;
+            return true; 
         }
 
     private:
