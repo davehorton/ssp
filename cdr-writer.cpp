@@ -229,7 +229,7 @@ namespace ssp {
 				stmt.reset( conn->prepareStatement("INSERT INTO cdr_session "
 								"(session_uuid,start_time,originating_carrier,originating_carrier_ip_address,originating_edge_server_ip_address"
 								"fs_ip_address,calling_party_number,called_party_number_in,a_leg_sip_call_id,b_leg_sip_call_id,final_sip_status,release_cause,end_time) "
-								"VALUES (?,?,?,?,?,?,?,?,?,?)" ) ) ;
+								"VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)" ) ) ;
 			}
 			struct tm* pGmtStartTime = NULL ;
 			struct tm* pGmtConnectTime = NULL ;
@@ -252,8 +252,6 @@ namespace ssp {
 				strftime( szEndTime, 64, "%F %T", pGmtEndTime) ;
 			}
 
-
-
 			stmt->setString(1, pCdr->getUuid());
 			stmt->setDateTime(2, szStartTime) ;
 			stmt->setString(3, pCdr->getOriginatingCarrier()) ;
@@ -264,36 +262,38 @@ namespace ssp {
 			stmt->setString(8, pCdr->getCalledPartyNumberIn()) ;
 			stmt->setString(9, pCdr->getALegCallId()) ;
 			if( pCdr->getBLegCallId().length() > 0 ) {
-				stmt->setString(9, pCdr->getALegCallId()) ;
+				stmt->setString(10, pCdr->getALegCallId()) ;
 			}
 			else {
-				stmt->setNull(9, sql::DataType::VARCHAR) ;
+				stmt->setNull(10, sql::DataType::VARCHAR) ;
 			}
 			if( pCdr->getSipStatus() > 0 ) {
-				stmt->setInt(10, pCdr->getSipStatus() ) ;
-			}
-			else {
-				stmt->setNull(10, sql::DataType::SMALLINT) ;
-			}
-			if( pCdr->getSipStatus() > 0 ) {
-				stmt->setInt(11, (int32_t) pCdr->getReleaseCause() ) ;
+				stmt->setInt(11, pCdr->getSipStatus() ) ;
 			}
 			else {
 				stmt->setNull(11, sql::DataType::SMALLINT) ;
 			}
-			if( 0 != tmEnd ) {
-				stmt->setDateTime(12, szEndTime ) ;
+			if( pCdr->getSipStatus() > 0 ) {
+				stmt->setInt(12, (int32_t) pCdr->getReleaseCause() ) ;
 			}
 			else {
-				stmt->setNull(11, sql::DataType::TIMESTAMP) ;
+				stmt->setNull(12, sql::DataType::SMALLINT) ;
+			}
+			if( 0 != tmEnd ) {
+				stmt->setDateTime(13, szEndTime ) ;
+			}
+			else {
+				stmt->setNull(13, sql::DataType::TIMESTAMP) ;
 			}
 
 			int rows = stmt->executeUpdate();
 			assert( 1 == rows ) ;
 
 		} catch (sql::SQLException &e) {
+				cerr << "CdrWriter::writeOriginationRequestCdr sql exception: " << e.what() << " mysql error code: " << e.getErrorCode() << ", sql state: " << e.getSQLState() << endl ;
 				SSP_LOG(log_error) << "CdrWriter::writeOriginationRequestCdr sql exception: " << e.what() << " mysql error code: " << e.getErrorCode() << ", sql state: " << e.getSQLState() << endl ;
 		} catch (std::runtime_error &e) {
+				cerr << "CdrWriter::writeOriginationRequestCdr runtime exception: " << e.what() << endl ;
 				SSP_LOG(log_error) << "CdrWriter::writeOriginationRequestCdr runtime exception: " << e.what() << endl ;
 		}
 	}
