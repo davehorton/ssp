@@ -122,6 +122,27 @@ namespace ssp {
 		m_pWork.reset(); // stop all!
 		m_threadGroup.join_all(); // wait for all completition
 	}
+	boost::shared_ptr<sql::Connection> CdrWriter::getConnection() {
+		boost::shared_ptr<sql::Connection> conn ;
+		{
+			boost::lock_guard<boost::mutex> l( m_lock ) ;
+			if( !m_vecConnection.empty() ) {
+				conn = m_vecConnection.front() ;
+				m_vecConnection.pop_front() ;
+				return conn ;
+			}
+		}
+		try {
+			conn.reset( m_pDriver->connect( m_dbUrl, m_user, m_password ) ) ;
+		} catch (sql::SQLException &e) {
+				SSP_LOG(log_error) << "CdrWriter::getConnection sql exception getting a connection: " << e.what() << " mysql error code: " << e.getErrorCode() << ", sql state: " << e.getSQLState() << endl ;
+		}
+		return conn ;
+	}
+	void CdrWriter::releaseConnection( boost::shared_ptr<sql::Connection> conn ) {
+		boost::lock_guard<boost::mutex> l( m_lock ) ;
+		m_vecConnection.push_back( conn ) ;
+	}
 
 	void CdrWriter::worker_thread() {
 		{
@@ -150,48 +171,45 @@ namespace ssp {
 		m_io_service.post( boost::bind( &CdrWriter::writeCdr, this, pCdr ) ) ;
 	}
 	void CdrWriter::writeCdr( boost::shared_ptr<CdrInfo> pCdr ) {
-		static boost::thread_specific_ptr<sql::Connection> conn ;
 		try {
-			if( !conn.get() ) {
-				conn.reset( m_pDriver->connect( m_dbUrl, m_user, m_password ) ) ;
-			}
-
-			sql::Connection* pConn = conn.get() ;
-			if( NULL == pConn ) {
-				SSP_LOG(log_error) << "CdrWriter: unable to write cdr due to failure connecting to database" << endl ;
+			boost::shared_ptr<sql::Connection> conn = this->getConnection() ;
+			if( !conn ) {
+				assert(false) ;
+				SSP_LOG(log_error) << "Error retrieving connection" << endl ;
 				return ;
 			}
 			CdrInfo::CdrEvent_t type =  pCdr->getCdrType() ;
 			switch( type ) {
 				case CdrInfo::origination_request:
-					this->writeOriginationRequestCdr( pCdr, pConn ) ;
+					this->writeOriginationRequestCdr( pCdr, conn ) ;
 				break ;
 				case CdrInfo::origination_final_response:
-					this->writeOriginationFinalResponseCdr( pCdr, pConn ) ;
+					this->writeOriginationFinalResponseCdr( pCdr, conn ) ;
 				break ;
 				case CdrInfo::origination_cancel:
-					this->writeOriginationCancelCdr( pCdr, pConn ) ;
+					this->writeOriginationCancelCdr( pCdr, conn ) ;
 				break ;
 				case CdrInfo::termination_attempt:
-					this->writeTerminationAttemptCdr( pCdr, pConn ) ;
+					this->writeTerminationAttemptCdr( pCdr, conn ) ;
 				break ;
 				case CdrInfo::call_cleared:
-					this->writeByeCdr( pCdr, pConn) ;
+					this->writeByeCdr( pCdr, conn ) ;
 				break ;
 				default:
 				break ;
 			}
+			this->releaseConnection( conn ) ;
 		} catch (sql::SQLException &e) {
 				SSP_LOG(log_error) << "CdrWriter::writeCdr sql exception: " << e.what() << " mysql error code: " << e.getErrorCode() << ", sql state: " << e.getSQLState() << endl ;
 		} catch (std::runtime_error &e) {
 				SSP_LOG(log_error) << "CdrWriter::writeCdr runtime exception: " << e.what() << endl ;
 		}
 	}	
-	void CdrWriter::writeOriginationRequestCdr( boost::shared_ptr<CdrInfo> pCdr, sql::Connection* pConn  ) {
+	void CdrWriter::writeOriginationRequestCdr( boost::shared_ptr<CdrInfo> pCdr, boost::shared_ptr<sql::Connection> conn ) {
 		try {
 			static boost::thread_specific_ptr< sql::PreparedStatement > stmt ;
 			if( !stmt.get() ) {
-				stmt.reset( pConn->prepareStatement("INSERT INTO cdr_session "
+				stmt.reset( conn->prepareStatement("INSERT INTO cdr_session "
 								"(session_uuid,start_time,originating_carrier,originating_carrier_ip_address,originating_edge_server_ip_address"
 								"fs_ip_address,calling_party_number,called_party_number_in,a_leg_sip_call_id,b_leg_sip_call_id,final_sip_status,release_cause,end_time) "
 								"VALUES (?,?,?,?,?,?,?,?,?,?)" ) ) ;
@@ -262,7 +280,7 @@ namespace ssp {
 				SSP_LOG(log_error) << "CdrWriter::writeOriginationRequestCdr runtime exception: " << e.what() << endl ;
 		}
 	}
-	void CdrWriter::writeOriginationFinalResponseCdr( boost::shared_ptr<CdrInfo> pCdr, sql::Connection* pConn ) {
+	void CdrWriter::writeOriginationFinalResponseCdr( boost::shared_ptr<CdrInfo> pCdr, boost::shared_ptr<sql::Connection> conn ) {
 		try {
 			
 		} catch (sql::SQLException &e) {
@@ -272,7 +290,7 @@ namespace ssp {
 		}
 
 	}
-	void CdrWriter::writeOriginationCancelCdr( boost::shared_ptr<CdrInfo> pCdr, sql::Connection* pConn  ) {
+	void CdrWriter::writeOriginationCancelCdr( boost::shared_ptr<CdrInfo> pCdr, boost::shared_ptr<sql::Connection> conn  ) {
 		try {
 			
 		} catch (sql::SQLException &e) {
@@ -282,7 +300,7 @@ namespace ssp {
 		}
 
 	}
-	void CdrWriter::writeTerminationAttemptCdr( boost::shared_ptr<CdrInfo> pCdr,  sql::Connection* pConn ) {
+	void CdrWriter::writeTerminationAttemptCdr( boost::shared_ptr<CdrInfo> pCdr,  boost::shared_ptr<sql::Connection> conn ) {
 		try {
 			
 		} catch (sql::SQLException &e) {
@@ -292,7 +310,7 @@ namespace ssp {
 		}
 
 	}
-	void CdrWriter::writeByeCdr( boost::shared_ptr<CdrInfo> pCdr, sql::Connection* pConn ) {
+	void CdrWriter::writeByeCdr( boost::shared_ptr<CdrInfo> pCdr, boost::shared_ptr<sql::Connection> conn ) {
 		try {
 			
 		} catch (sql::SQLException &e) {

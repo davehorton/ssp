@@ -120,11 +120,14 @@ namespace ssp {
 	private:
 		void worker_thread() ;
 		void writeCdr( boost::shared_ptr<CdrInfo> pCdr ) ;
-		void writeOriginationRequestCdr( boost::shared_ptr<CdrInfo> pCdr, sql::Connection* pConn   ) ;
-		void writeOriginationFinalResponseCdr( boost::shared_ptr<CdrInfo> pCdr, sql::Connection* pConn  ) ;
-		void writeOriginationCancelCdr( boost::shared_ptr<CdrInfo> pCdr, sql::Connection* pConn  ) ;
-		void writeTerminationAttemptCdr( boost::shared_ptr<CdrInfo> pCdr,  sql::Connection* pConn  ) ;
-		void writeByeCdr( boost::shared_ptr<CdrInfo> pCdr,  sql::Connection* pConn   ) ;
+		void writeOriginationRequestCdr( boost::shared_ptr<CdrInfo> pCdr, boost::shared_ptr<sql::Connection> conn  ) ;
+		void writeOriginationFinalResponseCdr( boost::shared_ptr<CdrInfo> pCdr, boost::shared_ptr<sql::Connection> conn ) ;
+		void writeOriginationCancelCdr( boost::shared_ptr<CdrInfo> pCdr, boost::shared_ptr<sql::Connection> conn ) ;
+		void writeTerminationAttemptCdr( boost::shared_ptr<CdrInfo> pCdr, boost::shared_ptr<sql::Connection> conn ) ;
+		void writeByeCdr( boost::shared_ptr<CdrInfo> pCdr, boost::shared_ptr<sql::Connection> conn ) ;
+
+		boost::shared_ptr<sql::Connection> getConnection() ;
+		void releaseConnection( boost::shared_ptr<sql::Connection> conn ) ;
 
 		boost::asio::io_service m_io_service;
 		boost::shared_ptr<boost::asio::io_service::work> m_pWork;
@@ -136,6 +139,8 @@ namespace ssp {
 		string 	m_dbUrl ;
 
 		boost::shared_ptr<sql::Driver> m_pDriver;
+
+		deque< boost::shared_ptr<sql::Connection> > m_vecConnection ;
 
 	} ;
 
