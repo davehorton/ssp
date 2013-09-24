@@ -404,7 +404,7 @@ namespace ssp {
 			static boost::thread_specific_ptr< sql::PreparedStatement > stmt2 ;
 			if( !stmt2.get() ) {
 				stmt2.reset( conn->prepareStatement("UPDATE cdr_session SET terminating_edge_server_ip_address=?,terminating_carrier=?,"
-					"terminating_carrier_ip_address,c_leg_sip_call_id,d_leg_sip_call_id,fs_assigned_customer WHERE session_uuid=?")) ;
+					"terminating_carrier_ip_address=?,c_leg_sip_call_id=?,d_leg_sip_call_id=?,fs_assigned_customer=? WHERE session_uuid=?")) ;
 			}
 			stmt2->setString(1, pCdr->getTerminatingEdgeServerAddress()) ;
 			stmt2->setString(2, pCdr->getTerminatingCarrier()) ;
