@@ -1,6 +1,6 @@
-DROP TABLE cdr_session ;
-DROP TABLE termination_attempt ;
-DROP TRIGGER after_insert_termination_attempt ;
+DROP TABLE IF EXISTS cdr_session ;
+DROP TABLE IF EXISTS termination_attempt ;
+DROP TRIGGER IF EXISTS after_insert_termination_attempt ;
 
 CREATE TABLE cdr_session (
 	id SERIAL 
@@ -11,10 +11,10 @@ CREATE TABLE cdr_session (
 	,final_sip_status smallint 
 	,release_cause smallint DEFAULT 0 NOT NULL
 	,originating_carrier varchar(64) NOT NULL
-	,originating_ip_address varchar(64) NOT NULL
+	,originating_carrier_ip_address varchar(64) NOT NULL
 	,terminating_carrier varchar(64)
-	,terminating_ip_address varchar(64)
-	,originating_edge_server_ip_address
+	,terminating_carrier_ip_address varchar(64)
+	,originating_edge_server_ip_address varchar(64)
 	,terminating_edge_server_ip_address varchar(64)
 	,fs_ip_address varchar(64)
 	,calling_party_number varchar(32) NOT NULL
@@ -28,14 +28,16 @@ CREATE TABLE cdr_session (
 	,PRIMARY KEY(id)
 	,INDEX(start_time)
 	,INDEX(fs_ip_address)
-	,INDEX(edge_server_ip_address)
+	,INDEX(originating_edge_server_ip_address)
+	,INDEX(terminating_edge_server_ip_address)
 	,INDEX(originating_carrier)
-	,INDEX(originating_ip_address)
+	,INDEX(terminating_carrier_ip_address)
 	,INDEX(terminating_carrier)
-	,INDEX(terminating_ip_address)
+	,INDEX(terminating_carrier_ip_address)
+	,INDEX(calling_party_number)
 ) ;
 
-CREATE UNIQUE INDEX IX_cdr_session_uuid ON cdr_session (uuid ASC);
+CREATE UNIQUE INDEX IX_cdr_session_uuid ON cdr_session (session_uuid ASC);
 
 CREATE TABLE termination_attempt (
 	id SERIAL
@@ -49,8 +51,8 @@ CREATE TABLE termination_attempt (
 	,terminating_ip_address varchar(64)
 	,attempt_sequence tinyint
 	,PRIMARY KEY(id)
-    ,CONSTRAINT FK_uuid_1 FOREIGN KEY (session_uuid)
-                  REFERENCES cdr_session (uuid) ON DELETE SET NULL ON UPDATE CASCADE
+    ,CONSTRAINT FK_uuid_1 FOREIGN KEY (cdr_session_uuid)
+                  REFERENCES cdr_session (session_uuid) ON DELETE SET NULL ON UPDATE CASCADE
     ,INDEX(start_time)
 ) ;
 

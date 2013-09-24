@@ -182,7 +182,7 @@ namespace ssp {
 			if( !stmt.get() ) {
 				stmt.reset( pConn->prepareStatement("INSERT INTO cdr_session "
 								"(session_uuid,start_time,originating_carrier,originating_carrier_ip_address,originating_edge_server_ip_address"
-								"fs_ip_address,calling_party_number,called_party_number_in,a_leg_sip_call_id,b_leg_sip_call_id,final_sip_status,release_cause) "
+								"fs_ip_address,calling_party_number,called_party_number_in,a_leg_sip_call_id,b_leg_sip_call_id,final_sip_status,release_cause,end_time) "
 								"VALUES (?,?,?,?,?,?,?,?,?,?)" ) ) ;
 			}
 			struct tm* pGmtStartTime = NULL ;
@@ -234,6 +234,12 @@ namespace ssp {
 			}
 			else {
 				stmt->setNull(11, sql::DataType::SMALLINT) ;
+			}
+			if( 0 != tmEnd ) {
+				stmt->setDateTime(12, szEndTime ) ;
+			}
+			else {
+				stmt->setNull(11, sql::DataType::TIMESTAMP) ;
 			}
 
 			int rows = stmt->executeUpdate();

@@ -429,7 +429,7 @@ namespace ssp {
         pCdr->setOriginatingCarrier( "carrierX" ) ;
         pCdr->setOriginatingCarrierAddress( "carrierX-address") ;
         pCdr->setALegCallId( "A-leg-callid" ) ;
-        pCdr->setOriginatingEdgeServerAddress( string(m_my_contact->m_url[0].url_host, strlen(m_my_contact->m_url[0].url_host) ) ) ;
+        pCdr->setOriginatingEdgeServerAddress( "localhost" ) ;
         pCdr->setCalledPartyNumberIn( "did" ) ;
         pCdr->setCallingPartyNumber( "cli" ) ;
         m_cdrWriter->postCdr( pCdr ) ;
