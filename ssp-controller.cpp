@@ -447,7 +447,7 @@ namespace ssp {
                 pCdr->setTerminatingCarrier("carrierY") ;
                 pCdr->setTerminatingCarrierAddress("carrierY-address") ;
                 pCdr->setTerminatingEdgeServerAddress("localhost") ;
-
+                m_cdrWriter->postCdr( pCdr ) ;   
 
                 pCdr = boost::make_shared<CdrInfo>(CdrInfo::origination_final_response );
                 pCdr->setUuid( uuid ) ;

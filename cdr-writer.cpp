@@ -372,8 +372,8 @@ namespace ssp {
 			static boost::thread_specific_ptr< sql::PreparedStatement > stmt ;
 			if( !stmt.get() ) {
 				stmt.reset( conn->prepareStatement("INSERT into termination_attempt(cdr_session_uuid,start_time,connect_time,end_time,"
-					"final_sip_status,sip_call_id,terminating_carrier,terminating_carrier_ip_address "
-					"VALUES(?,?,?,?,?,?,?,?,?)") );
+					"final_sip_status,sip_call_id,terminating_carrier,terminating_carrier_ip_address) "
+					"VALUES(?,?,?,?,?,?,?,?)") );
 			}
 
 			string strTimeStart, strTimeConnect, strTimeEnd ;
