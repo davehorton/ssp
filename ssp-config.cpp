@@ -279,7 +279,7 @@ namespace ssp {
                 
                 /* cdr database configuration */
                 m_cdrUser = pt.get<string>("ssp.cdr.user","");
-                m_cdrPassword = pt.get<string>("ssp.cdr.pasword","");
+                m_cdrPassword = pt.get<string>("ssp.cdr.password","");
                 m_cdrHost = pt.get<string>("ssp.cdr.host","");
                 m_cdrPort = pt.get<string>("ssp.cdr.port","3306");
                 m_poolsize = pt.get<unsigned int>("ssp.cdr.num-threads",1);
