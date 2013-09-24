@@ -144,6 +144,7 @@ namespace ssp {
 		}
 		try {
 			conn.reset( m_pDriver->connect( m_dbUrl, m_user, m_password ) ) ;
+			if( conn ) conn->setSchema("ssp") ;	//TODO: get from config
 		} catch (sql::SQLException &e) {
 				cerr << "CdrWriter::getConnection sql exception getting a connection: " << e.what() << " mysql error code: " << e.getErrorCode() << ", sql state: " << e.getSQLState() << endl ;
 				SSP_LOG(log_error) << "CdrWriter::getConnection sql exception getting a connection: " << e.what() << " mysql error code: " << e.getErrorCode() << ", sql state: " << e.getSQLState() << endl ;
