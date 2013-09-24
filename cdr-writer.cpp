@@ -107,16 +107,26 @@ namespace ssp {
 
 
 	CdrWriter::CdrWriter( const string& dbUrl, const string& user, const string& password, unsigned int poolSize ) : m_dbUrl(dbUrl), m_user(user), m_password(password)  {
-		
-		m_pDriver.reset( sql::mysql::get_driver_instance() );
-		if( !m_pDriver ) throw std::runtime_error("Error creating instance of mysql driver") ;
+		try {
+			m_pDriver.reset( sql::mysql::get_driver_instance() );
+			if( !m_pDriver ) throw std::runtime_error("Error creating instance of mysql driver") ;
 
-		m_pWork.reset( new boost::asio::io_service::work(m_io_service) );
+			m_pWork.reset( new boost::asio::io_service::work(m_io_service) );
 
-		for ( unsigned int i = 0; i < poolSize; ++i) {
-			//m_threadGroup.create_thread( boost::bind(&boost::asio::io_service::run, &m_io_service) );
-			m_threadGroup.create_thread( boost::bind(&CdrWriter::worker_thread, this) );
-		}
+			for ( unsigned int i = 0; i < poolSize; ++i) {
+				//m_threadGroup.create_thread( boost::bind(&boost::asio::io_service::run, &m_io_service) );
+				m_threadGroup.create_thread( boost::bind(&CdrWriter::worker_thread, this) );
+			}
+		} catch (sql::SQLException &e) {
+			cerr << "CdrWriter::CdrWriter sql exception: " << e.what() << " mysql error code: " << e.getErrorCode() << ", sql state: " << e.getSQLState() << endl ;
+			SSP_LOG(log_error) << "CdrWriter::worker_thread sql exception: " << e.what() << " mysql error code: " << e.getErrorCode() << ", sql state: " << e.getSQLState() << endl ;
+		} catch (std::runtime_error &e) {
+			cerr<< "CdrWriter::CdrWriter runtime exception: " << e.what() << endl ;
+			SSP_LOG(log_error) << "CdrWriter::worker_thread runtime exception: " << e.what() << endl ;
+		} catch( ... ) {
+			cerr << "CdrWriter::CdrWriter uncaught exception " << endl ;
+			SSP_LOG(log_error) << "CdrWriter::worker_thread uncaught exception " << endl ;
+		}		
 	}
 	CdrWriter::~CdrWriter() {
 		m_pWork.reset(); // stop all!
@@ -135,6 +145,7 @@ namespace ssp {
 		try {
 			conn.reset( m_pDriver->connect( m_dbUrl, m_user, m_password ) ) ;
 		} catch (sql::SQLException &e) {
+				cerr << "CdrWriter::getConnection sql exception getting a connection: " << e.what() << " mysql error code: " << e.getErrorCode() << ", sql state: " << e.getSQLState() << endl ;
 				SSP_LOG(log_error) << "CdrWriter::getConnection sql exception getting a connection: " << e.what() << " mysql error code: " << e.getErrorCode() << ", sql state: " << e.getSQLState() << endl ;
 		}
 		return conn ;
@@ -151,6 +162,7 @@ namespace ssp {
 				m_pDriver->threadInit() ;
 			}
 			catch (sql::SQLException &e) {
+				cerr << "CdrWriter exception calling threadInit: " << e.what() << " mysql error code: " << e.getErrorCode() << ", sql state: " << e.getSQLState() << endl ;
 				SSP_LOG(log_error) << "CdrWriter exception calling threadInit: " << e.what() << " mysql error code: " << e.getErrorCode() << ", sql state: " << e.getSQLState() << endl ;
 				return ;
 			}
@@ -158,10 +170,13 @@ namespace ssp {
 		try {
 			m_io_service.run() ;
 		} catch (sql::SQLException &e) {
+			cerr << "CdrWriter::worker_thread sql exception: " << e.what() << " mysql error code: " << e.getErrorCode() << ", sql state: " << e.getSQLState() << endl ;
 			SSP_LOG(log_error) << "CdrWriter::worker_thread sql exception: " << e.what() << " mysql error code: " << e.getErrorCode() << ", sql state: " << e.getSQLState() << endl ;
 		} catch (std::runtime_error &e) {
+			cerr<< "CdrWriter::worker_thread runtime exception: " << e.what() << endl ;
 			SSP_LOG(log_error) << "CdrWriter::worker_thread runtime exception: " << e.what() << endl ;
 		} catch( ... ) {
+			cerr << "CdrWriter::worker_thread uncaught exception " << endl ;
 			SSP_LOG(log_error) << "CdrWriter::worker_thread uncaught exception " << endl ;
 		}		
 		m_pDriver->threadEnd() ;
@@ -200,8 +215,10 @@ namespace ssp {
 			}
 			this->releaseConnection( conn ) ;
 		} catch (sql::SQLException &e) {
+				cerr << "CdrWriter::writeCdr sql exception: " << e.what() << " mysql error code: " << e.getErrorCode() << ", sql state: " << e.getSQLState() << endl ;
 				SSP_LOG(log_error) << "CdrWriter::writeCdr sql exception: " << e.what() << " mysql error code: " << e.getErrorCode() << ", sql state: " << e.getSQLState() << endl ;
 		} catch (std::runtime_error &e) {
+				cerr << "CdrWriter::writeCdr runtime exception: " << e.what() << endl ;
 				SSP_LOG(log_error) << "CdrWriter::writeCdr runtime exception: " << e.what() << endl ;
 		}
 	}	
