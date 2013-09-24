@@ -4,7 +4,7 @@
 #include "ssp-controller.h"
 
 namespace ssp {
-	CdrInfo::CdrInfo( CdrEvent_t cdrType ) : m_cdrType( cdrType ), m_sipStatus(0) {
+	CdrInfo::CdrInfo( CdrEvent_t cdrType ) : m_cdrType( cdrType ), m_sipStatus(0), m_releaseCause(unknown_release_cause) {
 		this->setTimeStart(0)
 		.setTimeConnect(0)
 		.setTimeEnd(0); 

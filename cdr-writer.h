@@ -28,7 +28,8 @@ namespace ssp {
 		} ;
 
 		enum ReleaseCause_t {
-			calling_party_release = 1
+			unknown_release_cause = 0 
+			,calling_party_release 
 			,called_party_release 
 			,call_canceled
 			,call_rejected_due_to_termination_carriers

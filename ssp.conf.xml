@@ -21,7 +21,6 @@
         <host>util02</host>
         <schema>ssp</schema>
         <port>3306</port>
-        <num-threads>3</num-threads>
     </cdr>
 
    <!-- logging configuration -->

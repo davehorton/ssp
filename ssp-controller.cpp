@@ -447,6 +447,7 @@ namespace ssp {
                 pCdr->setTerminatingCarrier("carrierY") ;
                 pCdr->setTerminatingCarrierAddress("carrierY-address") ;
                 pCdr->setTerminatingEdgeServerAddress("localhost-term-edge") ;
+                pCdr->setCalledPartyNumberOut("8XX") ;
                 m_cdrWriter->postCdr( pCdr ) ;   
 
                 pCdr = boost::make_shared<CdrInfo>(CdrInfo::origination_final_response );
@@ -458,6 +459,7 @@ namespace ssp {
                 pCdr = boost::make_shared<CdrInfo>(CdrInfo::call_cleared );
                 pCdr->setUuid( uuid ) ;
                 pCdr->setTimeEnd( time(0) ) ;
+                pCdr->setReleaseCause( CdrInfo::calling_party_release) ;
                 m_cdrWriter->postCdr( pCdr ) ;   
             }
             else {
