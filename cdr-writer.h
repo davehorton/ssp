@@ -84,6 +84,9 @@ namespace ssp {
 		time_t getTimeStart() const { return m_tmStart; }
 		time_t getTimeConnect() const { return m_tmConnect; }
 		time_t getTimeEnd() const { return m_tmEnd; }
+		bool getTimeStartFormatted(string& str) const ;
+		bool getTimeConnectFormatted(string& str) const ;
+		bool getTimeEndFormatted(string& str) const ;
 
 	private:
 		CdrEvent_t m_cdrType ;

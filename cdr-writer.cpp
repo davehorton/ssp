@@ -103,6 +103,36 @@ namespace ssp {
 		m_tmEnd = time ;
 		return *this ;
 	}
+	bool CdrInfo::getTimeStartFormatted(string& str) const {
+		struct tm* gmt = NULL ;
+		char sz[64] ;
+
+		if( 0 == this->getTimeStart() ) return false ;
+	
+		gmt = gmtime( &m_tmStart ) ;
+		strftime( sz, 64, "%F %T", gmt ) ;
+		str.assign( sz, strlen(sz) ) ;
+	}
+	bool CdrInfo::getTimeConnectFormatted(string& str) const {
+		struct tm* gmt = NULL ;
+		char sz[64] ;
+
+		if( 0 == this->getTimeConnect() ) return false ;
+	
+		gmt = gmtime( &m_tmConnect ) ;
+		strftime( sz, 64, "%F %T", gmt ) ;
+		str.assign( sz, strlen(sz) ) ;
+	}
+	bool CdrInfo::getTimeEndFormatted(string& str) const {
+		struct tm* gmt = NULL ;
+		char sz[64] ;
+
+		if( 0 == this->getTimeEnd() ) return false ;
+	
+		gmt = gmtime( &m_tmEnd ) ;
+		strftime( sz, 64, "%F %T", gmt ) ;
+		str.assign( sz, strlen(sz) ) ;
+	}
 
 
 
@@ -232,29 +262,13 @@ namespace ssp {
 								"fs_ip_address,calling_party_number,called_party_number_in,a_leg_sip_call_id,b_leg_sip_call_id,final_sip_status,release_cause,end_time) "
 								"VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)" ) ) ;
 			}
-			struct tm* pGmtStartTime = NULL ;
-			struct tm* pGmtConnectTime = NULL ;
-			struct tm* pGmtEndTime = NULL ;
-			time_t tmStart = pCdr->getTimeStart()  ;
-			time_t tmConnect = pCdr->getTimeConnect() ;
-			time_t tmEnd = pCdr->getTimeEnd() ;
-			char szStartTime[64], szConnectTime[64], szEndTime[64] ;
 
-			if( 0 != tmStart ) {
-				pGmtStartTime = gmtime( &tmStart ) ;
-				strftime( szStartTime, 64, "%F %T", pGmtStartTime) ;
-			}
-			if( 0 != tmConnect ) {
-				pGmtConnectTime = gmtime( &tmConnect ) ;
-				strftime( szConnectTime, 64, "%F %T", pGmtConnectTime) ;
-			}
-			if( 0 != tmEnd) {
-				pGmtEndTime = gmtime( &tmEnd ) ;
-				strftime( szEndTime, 64, "%F %T", pGmtEndTime) ;
-			}
+			string strTimeStart, strTimeEnd ;
+			pCdr->getTimeStartFormatted( strTimeEnd ) ;
+			pCdr->getTimeEndFormatted( strTimeEnd ) ;
 
 			stmt->setString(1, pCdr->getUuid());
-			stmt->setDateTime(2, szStartTime) ;
+			stmt->setDateTime(2, strTimeStart) ;
 			stmt->setString(3, pCdr->getOriginatingCarrier()) ;
 			stmt->setString(4,pCdr->getOriginatingCarrierAddress()) ;
 			stmt->setString(5, pCdr->getOriginatingEdgeServerAddress());
@@ -275,8 +289,8 @@ namespace ssp {
 				stmt->setNull(11, sql::DataType::SMALLINT) ;
 			}
 			stmt->setInt(12, (int32_t) pCdr->getReleaseCause() ) ;
-			if( 0 != tmEnd ) {
-				stmt->setDateTime(13, szEndTime ) ;
+			if( strTimeEnd.length() > 0 ) {
+				stmt->setDateTime(13, strTimeEnd ) ;
 			}
 			else {
 				stmt->setNull(13, sql::DataType::TIMESTAMP) ;
@@ -299,48 +313,54 @@ namespace ssp {
 			if( !stmt.get() ) {
 				stmt.reset( conn->prepareStatement("UPDATE cdr_session SET final_sip_status=?,connect_time=?,end_time=?,release_cause=? WHERE session_uuid=?") );
 			}
-			struct tm* pGmtConnectTime = NULL ;
-			struct tm* pGmtEndTime = NULL ;
-			time_t tmConnect = pCdr->getTimeConnect() ;
-			time_t tmEnd = pCdr->getTimeEnd() ;
-			char szConnectTime[64], szEndTime[64] ;
 
-			if( 0 != tmConnect ) {
-				pGmtConnectTime = gmtime( &tmConnect ) ;
-				strftime( szConnectTime, 64, "%F %T", pGmtConnectTime) ;
-			}
-			if( 0 != tmEnd) {
-				pGmtEndTime = gmtime( &tmEnd ) ;
-				strftime( szEndTime, 64, "%F %T", pGmtEndTime) ;
-			}
+			string strTimeConnect, strTimeEnd ;
+			pCdr->getTimeConnectFormatted( strTimeEnd ) ;
+			pCdr->getTimeEndFormatted( strTimeEnd ) ;
 
 			stmt->setInt(1, pCdr->getSipStatus() ) ;
 			if( 200 == pCdr->getSipStatus() ) {
-				stmt->setDateTime(2, szConnectTime) ;
+				stmt->setDateTime(2, strTimeConnect) ;
 				stmt->setNull(3,sql::DataType::TIMESTAMP) ;
 				stmt->setInt(4, 0) ;
 			}
 			else {
 				stmt->setNull(2, sql::DataType::TIMESTAMP) ;
-				stmt->setDateTime(3, szEndTime) ;
+				stmt->setDateTime(3, strTimeEnd) ;
 				stmt->setInt(4, (int32_t) CdrInfo::call_rejected_due_to_termination_carriers) ;
 			}
-			stmt->setString(4,pCdr->getUuid()) ;
+			stmt->setString(5,pCdr->getUuid()) ;
 
 			int rows = stmt->executeUpdate();
 			assert( 1 == rows ) ;
 			
 		} catch (sql::SQLException &e) {
+				cerr << "CdrWriter::writeOriginationFinalResponseCdr sql exception: " << e.what() << " mysql error code: " << e.getErrorCode() << ", sql state: " << e.getSQLState() << endl ;
 				SSP_LOG(log_error) << "CdrWriter::writeOriginationFinalResponseCdr sql exception: " << e.what() << " mysql error code: " << e.getErrorCode() << ", sql state: " << e.getSQLState() << endl ;
 		} catch (std::runtime_error &e) {
+				cerr << "CdrWriter::writeOriginationFinalResponseCdr runtime exception: " << e.what() << endl ;
 				SSP_LOG(log_error) << "CdrWriter::writeOriginationFinalResponseCdr runtime exception: " << e.what() << endl ;
 		}
 
 	}
 	void CdrWriter::writeOriginationCancelCdr( boost::shared_ptr<CdrInfo> pCdr, boost::shared_ptr<sql::Connection> conn  ) {
 		try {
+			static boost::thread_specific_ptr< sql::PreparedStatement > stmt ;
+			if( !stmt.get() ) {
+				stmt.reset( conn->prepareStatement("UPDATE cdr_session SET final_sip_status=487,end_time=?,release_cause=? WHERE session_uuid=?") );
+			}
+			string strTimeEnd ;
+			pCdr->getTimeEndFormatted( strTimeEnd ) ;
+
+			stmt->setDateTime(1, strTimeEnd) ;
+			stmt->setInt(2, (int32_t) CdrInfo::call_canceled) ;
+			stmt->setString(3,pCdr->getUuid()) ;
+
+			int rows = stmt->executeUpdate();
+			assert( 1 == rows ) ;
 			
 		} catch (sql::SQLException &e) {
+				cerr << "CdrWriter::writeOriginationCancelCdr sql exception: " << e.what() << " mysql error code: " << e.getErrorCode() << ", sql state: " << e.getSQLState() << endl ;
 				SSP_LOG(log_error) << "CdrWriter::writeOriginationCancelCdr sql exception: " << e.what() << " mysql error code: " << e.getErrorCode() << ", sql state: " << e.getSQLState() << endl ;
 		} catch (std::runtime_error &e) {
 				SSP_LOG(log_error) << "CdrWriter::writeOriginationCancelCdr runtime exception: " << e.what() << endl ;
@@ -349,8 +369,56 @@ namespace ssp {
 	}
 	void CdrWriter::writeTerminationAttemptCdr( boost::shared_ptr<CdrInfo> pCdr,  boost::shared_ptr<sql::Connection> conn ) {
 		try {
+			static boost::thread_specific_ptr< sql::PreparedStatement > stmt ;
+			if( !stmt.get() ) {
+				stmt.reset( conn->prepareStatement("INSERT into termination_attempt(cdr_session_uuid,start_time,connect_time,end_time,"
+					"final_sip_status,sip_call_id,terminating_carrier,terminating_carrier_ip_address "
+					"VALUES(?,?,?,?,?,?,?,?,?)") );
+			}
+
+			string strTimeStart, strTimeConnect, strTimeEnd ;
+			pCdr->getTimeStartFormatted( strTimeEnd ) ;
+			pCdr->getTimeConnectFormatted( strTimeConnect ) ;
+			pCdr->getTimeEndFormatted( strTimeEnd ) ;
+
+
+			stmt->setString(1, pCdr->getUuid()) ;
+			stmt->setDateTime(2, strTimeStart);
+
+			if( 200 == pCdr->getSipStatus() ) {
+				stmt->setDateTime(3, strTimeConnect) ;
+				stmt->setNull(4, sql::DataType::TIMESTAMP) ;
+			}
+			else {
+				stmt->setNull(3, sql::DataType::TIMESTAMP) ;
+				stmt->setDateTime(4, strTimeEnd) ;
+			}
+			stmt->setInt(5, pCdr->getSipStatus() ) ;
+			stmt->setString(6,pCdr->getDLegCallId() ) ;
+			stmt->setString(7,pCdr->getTerminatingCarrier()) ;
+			stmt->setString(8,pCdr->getTerminatingCarrierAddress()) ;
+
+			int rows = stmt->executeUpdate();
+			assert( 1 == rows ) ;
+
+			static boost::thread_specific_ptr< sql::PreparedStatement > stmt2 ;
+			if( !stmt2.get() ) {
+				stmt2.reset( conn->prepareStatement("UPDATE cdr_session SET terminating_edge_server_ip_address=?,terminating_carrier=?,"
+					"terminating_carrier_ip_address,c_leg_sip_call_id,d_leg_sip_call_id,fs_assigned_customer WHERE session_uuid=?")) ;
+			}
+			stmt2->setString(1, pCdr->getTerminatingEdgeServerAddress()) ;
+			stmt2->setString(2, pCdr->getTerminatingCarrier()) ;
+			stmt2->setString(3, pCdr->getTerminatingCarrierAddress()) ;
+			stmt2->setString(4, pCdr->getCLegCallId()) ;
+			stmt2->setString(5, pCdr->getDLegCallId()) ;
+			stmt2->setString(6, pCdr->getCustomerName()) ;
+			stmt2->setString(7, pCdr->getUuid()) ;
+			rows = stmt->executeUpdate();
+			assert( 1 == rows ) ;
+
 			
 		} catch (sql::SQLException &e) {
+				cerr << "CdrWriter::writeTerminationAttemptCdr sql exception: " << e.what() << " mysql error code: " << e.getErrorCode() << ", sql state: " << e.getSQLState() << endl ;
 				SSP_LOG(log_error) << "CdrWriter::writeTerminationAttemptCdr sql exception: " << e.what() << " mysql error code: " << e.getErrorCode() << ", sql state: " << e.getSQLState() << endl ;
 		} catch (std::runtime_error &e) {
 				SSP_LOG(log_error) << "CdrWriter::writeTerminationAttemptCdr runtime exception: " << e.what() << endl ;
@@ -359,8 +427,28 @@ namespace ssp {
 	}
 	void CdrWriter::writeByeCdr( boost::shared_ptr<CdrInfo> pCdr, boost::shared_ptr<sql::Connection> conn ) {
 		try {
+			static boost::thread_specific_ptr< sql::PreparedStatement > stmt ;
+			if( !stmt.get() ) {
+				stmt.reset( conn->prepareStatement("UPDATE cdr_session SET end_time=?,release_cause=? WHERE session_uuid=?") );
+			}
+			struct tm* pGmtEndTime = NULL ;
+			time_t tmEnd = pCdr->getTimeEnd() ;
+			char szEndTime[64] ;
+
+			if( 0 != tmEnd) {
+				pGmtEndTime = gmtime( &tmEnd ) ;
+				strftime( szEndTime, 64, "%F %T", pGmtEndTime) ;
+			}
+
+			stmt->setDateTime(1, szEndTime) ;
+			stmt->setInt(2, (int32_t) pCdr->getReleaseCause() ) ;
+			stmt->setString(3,pCdr->getUuid()) ;
+
+			int rows = stmt->executeUpdate();
+			assert( 1 == rows ) ;
 			
 		} catch (sql::SQLException &e) {
+				cerr << "CdrWriter::writeOriginationRequestCdr sql exception: " << e.what() << " mysql error code: " << e.getErrorCode() << ", sql state: " << e.getSQLState() << endl ;
 				SSP_LOG(log_error) << "CdrWriter::writeOriginationRequestCdr sql exception: " << e.what() << " mysql error code: " << e.getErrorCode() << ", sql state: " << e.getSQLState() << endl ;
 		} catch (std::runtime_error &e) {
 				SSP_LOG(log_error) << "CdrWriter::writeOriginationRequestCdr runtime exception: " << e.what() << endl ;

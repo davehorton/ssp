@@ -430,16 +430,43 @@ namespace ssp {
             pCdr->setOriginatingCarrier( "carrierX" ) ;
             pCdr->setOriginatingCarrierAddress( "carrierX-address") ;
             pCdr->setALegCallId( "A-leg-callid" ) ;
+            pCdr->setBLegCallId( "B-leg-callid" ) ;
             pCdr->setOriginatingEdgeServerAddress( "localhost" ) ;
             pCdr->setCalledPartyNumberIn( "did" ) ;
             pCdr->setCallingPartyNumber( "cli" ) ;
             m_cdrWriter->postCdr( pCdr ) ;
 
-            pCdr->setCdrType( CdrInfo::origination_final_response ) ;
-            pCdr->setSipStatus( 503 ) ;
-            pCdr->setTimeEnd( time(0) ) ;
-            m_cdrWriter->postCdr( pCdr ) ;
+            if( 0 == i % 2 ) {
+                pCdr = boost::make_shared<CdrInfo>(CdrInfo::termination_attempt );
+                pCdr->setUuid( uuid ) ;
+                pCdr->setTimeStart(time(0)) ;
+                pCdr->setTimeConnect(time(0)) ; 
+                pCdr->setSipStatus(200);
+                pCdr->setCLegCallId("C-Leg-callid") ;
+                pCdr->setDLegCallId("D-Leg-callid") ;
+                pCdr->setTerminatingCarrier("carrierY") ;
+                pCdr->setTerminatingCarrierAddress("carrierY-address") ;
+                pCdr->setTerminatingEdgeServerAddress("localhost") ;
 
+
+                pCdr = boost::make_shared<CdrInfo>(CdrInfo::origination_final_response );
+                pCdr->setUuid( uuid ) ;
+                pCdr->setSipStatus( 200 ) ;
+                pCdr->setTimeConnect( time(0) ) ;
+                m_cdrWriter->postCdr( pCdr ) ;   
+
+                pCdr = boost::make_shared<CdrInfo>(CdrInfo::call_cleared );
+                pCdr->setUuid( uuid ) ;
+                pCdr->setTimeEnd( time(0) ) ;
+                m_cdrWriter->postCdr( pCdr ) ;   
+            }
+            else {
+               pCdr = boost::make_shared<CdrInfo>(CdrInfo::origination_cancel );
+                pCdr->setUuid( uuid ) ;
+                pCdr->setTimeEnd( time(0) ) ;
+                m_cdrWriter->postCdr( pCdr ) ;                   
+            }
+ 
         }
 
     }
