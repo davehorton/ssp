@@ -245,11 +245,11 @@ namespace ssp {
 				strftime( szStartTime, 64, "%F %T", pGmtStartTime) ;
 			}
 			if( 0 != tmConnect ) {
-				pGmtConnectTime = gmtime( &tmStart ) ;
+				pGmtConnectTime = gmtime( &tmConnect ) ;
 				strftime( szConnectTime, 64, "%F %T", pGmtConnectTime) ;
 			}
 			if( 0 != tmEnd) {
-				pGmtEndTime = gmtime( &tmStart ) ;
+				pGmtEndTime = gmtime( &tmEnd ) ;
 				strftime( szEndTime, 64, "%F %T", pGmtEndTime) ;
 			}
 
@@ -295,6 +295,40 @@ namespace ssp {
 	}
 	void CdrWriter::writeOriginationFinalResponseCdr( boost::shared_ptr<CdrInfo> pCdr, boost::shared_ptr<sql::Connection> conn ) {
 		try {
+			static boost::thread_specific_ptr< sql::PreparedStatement > stmt ;
+			if( !stmt.get() ) {
+				stmt.reset( conn->prepareStatement("UPDATE cdr_session SET final_sip_status=?,connect_time=?,end_time=?,release_cause=? WHERE session_uuid=?") );
+			}
+			struct tm* pGmtConnectTime = NULL ;
+			struct tm* pGmtEndTime = NULL ;
+			time_t tmConnect = pCdr->getTimeConnect() ;
+			time_t tmEnd = pCdr->getTimeEnd() ;
+			char szConnectTime[64], szEndTime[64] ;
+
+			if( 0 != tmConnect ) {
+				pGmtConnectTime = gmtime( &tmConnect ) ;
+				strftime( szConnectTime, 64, "%F %T", pGmtConnectTime) ;
+			}
+			if( 0 != tmEnd) {
+				pGmtEndTime = gmtime( &tmEnd ) ;
+				strftime( szEndTime, 64, "%F %T", pGmtEndTime) ;
+			}
+
+			stmt->setInt(1, pCdr->getSipStatus() ) ;
+			if( 200 == pCdr->getSipStatus() ) {
+				stmt->setDateTime(2, szConnectTime) ;
+				stmt->setNull(3,sql::DataType::TIMESTAMP) ;
+				stmt->setInt(4, 0) ;
+			}
+			else {
+				stmt->setNull(2, sql::DataType::TIMESTAMP) ;
+				stmt->setDateTime(3, szEndTime) ;
+				stmt->setInt(4, (int32_t) CdrInfo::call_rejected_due_to_termination_carriers) ;
+			}
+			stmt->setString(4,pCdr->getUuid()) ;
+
+			int rows = stmt->executeUpdate();
+			assert( 1 == rows ) ;
 			
 		} catch (sql::SQLException &e) {
 				SSP_LOG(log_error) << "CdrWriter::writeOriginationFinalResponseCdr sql exception: " << e.what() << " mysql error code: " << e.getErrorCode() << ", sql state: " << e.getSQLState() << endl ;

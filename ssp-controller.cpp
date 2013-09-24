@@ -421,18 +421,26 @@ namespace ssp {
         }	
     }
     void SipLbController::runDbTest() {
-        string uuid ;
-        boost::shared_ptr<CdrInfo> pCdr = boost::make_shared<CdrInfo>(CdrInfo::origination_request) ;
-        this->generateUuid( uuid ) ;
-        pCdr->setUuid( uuid ) ;
-        pCdr->setTimeStart( time(0) ) ;
-        pCdr->setOriginatingCarrier( "carrierX" ) ;
-        pCdr->setOriginatingCarrierAddress( "carrierX-address") ;
-        pCdr->setALegCallId( "A-leg-callid" ) ;
-        pCdr->setOriginatingEdgeServerAddress( "localhost" ) ;
-        pCdr->setCalledPartyNumberIn( "did" ) ;
-        pCdr->setCallingPartyNumber( "cli" ) ;
-        m_cdrWriter->postCdr( pCdr ) ;
+        for( int i = 0; i < 100; i++ ) {
+            string uuid ;
+            boost::shared_ptr<CdrInfo> pCdr = boost::make_shared<CdrInfo>(CdrInfo::origination_request) ;
+            this->generateUuid( uuid ) ;
+            pCdr->setUuid( uuid ) ;
+            pCdr->setTimeStart( time(0) ) ;
+            pCdr->setOriginatingCarrier( "carrierX" ) ;
+            pCdr->setOriginatingCarrierAddress( "carrierX-address") ;
+            pCdr->setALegCallId( "A-leg-callid" ) ;
+            pCdr->setOriginatingEdgeServerAddress( "localhost" ) ;
+            pCdr->setCalledPartyNumberIn( "did" ) ;
+            pCdr->setCallingPartyNumber( "cli" ) ;
+            m_cdrWriter->postCdr( pCdr ) ;
+
+            pCdr->setCdrType( CdrInfo::origination_final_response ) ;
+            pCdr->setSipStatus( 503 ) ;
+            pCdr->setTimeEnd( time(0) ) ;
+            m_cdrWriter->postCdr( pCdr ) ;
+
+        }
 
     }
     void SipLbController::run() {
