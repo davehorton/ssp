@@ -1,6 +1,6 @@
 DROP TABLE IF EXISTS cdr_session ;
 DROP TABLE IF EXISTS termination_attempt ;
-DROP TRIGGER IF EXISTS after_insert_termination_attempt ;
+DROP TRIGGER IF EXISTS before_insert_termination_attempt ;
 
 CREATE TABLE cdr_session (
 	id SERIAL 
@@ -48,7 +48,7 @@ CREATE TABLE termination_attempt (
 	,final_sip_status smallint 
 	,sip_call_id varchar(64) NOT NULL
 	,terminating_carrier varchar(64)
-	,terminating_ip_address varchar(64)
+	,terminating_carrier_ip_address varchar(64)
 	,attempt_sequence tinyint
 	,PRIMARY KEY(id)
     ,CONSTRAINT FK_uuid_1 FOREIGN KEY (cdr_session_uuid)
@@ -57,7 +57,6 @@ CREATE TABLE termination_attempt (
 ) ;
 
 
- CREATE TRIGGER after_insert_termination_attempt after insert on termination_attempt 
- for each row  
- set @attempt_sequence = (select ifnull( max(attempt_sequence), 0) + 1 from termination_attempt where  cdr_session_uuid = NEW.cdr_session_uuid) ; 
-
+ CREATE TRIGGER before_insert_termination_attempt before insert on termination_attempt
+ for each row
+  set NEW.attempt_sequence = (select ifnull( max(attempt_sequence), 0) + 1 from termination_attempt where  cdr_session_uuid = NEW.cdr_session_uuid) ;

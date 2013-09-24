@@ -431,7 +431,7 @@ namespace ssp {
             pCdr->setOriginatingCarrierAddress( "carrierX-address") ;
             pCdr->setALegCallId( "A-leg-callid" ) ;
             pCdr->setBLegCallId( "B-leg-callid" ) ;
-            pCdr->setOriginatingEdgeServerAddress( "localhost" ) ;
+            pCdr->setOriginatingEdgeServerAddress( "localhost-orig-edge" ) ;
             pCdr->setCalledPartyNumberIn( "did" ) ;
             pCdr->setCallingPartyNumber( "cli" ) ;
             m_cdrWriter->postCdr( pCdr ) ;
@@ -446,7 +446,7 @@ namespace ssp {
                 pCdr->setDLegCallId("D-Leg-callid") ;
                 pCdr->setTerminatingCarrier("carrierY") ;
                 pCdr->setTerminatingCarrierAddress("carrierY-address") ;
-                pCdr->setTerminatingEdgeServerAddress("localhost") ;
+                pCdr->setTerminatingEdgeServerAddress("localhost-term-edge") ;
                 m_cdrWriter->postCdr( pCdr ) ;   
 
                 pCdr = boost::make_shared<CdrInfo>(CdrInfo::origination_final_response );

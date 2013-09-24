@@ -264,7 +264,7 @@ namespace ssp {
 			}
 
 			string strTimeStart, strTimeEnd ;
-			pCdr->getTimeStartFormatted( strTimeEnd ) ;
+			pCdr->getTimeStartFormatted( strTimeStart ) ;
 			pCdr->getTimeEndFormatted( strTimeEnd ) ;
 
 			stmt->setString(1, pCdr->getUuid());
@@ -277,7 +277,7 @@ namespace ssp {
 			stmt->setString(8, pCdr->getCalledPartyNumberIn()) ;
 			stmt->setString(9, pCdr->getALegCallId()) ;
 			if( pCdr->getBLegCallId().length() > 0 ) {
-				stmt->setString(10, pCdr->getALegCallId()) ;
+				stmt->setString(10, pCdr->getBLegCallId()) ;
 			}
 			else {
 				stmt->setNull(10, sql::DataType::VARCHAR) ;
@@ -377,7 +377,7 @@ namespace ssp {
 			}
 
 			string strTimeStart, strTimeConnect, strTimeEnd ;
-			pCdr->getTimeStartFormatted( strTimeEnd ) ;
+			pCdr->getTimeStartFormatted( strTimeStart ) ;
 			pCdr->getTimeConnectFormatted( strTimeConnect ) ;
 			pCdr->getTimeEndFormatted( strTimeEnd ) ;
 
@@ -413,7 +413,7 @@ namespace ssp {
 			stmt2->setString(5, pCdr->getDLegCallId()) ;
 			stmt2->setString(6, pCdr->getCustomerName()) ;
 			stmt2->setString(7, pCdr->getUuid()) ;
-			rows = stmt->executeUpdate();
+			rows = stmt2->executeUpdate();
 			assert( 1 == rows ) ;
 
 			
