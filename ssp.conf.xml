@@ -16,11 +16,12 @@
     </sip>
  
     <cdr>
-        <user>foo</user>
-        <password>bar</password>
-        <host>127.0.0.1</host>
+        <user>ssp</user>
+        <password>ssp</password>
+        <host>util02</host>
+        <schema>ssp</schema>
         <port>3306</port>
-        <num-threads>6</num-threads>
+        <num-threads>3</num-threads>
     </cdr>
 
    <!-- logging configuration -->
