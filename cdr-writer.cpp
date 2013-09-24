@@ -228,7 +228,7 @@ namespace ssp {
 			static boost::thread_specific_ptr< sql::PreparedStatement > stmt ;
 			if( !stmt.get() ) {
 				stmt.reset( conn->prepareStatement("INSERT INTO cdr_session "
-								"(session_uuid,start_time,originating_carrier,originating_carrier_ip_address,originating_edge_server_ip_address"
+								"(session_uuid,start_time,originating_carrier,originating_carrier_ip_address,originating_edge_server_ip_address,"
 								"fs_ip_address,calling_party_number,called_party_number_in,a_leg_sip_call_id,b_leg_sip_call_id,final_sip_status,release_cause,end_time) "
 								"VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)" ) ) ;
 			}
@@ -274,12 +274,7 @@ namespace ssp {
 			else {
 				stmt->setNull(11, sql::DataType::SMALLINT) ;
 			}
-			if( pCdr->getSipStatus() > 0 ) {
-				stmt->setInt(12, (int32_t) pCdr->getReleaseCause() ) ;
-			}
-			else {
-				stmt->setNull(12, sql::DataType::SMALLINT) ;
-			}
+			stmt->setInt(12, (int32_t) pCdr->getReleaseCause() ) ;
 			if( 0 != tmEnd ) {
 				stmt->setDateTime(13, szEndTime ) ;
 			}
