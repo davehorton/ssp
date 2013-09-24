@@ -120,11 +120,11 @@ namespace ssp {
 	private:
 		void worker_thread() ;
 		void writeCdr( boost::shared_ptr<CdrInfo> pCdr ) ;
-		void writeOriginationRequestCdr( boost::shared_ptr<CdrInfo> pCdr, sql::Connection* pConn  ) ;
+		void writeOriginationRequestCdr( boost::shared_ptr<CdrInfo> pCdr, sql::Connection* pConn   ) ;
 		void writeOriginationFinalResponseCdr( boost::shared_ptr<CdrInfo> pCdr, sql::Connection* pConn  ) ;
 		void writeOriginationCancelCdr( boost::shared_ptr<CdrInfo> pCdr, sql::Connection* pConn  ) ;
-		void writeTerminationAttemptCdr( boost::shared_ptr<CdrInfo> pCdr, sql::Connection* pConn  ) ;
-		void writeByeCdr( boost::shared_ptr<CdrInfo> pCdr, sql::Connection* pConn  ) ;
+		void writeTerminationAttemptCdr( boost::shared_ptr<CdrInfo> pCdr,  sql::Connection* pConn  ) ;
+		void writeByeCdr( boost::shared_ptr<CdrInfo> pCdr,  sql::Connection* pConn   ) ;
 
 		boost::asio::io_service m_io_service;
 		boost::shared_ptr<boost::asio::io_service::work> m_pWork;

@@ -134,7 +134,17 @@ namespace ssp {
 				return ;
 			}
 		}
-		m_io_service.run() ;
+		try {
+			m_io_service.run() ;
+		} catch (sql::SQLException &e) {
+			SSP_LOG(log_error) << "CdrWriter::worker_thread sql exception: " << e.what() << " mysql error code: " << e.getErrorCode() << ", sql state: " << e.getSQLState() << endl ;
+		} catch (std::runtime_error &e) {
+			SSP_LOG(log_error) << "CdrWriter::worker_thread runtime exception: " << e.what() << endl ;
+		} catch( ... ) {
+			SSP_LOG(log_error) << "CdrWriter::worker_thread uncaught exception " << endl ;
+		}		
+		m_pDriver->threadEnd() ;
+
 	}
 	void CdrWriter::postCdr( boost::shared_ptr<CdrInfo> pCdr ) {
 		m_io_service.post( boost::bind( &CdrWriter::writeCdr, this, pCdr ) ) ;
@@ -146,26 +156,27 @@ namespace ssp {
 				conn.reset( m_pDriver->connect( m_dbUrl, m_user, m_password ) ) ;
 			}
 
-			if( !conn.get() ) {
+			sql::Connection* pConn = conn.get() ;
+			if( NULL == pConn ) {
 				SSP_LOG(log_error) << "CdrWriter: unable to write cdr due to failure connecting to database" << endl ;
 				return ;
 			}
-
-			switch( pCdr->getCdrType() ) {
+			CdrInfo::CdrEvent_t type =  pCdr->getCdrType() ;
+			switch( type ) {
 				case CdrInfo::origination_request:
-					this->writeOriginationRequestCdr( pCdr, conn.get() ) ;
+					this->writeOriginationRequestCdr( pCdr, pConn ) ;
 				break ;
 				case CdrInfo::origination_final_response:
-					this->writeOriginationFinalResponseCdr( pCdr, conn.get() ) ;
+					this->writeOriginationFinalResponseCdr( pCdr, pConn ) ;
 				break ;
 				case CdrInfo::origination_cancel:
-					this->writeOriginationCancelCdr( pCdr, conn.get() ) ;
+					this->writeOriginationCancelCdr( pCdr, pConn ) ;
 				break ;
 				case CdrInfo::termination_attempt:
-					this->writeTerminationAttemptCdr( pCdr, conn.get() ) ;
+					this->writeTerminationAttemptCdr( pCdr, pConn ) ;
 				break ;
 				case CdrInfo::call_cleared:
-					this->writeByeCdr( pCdr, conn.get() ) ;
+					this->writeByeCdr( pCdr, pConn) ;
 				break ;
 				default:
 				break ;
@@ -251,7 +262,7 @@ namespace ssp {
 				SSP_LOG(log_error) << "CdrWriter::writeOriginationRequestCdr runtime exception: " << e.what() << endl ;
 		}
 	}
-	void CdrWriter::writeOriginationFinalResponseCdr( boost::shared_ptr<CdrInfo> pCdr, sql::Connection* pConn  ) {
+	void CdrWriter::writeOriginationFinalResponseCdr( boost::shared_ptr<CdrInfo> pCdr, sql::Connection* pConn ) {
 		try {
 			
 		} catch (sql::SQLException &e) {
@@ -271,7 +282,7 @@ namespace ssp {
 		}
 
 	}
-	void CdrWriter::writeTerminationAttemptCdr( boost::shared_ptr<CdrInfo> pCdr, sql::Connection* pConn  ) {
+	void CdrWriter::writeTerminationAttemptCdr( boost::shared_ptr<CdrInfo> pCdr,  sql::Connection* pConn ) {
 		try {
 			
 		} catch (sql::SQLException &e) {
@@ -281,7 +292,7 @@ namespace ssp {
 		}
 
 	}
-	void CdrWriter::writeByeCdr( boost::shared_ptr<CdrInfo> pCdr, sql::Connection* pConn  ) {
+	void CdrWriter::writeByeCdr( boost::shared_ptr<CdrInfo> pCdr, sql::Connection* pConn ) {
 		try {
 			
 		} catch (sql::SQLException &e) {
