@@ -25,6 +25,9 @@
 #include <boost/log/sinks/text_ostream_backend.hpp>
 #include <boost/log/attributes/scoped_attribute.hpp>
 
+#include <boost/uuid/uuid.hpp>            // uuid class
+#include <boost/uuid/uuid_generators.hpp> // generators
+#include <boost/uuid/uuid_io.hpp>         // streaming operato
 namespace ssp {
     class SipLbController ;
 }
@@ -44,6 +47,8 @@ namespace ssp {
 #define DEFAULT_CONFIG_FILENAME "/etc/ssp.conf.xml"
 
 #define MAXLOGLEN (8192)
+
+#define X_SESSION_UUID "X-session-uuid"
 
 /* from sofia */
 #define MSG_SEPARATOR \
@@ -180,7 +185,7 @@ namespace ssp {
 
 
     SipLbController::SipLbController( int argc, char* argv[] ) : m_bDaemonize(false), m_bLoggingInitialized(false),
-        m_configFilename(DEFAULT_CONFIG_FILENAME), m_bInbound(false), m_bOutbound(false), m_nIterationCount(-1), m_nTerminationRetries(0) {
+        m_configFilename(DEFAULT_CONFIG_FILENAME), m_bInbound(false), m_bOutbound(false), m_nIterationCount(-1), m_nTerminationRetries(0), m_bDbTest(false) {
         
         if( !parseCmdArgs( argc, argv ) ) {
             usage() ;
@@ -231,8 +236,6 @@ namespace ssp {
         else {
             SSP_LOG(log_error) << "Ignoring signal; already have a new configuration file to install" << endl ;
         }
-        
-    
     }
 
     bool SipLbController::parseCmdArgs( int argc, char* argv[] ) {        
@@ -243,6 +246,7 @@ namespace ssp {
             {
                 /* These options set a flag. */
                 {"daemon", no_argument,       &m_bDaemonize, true},
+                {"dbtest", no_argument,       &m_bDbTest, true},
                 
                 /* These options don't set a flag.
                  We distinguish them by their indices. */
@@ -306,7 +310,7 @@ namespace ssp {
     }
 
     void SipLbController::usage() {
-        cout << "ssp -f <filename> [--inbound|--outbound] [--nc]" << endl ;
+        cout << "ssp -f <filename> [--daemon]" << endl ;
     }
 
     void SipLbController::daemonize() {
@@ -416,7 +420,21 @@ namespace ssp {
             throw e;
         }	
     }
+    void SipLbController::runDbTest() {
+        string uuid ;
+        boost::shared_ptr<CdrInfo> pCdr = boost::make_shared<CdrInfo>(CdrInfo::origination_request) ;
+        this->generateUuid( uuid ) ;
+        pCdr->setUuid( uuid ) ;
+        pCdr->setTimeStart( time(0) ) ;
+        pCdr->setOriginatingCarrier( "carrierX" ) ;
+        pCdr->setOriginatingCarrierAddress( "carrierX-address") ;
+        pCdr->setALegCallId( "A-leg-callid" ) ;
+        pCdr->setOriginatingEdgeServerAddress( string(m_my_contact->m_url[0].url_host, strlen(m_my_contact->m_url[0].url_host) ) ) ;
+        pCdr->setCalledPartyNumberIn( "did" ) ;
+        pCdr->setCallingPartyNumber( "cli" ) ;
+        m_cdrWriter->postCdr( pCdr ) ;
 
+    }
     void SipLbController::run() {
         
         if( m_bDaemonize ) {
@@ -434,6 +452,16 @@ namespace ssp {
             m_stats.reset( new NagiosConnector( statsAddress, statsPort )) ;
         }
 
+        /* create the cdr writer */
+        string user, pass, dbUrl ;
+        unsigned int poolsize ;
+        if( m_Config->getCdrConnectInfo( user, pass, dbUrl, poolsize ) ) {
+            m_cdrWriter.reset( new CdrWriter(dbUrl, user, pass, poolsize) ) ;           
+        }
+        if( m_bDbTest ) {
+            this->runDbTest() ;
+            return ;
+        }
         
         string url ;
         m_Config->getSipUrl( url ) ;
@@ -889,13 +917,16 @@ namespace ssp {
         return 0 ;
     }
     int SipLbController::processOriginationRequest( nta_incoming_t* irq, sip_t const *sip, const string& carrier) {
-        
+        boost::shared_ptr<CdrInfo> pCdr = boost::make_shared<CdrInfo>(CdrInfo::origination_request) ;
+        this->populateOriginationCdr( pCdr, sip, carrier ) ;
+
         /* select a freeswitch server */
-        string strCallId( sip->sip_call_id->i_id, strlen(sip->sip_call_id->i_id) ) ;
         deque< boost::shared_ptr<FsInstance> > servers ;
         if( !m_fsMonitor.getAvailableServers( servers ) ) {
-            SSP_LOG(log_error) << "No available server for incoming call; returning to carrier for busy handling " << strCallId << endl ;
-            return 486 ;
+            SSP_LOG(log_error) << "No available server for incoming call; returning to carrier for busy handling " << pCdr->getALegCallId() << endl ;
+            pCdr->setSipStatus( 486 ) ;
+            if( m_cdrWriter ) m_cdrWriter->postCdr( pCdr ) ;
+            return pCdr->getSipStatus() ;
         }
         
         
@@ -919,7 +950,9 @@ namespace ssp {
                                            TAG_END());
         if( NULL == a_leg ) {
             SSP_LOG(log_error) << "Error creating a leg for  origination" << endl ;
-            return 503 ;
+            pCdr->setSipStatus( 503 ) ;
+            if( m_cdrWriter ) m_cdrWriter->postCdr( pCdr ) ;
+            return pCdr->getSipStatus() ;
         }
         nta_leg_server_route( a_leg, sip->sip_record_route, sip->sip_contact ) ;
         
@@ -944,49 +977,60 @@ namespace ssp {
         if( NULL == b_leg ) {
             SSP_LOG(log_error) << "Error creating b leg for origination" << endl ;
             nta_leg_destroy(a_leg) ;
-            return 503 ;
+            pCdr->setSipStatus( 503 ) ;
+            if( m_cdrWriter ) m_cdrWriter->postCdr( pCdr ) ;
+            return pCdr->getSipStatus() ;
         }
         
         nta_leg_tag( b_leg, NULL ) ;
         SSP_LOG(log_debug) << "outgoing leg " << b_leg << endl ;
         
-        std::stringstream carrierString ;
-        carrierString << "X-Originating-Carrier: " ;
-        carrierString << (carrier.empty() ? "unknown": carrier);
+        stringstream carrierString ;
+        carrierString << "X-Originating-Carrier: " << (carrier.empty() ? "unknown": carrier);
         
-        std::stringstream carrierTrunk ;
-        carrierTrunk << "X-Originating-Carrier-IP: " ;
-        carrierTrunk << sip->sip_contact->m_url[0].url_host;
+        stringstream carrierTrunk ;
+        carrierTrunk << "X-Originating-Carrier-IP: " << sip->sip_contact->m_url[0].url_host;
+
+        stringstream xuuid ;
+        xuuid << X_SESSION_UUID << ": " << pCdr->getUuid() ;
         
         /* send the outbound INVITE */
         nta_outgoing_t* orq = nta_outgoing_tcreate(b_leg, response_to_invite, this,
-                                                   NULL,
-                                                   SIP_METHOD_INVITE,
-                                                   URL_STRING_MAKE(str),
-                                                   SIPTAG_CONTACT_STR(contactStr.c_str()),
-                                                   SIPTAG_CONTENT_TYPE(sip->sip_content_type),
-                                                   SIPTAG_CONTENT_DISPOSITION(sip->sip_content_disposition),
-                                                   SIPTAG_CONTENT_LENGTH(sip->sip_content_length),
-                                                   SIPTAG_PAYLOAD(sip->sip_payload),
-                                                   SIPTAG_SUPPORTED(sip->sip_supported),
-                                                   SIPTAG_SUBJECT(sip->sip_subject),
-                                                   SIPTAG_UNSUPPORTED(sip->sip_unsupported),
-                                                   SIPTAG_REQUIRE(sip->sip_require),
-                                                   SIPTAG_USER_AGENT(sip->sip_user_agent),
-                                                   SIPTAG_ALLOW(sip->sip_allow),
-                                                   SIPTAG_PRIVACY(sip->sip_privacy),
-                                                   SIPTAG_SESSION_EXPIRES(sip->sip_session_expires),
-                                                   SIPTAG_P_ASSERTED_IDENTITY(sip_p_asserted_identity( sip )),
-                                                   SIPTAG_UNKNOWN(sip_unknown(sip)),
-                                                   SIPTAG_UNKNOWN_STR(carrierString.str().c_str()),
-                                                   SIPTAG_UNKNOWN_STR(carrierTrunk.str().c_str()),
-                                                   TAG_END());
+                                                    NULL,
+                                                    SIP_METHOD_INVITE,
+                                                    URL_STRING_MAKE(str),
+                                                    SIPTAG_CONTACT_STR(contactStr.c_str()),
+                                                    SIPTAG_CONTENT_TYPE(sip->sip_content_type),
+                                                    SIPTAG_CONTENT_DISPOSITION(sip->sip_content_disposition),
+                                                    SIPTAG_CONTENT_LENGTH(sip->sip_content_length),
+                                                    SIPTAG_PAYLOAD(sip->sip_payload),
+                                                    SIPTAG_SUPPORTED(sip->sip_supported),
+                                                    SIPTAG_SUBJECT(sip->sip_subject),
+                                                    SIPTAG_UNSUPPORTED(sip->sip_unsupported),
+                                                    SIPTAG_REQUIRE(sip->sip_require),
+                                                    SIPTAG_USER_AGENT(sip->sip_user_agent),
+                                                    SIPTAG_ALLOW(sip->sip_allow),
+                                                    SIPTAG_PRIVACY(sip->sip_privacy),
+                                                    SIPTAG_SESSION_EXPIRES(sip->sip_session_expires),
+                                                    SIPTAG_P_ASSERTED_IDENTITY(sip_p_asserted_identity( sip )),
+                                                    SIPTAG_UNKNOWN(sip_unknown(sip)),
+                                                    SIPTAG_UNKNOWN_STR(carrierString.str().c_str()),
+                                                    SIPTAG_UNKNOWN_STR(carrierTrunk.str().c_str()),
+                                                    SIPTAG_UNKNOWN_STR(xuuid.str().c_str()),
+                                                    TAG_END());
         if( NULL == orq ) {
             SSP_LOG(log_error) << "Error creating outgoing transaction for origination" << endl ;
             nta_leg_destroy(a_leg) ;
             nta_leg_destroy(b_leg) ;
-            return 503 ;
+            pCdr->setSipStatus( 503 ) ;
+            if( m_cdrWriter ) m_cdrWriter->postCdr( pCdr ) ;
+            return pCdr->getSipStatus() ;
         }
+
+        sip_t* invite = sip_object( nta_outgoing_getrequest(orq) ) ;
+
+        pCdr->setFsAddress( server->getSipAddress() ) ;
+        pCdr->setBLegCallId( string( invite->sip_call_id->i_id, strlen(invite->sip_call_id->i_id) ) ) ;
         
         /* set a session timer, if configured and supported by remote (note: currently we only support the remote leg acting as refresher) */
         unsigned long nSessionTimer = 0 ;
@@ -997,10 +1041,13 @@ namespace ssp {
 
         /* save information about the a leg so we can respond to re-INVITEs from the origination carrier */
         boost::shared_ptr<SipDialogInfo> p = boost::make_shared<SipDialogInfo>( a_leg, true, nSessionTimer ) ;
+        p->setCdrInfo( pCdr ) ;
         m_mapDialogInfo.insert( mapDialogInfo::value_type( a_leg, p ) ) ;
 
         this->addTransactions( irq, orq) ;
         this->addDialogs( a_leg, b_leg ) ;
+        
+        if( m_cdrWriter ) m_cdrWriter->postCdr( pCdr ) ;
         
         return 0 ;
         
@@ -1008,13 +1055,20 @@ namespace ssp {
     int SipLbController::processTerminationRequest( nta_incoming_t* irq, sip_t const *sip) {
         string terminationSipAddress, carrier, chargeNumber ;
         unsigned int terminationSipPort ;
-        
+        boost::shared_ptr<CdrInfo> pCdr = boost::make_shared<CdrInfo>(CdrInfo::termination_attempt) ;
         string strCallId( sip->sip_call_id->i_id, strlen(sip->sip_call_id->i_id) ) ;
+        string uuid ;
         
         if( !m_Config->getTerminationRoute( terminationSipAddress, carrier, chargeNumber) ) {
             SSP_LOG(log_error) << "No termination providers configured" << endl ;
             return 480 ;
         }
+
+       if( !this->findCustomHeaderValue( sip, X_SESSION_UUID, uuid) ) {
+            SSP_LOG(log_error) << "No " << X_SESSION_UUID << " header found on termination request; cdrs will be impaired: call-id " << strCallId << endl ;
+        }
+
+        this->populateTerminationCdr( pCdr, sip, carrier, uuid ) ;
 
         ostringstream dest ;
         dest << "sip:" << sip->sip_to->a_url[0].url_user << "@" << terminationSipAddress ;
@@ -1054,6 +1108,7 @@ namespace ssp {
         }
         
         boost::shared_ptr<TerminationAttempt> t = boost::make_shared<TerminationAttempt>(url, sip, fromStr, toStr, contactStr, chargeInfoHeader.str(), carrier, terminationSipAddress ) ;
+        t->setCdrInfo( pCdr ) ;
         nta_outgoing_t* orq ;
         nta_leg_t* b_leg ;
         if( !this->generateTerminationRequest( t, irq, orq, b_leg ) ) {
@@ -1120,6 +1175,11 @@ namespace ssp {
             nta_leg_destroy(b_leg) ;
             return false ;            
         }
+        sip_t* invite = sip_object( nta_outgoing_getrequest(orq) ) ;
+        t->getCdrInfo()->setDLegCallId( string( invite->sip_call_id->i_id, strlen(invite->sip_call_id->i_id) ) ) ;
+
+
+
         mapTrunkStats::iterator it = m_mapTrunkStats.find( t->getSipTrunk() ) ;
         if( m_mapTrunkStats.end() != it ) {
             boost::shared_ptr<TrunkStats> tr = it->second ;
@@ -1142,7 +1202,10 @@ namespace ssp {
         bool bDestroyLegs = false ;
         bool bProxyResponse = true ;
         bool bSessionTimer = false ;
+        bool bTermination = false ;
         ostringstream ostrSessionTimer ;
+        boost::shared_ptr<CdrInfo> pCdr ;
+        boost::shared_ptr<SipDialogInfo> pDialog ;
         
         nta_incoming_t* irq = this->getAssociatedTransaction( orq) ;
         if( NULL == irq ) {
@@ -1157,9 +1220,29 @@ namespace ssp {
             assert(false );
             return 0 ;
         }
-        
+        nta_leg_t* a_leg = this->getLegFromTransaction( irq ) ;
+        if( NULL == a_leg ) {
+            SSP_LOG(log_error) << "Received INVITE response on B leg but unable to retrieve associated A leg" << endl ;
+            assert(false) ;
+            return 0 ;
+        }
+          
         int status = sip->sip_status->st_status ;
-
+        mapTerminationAttempts::iterator it = m_mapTerminationAttempts.find( orq ) ;
+        if( m_mapTerminationAttempts.end() != it ) {
+            bTermination = true ;
+            boost::shared_ptr<TerminationAttempt> t = it->second ;
+            pCdr = t->getCdrInfo() ;
+        }
+        else {
+            mapDialogInfo::iterator it = m_mapDialogInfo.find( a_leg ) ;
+            if( m_mapDialogInfo.end() != it ) {
+                pDialog = it->second ;
+                pCdr = pDialog->getCdrInfo() ;
+            }
+        }
+        assert( pCdr ) ;
+ 
         if( 100 == status ) {
             bProxyResponse= false ;
         }
@@ -1169,8 +1252,7 @@ namespace ssp {
 
             /* log and report failures */
             if( status >= 400 && status <= 700 ) {
-                mapTerminationAttempts::iterator it = m_mapTerminationAttempts.find( orq ) ;
-                if( m_mapTerminationAttempts.end() != it ) {
+                if( bTermination ) {
                     boost::shared_ptr<TerminationAttempt> t = it->second ;
                     mapTrunkStats::iterator it = m_mapTrunkStats.find( t->getSipTrunk() ) ;
                     if( m_mapTrunkStats.end() != it ) {
@@ -1179,8 +1261,7 @@ namespace ssp {
                     }
                     
                     SSP_LOG(log_error) << "Failure connecting outbound leg through sip gateway: " << t->getSipTrunk() << " (" << t->getCarrier() << ") status code: " << status << endl ;
-                }
-                
+                }             
             }
             
             if( 200 == status ) {
@@ -1196,21 +1277,17 @@ namespace ssp {
                 nta_outgoing_destroy( ack_request ) ;
                 
                 /* check if we want to set a session timer on this leg */
-                nta_leg_t* a_leg = this->getLegFromTransaction( irq ) ;
-                assert( a_leg ) ;
-                mapDialogInfo::iterator it = m_mapDialogInfo.find( a_leg ) ;
-                if( m_mapDialogInfo.end() != it ) {
-                    boost::shared_ptr<SipDialogInfo> p = it->second ;
-                    p->setLocalSdp( sip->sip_payload->pl_data, sip->sip_payload->pl_len ) ;
-                    if( p->getSessionTimerSecs() > 0 ) {
+                if( pDialog) {
+                    pDialog->setLocalSdp( sip->sip_payload->pl_data, sip->sip_payload->pl_len ) ;
+                    if( pDialog->getSessionTimerSecs() > 0 ) {
                         bSessionTimer = true ;
-                        su_timer_t*  t = su_timer_create( su_root_task(m_root), p->getSessionTimerSecs() * 1000) ;
+                        su_timer_t*  t = su_timer_create( su_root_task(m_root), pDialog->getSessionTimerSecs() * 1000) ;
                         if( NULL == t ) {
                             SSP_LOG(log_error) << "Error setting Session-Expires timer" << endl ;
                         }
                         else {
-                            ostrSessionTimer <<  p->getSessionTimerSecs() ;
-                            p->setSessionTimerTimer( t ) ;
+                            ostrSessionTimer <<  pDialog->getSessionTimerSecs() ;
+                            pDialog->setSessionTimerTimer( t ) ;
                             su_timer_set(t, sessionTimerHandler, a_leg ) ;
                         }
                    }
@@ -1218,8 +1295,7 @@ namespace ssp {
                                 
             }
             else if( status >= 300 && status <= 399 ) {
-                mapTerminationAttempts::iterator it = m_mapTerminationAttempts.find( orq ) ;
-                if( m_mapTerminationAttempts.end() != it ) {
+                if( bTermination) {
                     boost::shared_ptr<TerminationAttempt> t = it->second ;
 
                     ostringstream dest ;
@@ -1246,8 +1322,7 @@ namespace ssp {
             else if( 503 == status || 480 == status ) {
                 
                 /* crank back to the next route, if there is a next route */
-                mapTerminationAttempts::iterator it = m_mapTerminationAttempts.find( orq ) ;
-                if( m_mapTerminationAttempts.end() != it ) {
+                if( bTermination ) {
                     boost::shared_ptr<TerminationAttempt> t = it->second ;
                     unsigned int nAttempt = t->getAttemptCount() ;
                     if( nAttempt < m_nTerminationRetries - 1 ) {
@@ -1283,8 +1358,7 @@ namespace ssp {
             
             if( status >= 200 ) {
                 /* retrieve terminating carrier information so we can provide a custom header back to freeswitch with that information */
-                mapTerminationAttempts::iterator it = m_mapTerminationAttempts.find( orq ) ;
-                if( m_mapTerminationAttempts.end() != it ) {
+                 if( bTermination ) {
                     boost::shared_ptr<TerminationAttempt> t = it->second ;
                     bHaveCarrierInfo = true ;
                     carrierString << "X-Terminating-Carrier: " << t->getCarrier() ;
@@ -1317,6 +1391,16 @@ namespace ssp {
             this->clearDialog( outgoing_leg ) ;
         }
 
+        if( status >= 200 && 487 != status && !bTermination && pCdr ) {
+            pCdr->setCdrType( CdrInfo::origination_final_response ) ;
+            populateFinalResponseCdr( pCdr, status ) ;
+            if( m_cdrWriter ) m_cdrWriter->postCdr( pCdr ) ;
+        }
+        else if( status >= 200 && bTermination && pCdr ) {
+            populateFinalResponseCdr( pCdr, status ) ;
+            if( m_cdrWriter ) m_cdrWriter->postCdr( pCdr ) ;
+        }
+
         return 0 ;
     }
     int SipLbController::processAckOrCancel( nta_incoming_t* irq, sip_t const *sip ) {
@@ -1338,6 +1422,14 @@ namespace ssp {
                 SSP_LOG(log_error) << "Received CANCEL from A but leg has already terminated" << endl ;
                 return 481 ;
             }
+            mapDialogInfo::iterator it = m_mapDialogInfo.find( leg ) ;
+            if( m_mapDialogInfo.end() != it ) {
+                boost::shared_ptr<SipDialogInfo>pDialog = it->second ;
+                boost::shared_ptr<CdrInfo> pCdr = pDialog->getCdrInfo() ;
+                this->populateCancelCdr( pCdr ) ;
+                if( m_cdrWriter ) m_cdrWriter->postCdr( pCdr ) ;
+            }
+
             nta_outgoing_cancel( orq ) ;
             nta_outgoing_destroy( orq ) ;
             this->clearTransaction( orq ) ;
@@ -1367,12 +1459,30 @@ namespace ssp {
                                                                SIP_METHOD_BYE,
                                                                NULL,
                                                                TAG_END() ) ;
-                    nta_outgoing_destroy(bye) ;                    
-                }
+                    nta_outgoing_destroy(bye) ;   
+
+                    /* close out the cdr for this call */
+                    boost::shared_ptr<SipDialogInfo>pDialog ;
+                    mapDialogInfo::iterator it = m_mapDialogInfo.find( leg ) ;
+                    if( m_mapDialogInfo.end() != it && it->second->isOrigination() ) {
+                        pDialog = it->second ;
+                        this->populateByeCdr( pDialog->getCdrInfo(), true ) ;
+                    }
+                    else {
+                        it = m_mapDialogInfo.find( other ) ;
+                        if( m_mapDialogInfo.end() != it && it->second->isOrigination() ) {
+                            pDialog = it->second ;
+                            this->populateByeCdr( pDialog->getCdrInfo(), false ) ;
+                        }
+                    }
+                    if( pDialog && m_cdrWriter ) m_cdrWriter->postCdr( pDialog->getCdrInfo() );
+                 }
                 
+
                 
                 this->clearDialog( leg ) ;
                 nta_incoming_destroy( irq ) ;
+
                return 200 ;
             }
             case sip_method_ack:
@@ -1615,8 +1725,70 @@ namespace ssp {
         return true ;
         
     }
-    
-   void SipLbController::logAgentStats() {
+    void SipLbController::generateUuid(string& uuid) {
+        boost::uuids::uuid id = boost::uuids::random_generator()();
+        uuid = boost::lexical_cast<std::string>(id) ;
+    }
+    bool SipLbController::findCustomHeaderValue( sip_t const *sip, const char* szHeaderName, string& strHeaderValue ) {
+        sip_unknown_t * hdr = sip_unknown(sip) ;
+        while( NULL != hdr ) {
+            if( 0 == strcmp(szHeaderName, hdr->un_name ) ) {
+                strHeaderValue.assign( hdr->un_value, strlen(hdr->un_value)) ;
+                return true ;
+            }
+            hdr = hdr->un_next ;
+        }
+        return false ;
+
+    }
+    void SipLbController::populateOriginationCdr( boost::shared_ptr<CdrInfo> pCdr, sip_t const *sip, const string& carrier ) {
+        string uuid ;
+
+        this->generateUuid( uuid ) ;
+
+        pCdr->setUuid( uuid ) ;
+        pCdr->setTimeStart( time(0) ) ;
+        pCdr->setOriginatingCarrier( carrier ) ;
+        pCdr->setOriginatingCarrierAddress( string( sip->sip_contact->m_url[0].url_host, strlen(sip->sip_contact->m_url[0].url_host) ) ) ;
+        pCdr->setALegCallId( string( sip->sip_call_id->i_id, strlen( sip->sip_call_id->i_id ) ) ) ;
+        pCdr->setOriginatingEdgeServerAddress( string(m_my_contact->m_url[0].url_host, strlen(m_my_contact->m_url[0].url_host) ) ) ;
+        pCdr->setCalledPartyNumberIn( string( sip->sip_to->a_url[0].url_user, strlen(sip->sip_to->a_url[0].url_user) ) ) ;
+        pCdr->setCallingPartyNumber( string( sip->sip_from->a_url[0].url_user, strlen(sip->sip_to->a_url[0].url_user) ) ) ;
+        if( 0 != pCdr->getSipStatus() ) {
+            pCdr->setReleaseCause( CdrInfo::call_rejected_due_to_system_error ) ;
+        }
+
+    }
+    void SipLbController::populateTerminationCdr( boost::shared_ptr<CdrInfo> pCdr, sip_t const *sip, const string& carrier, const string& uuid ) {
+        pCdr->setUuid( uuid ) ;
+        pCdr->setTimeStart( time(0) ) ;
+        pCdr->setTerminatingCarrier( carrier ) ;
+        pCdr->setTerminatingCarrierAddress( string( sip->sip_contact->m_url[0].url_host, strlen(sip->sip_contact->m_url[0].url_host) ) ) ;
+        pCdr->setCLegCallId( string( sip->sip_call_id->i_id, strlen( sip->sip_call_id->i_id ) ) ) ;
+        pCdr->setTerminatingEdgeServerAddress( string(m_my_contact->m_url[0].url_host, strlen(m_my_contact->m_url[0].url_host) ) ) ;
+        pCdr->setCalledPartyNumberOut( string( sip->sip_to->a_url[0].url_user, strlen(sip->sip_to->a_url[0].url_user) ) ) ;
+    }
+    void SipLbController::populateFinalResponseCdr( boost::shared_ptr<CdrInfo> pCdr, unsigned int status ) {
+        pCdr->setSipStatus( status ) ;
+        if( 200 == status ) {
+            pCdr->setTimeConnect( time(0) ) ;
+        }
+        else {
+            pCdr->setTimeEnd( time(0) ) ;
+            pCdr->setReleaseCause( CdrInfo::call_rejected_due_to_termination_carriers ) ;
+        }
+    }
+    void SipLbController::populateCancelCdr( boost::shared_ptr<CdrInfo> pCdr )  {
+        pCdr->setCdrType( CdrInfo::origination_cancel ) ;
+        pCdr->setTimeEnd( time(0) ) ;
+        pCdr->setReleaseCause( CdrInfo::call_canceled ) ;
+    }    
+    void SipLbController::populateByeCdr( boost::shared_ptr<CdrInfo> pCdr, bool callingPartyRelease )  {
+        pCdr->setCdrType( CdrInfo::call_cleared ) ;
+        pCdr->setReleaseCause( callingPartyRelease ? CdrInfo::calling_party_release : CdrInfo::called_party_release ) ;
+        pCdr->setTimeEnd( time(0) ) ;
+    }    
+    void SipLbController::logAgentStats() {
        usize_t irq_hash = -1, orq_hash = -1, leg_hash = -1;
        usize_t irq_used = -1, orq_used = -1, leg_used = -1 ;
        usize_t recv_msg = -1, sent_msg = -1;

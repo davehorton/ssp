@@ -48,6 +48,7 @@ namespace ssp {
         severity_levels getLoglevel() ;
         
         unsigned int getStatsPort( string& address ) ;
+        bool getCdrConnectInfo( string& user, string& pass, string& dbUrl, unsigned int& poolsize ) ;
         
         void Log() const ;
         

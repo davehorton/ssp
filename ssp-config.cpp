@@ -277,6 +277,13 @@ namespace ssp {
                 else if( 0 == loglevel.compare("debug") ) m_loglevel = log_debug ;
                 else m_loglevel = log_info ;
                 
+                /* cdr database configuration */
+                m_cdrUser = pt.get<string>("ssp.cdr.user","");
+                m_cdrPassword = pt.get<string>("ssp.cdr.pasword","");
+                m_cdrHost = pt.get<string>("ssp.cdr.host","");
+                m_cdrPort = pt.get<string>("ssp.cdr.port","3306");
+                m_poolsize = pt.get<unsigned int>("ssp.cdr.num-threads",1);
+
                 /* sip configuration */
                 m_sipUrl = pt.get<string>("ssp.sip.contact", "sip:*") ;
                 
@@ -571,6 +578,16 @@ namespace ssp {
             address = m_statsAddress ;
             return m_statsPort ;
         }
+        bool getCdrConnectInfo( string& user, string& pass, string& dbUrl, unsigned int& poolsize ) {
+            if( 0 == m_cdrHost.length() || 0 == m_cdrUser.length() || 0 == m_cdrPassword.length() ) return false ;
+
+            user = m_cdrUser ;
+            pass = m_cdrPassword ;
+            ostringstream s ;
+            s << "tcp://" << m_cdrHost << ":" << m_cdrPort ;
+            dbUrl = s.str() ;
+            poolsize = m_poolsize ;
+        }
 
     private:
         
@@ -611,6 +628,11 @@ namespace ssp {
         severity_levels m_loglevel ;
         string m_statsAddress ;
         unsigned int m_statsPort ;
+        string m_cdrUser ;
+        string m_cdrPassword ;
+        string m_cdrHost ;
+        string m_cdrPort ;
+        unsigned int m_poolsize ;
     } ;
     
     /*
@@ -680,7 +702,9 @@ namespace ssp {
     unsigned long SspConfig::getFSHealthCheckTimerTimeMsecs(void) {
         return m_pimpl->getFSHealthCheckTimerTimeMsecs() ;
     }
-
+    bool SspConfig::getCdrConnectInfo( string& user, string& pass, string& dbUrl, unsigned int& poolsize ) {
+        return m_pimpl->getCdrConnectInfo( user, pass, dbUrl, poolsize ) ;
+    } 
     void SspConfig::Log() const {
         SSP_LOG(log_notice) << "Configuration:" << endl ;
     }

@@ -14,6 +14,27 @@
         <!-- 'stateless' or 'stateful'.  Default: 'stateless' -->
         <agent-mode>stateful</agent-mode>
     </sip>
+ 
+    <cdr>
+        <user>foo</user>
+        <password>bar</password>
+        <host>127.0.0.1</host>
+        <port>3306</port>
+        <num-threads>6</num-threads>
+    </cdr>
+
+   <!-- logging configuration -->
+    <logging>
+        <syslog>
+            <address>localhost</address>
+            <port>514</port>
+            <facility>local6</facility>
+        </syslog>
+        <sofia-loglevel>7</sofia-loglevel>
+        
+        <!-- notice, warning, error, info, debug.  Default: info -->
+        <loglevel>debug</loglevel>
+    </logging>
 
     <!-- configuration specific to ssp handling inbound calls (originations) -->
     <inbound>
@@ -46,20 +67,7 @@
          -->
         <max-termination-attempts>3</max-termination-attempts>
     </outbound>
-            
-    <!-- logging configuration -->
-    <logging>
-        <syslog>
-            <address>localhost</address>
-            <port>514</port>
-            <facility>local6</facility>
-        </syslog>
-        <sofia-loglevel>7</sofia-loglevel>
-        
-        <!-- notice, warning, error, info, debug.  Default: info -->
-        <loglevel>debug</loglevel>
-    </logging>
-    
+                
     <!-- grouping of external sip endpoints into carriers/service providers -->
     <carrier name="level3">
         <inbound>

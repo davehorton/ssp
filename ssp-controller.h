@@ -40,6 +40,7 @@
 #include "fs-monitor.h"
 #include "sip-inbound-call.h"
 #include "nagios-connector.h"
+#include "cdr-writer.h"
 
 using namespace std ;
 
@@ -80,6 +81,12 @@ namespace ssp {
         sip_t const *  getSip(void) const   { return m_sip; }
         string& getCarrier(void) { return m_carrier; }
         string& getSipTrunk(void) { return m_sipTrunk; }
+         void setCdrInfo( boost::shared_ptr<CdrInfo> pCdr ) {
+            m_pCdr = pCdr ;
+        }
+        boost::shared_ptr<CdrInfo> getCdrInfo() {
+            return m_pCdr; 
+        }
         
     private:
         unsigned int            m_nAttemptCount ;
@@ -91,7 +98,8 @@ namespace ssp {
         string                  m_url;
         string                  m_carrier ;
         string                  m_sipTrunk ;
-    } ;
+        boost::shared_ptr<CdrInfo> m_pCdr ;
+   } ;
     
     class TrunkStats {
     public:
@@ -169,6 +177,12 @@ namespace ssp {
         void setLocalSdp( char* pl_data, usize_t pl_size ) {
             m_localSdp.assign( pl_data, pl_size ) ;
         }
+        void setCdrInfo( boost::shared_ptr<CdrInfo> pCdr ) {
+            m_pCdr = pCdr ;
+        }
+        boost::shared_ptr<CdrInfo> getCdrInfo() {
+            return m_pCdr; 
+        }
         
     private:
         nta_leg_t*      m_leg ;
@@ -176,6 +190,7 @@ namespace ssp {
         unsigned long   m_nSessionTimer ;
         su_timer_t*     m_timerSessionRefresh ;
         string          m_localSdp; 
+        boost::shared_ptr<CdrInfo> m_pCdr ;
     } ;
 
 
@@ -275,6 +290,16 @@ namespace ssp {
 		void deinitializeLogging() ;
 		bool installConfig() ;
 		void logConfig() ;
+
+        void generateUuid(string& uuid) ;
+        void populateOriginationCdr( boost::shared_ptr<CdrInfo> pCdr, sip_t const *sip, const string& carrier ) ;
+        void populateTerminationCdr( boost::shared_ptr<CdrInfo> pCdr, sip_t const *sip, const string& carrier, const string& uuid ) ;
+        void populateFinalResponseCdr( boost::shared_ptr<CdrInfo> pCdr, unsigned int status )  ;      
+        void populateCancelCdr( boost::shared_ptr<CdrInfo> pCdr )  ;      
+        void populateByeCdr( boost::shared_ptr<CdrInfo> pCdr, bool callingPartyRelease )  ;      
+        void runDbTest() ;
+        
+        bool findCustomHeaderValue( sip_t const *sip, const char* szHeaderName, string& strHeaderValue  ) ;
 	
 		scoped_ptr< src::severity_logger_mt<severity_levels> > m_logger ;
 		boost::mutex m_mutexGlobal ;
@@ -285,6 +310,7 @@ namespace ssp {
         string  m_user ;    //system user to run as
         
         shared_ptr< NagiosConnector > m_stats ;
+        shared_ptr<CdrWriter> m_cdrWriter ;
         
         shared_ptr< sinks::synchronous_sink< sinks::syslog_backend > > m_sink ;
         shared_ptr<SspConfig> m_Config, m_ConfigNew ;
@@ -333,6 +359,8 @@ namespace ssp {
         mapDialogInfo m_mapDialogInfo ;
 
         mapTrunkStats m_mapTrunkStats ;
+
+        int m_bDbTest ;
 	} ;
 }
 
