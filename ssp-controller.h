@@ -293,14 +293,14 @@ namespace ssp {
 
         void generateUuid(string& uuid) ;
         void populateOriginationCdr( boost::shared_ptr<CdrInfo> pCdr, sip_t const *sip, const string& carrier ) ;
-        void populateTerminationCdr( boost::shared_ptr<CdrInfo> pCdr, sip_t const *sip, const string& carrier, const string& uuid ) ;
+        void populateTerminationCdr( boost::shared_ptr<CdrInfo> pCdr, sip_t const *sip, const string& carrier, const string& carrierAddress, const string& uuid ) ;
         void populateFinalResponseCdr( boost::shared_ptr<CdrInfo> pCdr, unsigned int status )  ;      
         void populateCancelCdr( boost::shared_ptr<CdrInfo> pCdr )  ;      
         void populateByeCdr( boost::shared_ptr<CdrInfo> pCdr, bool callingPartyRelease )  ;      
         void runDbTest() ;
         
         bool findCustomHeaderValue( sip_t const *sip, const char* szHeaderName, string& strHeaderValue  ) ;
-	
+
 		scoped_ptr< src::severity_logger_mt<severity_levels> > m_logger ;
 		boost::mutex m_mutexGlobal ;
 		boost::shared_mutex m_mutexConfig ; 

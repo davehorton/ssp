@@ -461,22 +461,28 @@ namespace ssp {
 			if( !stmt.get() ) {
 				stmt.reset( conn->prepareStatement("UPDATE cdr_session SET end_time=?,release_cause=? WHERE session_uuid=?") );
 			}
-			struct tm* pGmtEndTime = NULL ;
-			time_t tmEnd = pCdr->getTimeEnd() ;
-			char szEndTime[64] ;
+			string strTimeEnd ;
+			pCdr->getTimeEndFormatted( strTimeEnd ) ;
 
-			if( 0 != tmEnd) {
-				pGmtEndTime = gmtime( &tmEnd ) ;
-				strftime( szEndTime, 64, "%F %T", pGmtEndTime) ;
-			}
-
-			stmt->setDateTime(1, szEndTime) ;
+			stmt->setDateTime(1, strTimeEnd) ;
 			stmt->setInt(2, (int32_t) pCdr->getReleaseCause() ) ;
 			stmt->setString(3,pCdr->getUuid()) ;
 
 			int rows = stmt->executeUpdate();
 			SSP_LOG(log_debug) << "Successfully updated " << rows << " row in cdr_session with call clearing: " << pCdr->getUuid() << endl ;
 			assert( 1 == rows ) ;
+
+			static boost::thread_specific_ptr< sql::PreparedStatement > stmt2 ;
+			if( !stmt2.get() ) {
+				stmt2.reset( conn->prepareStatement("UPDATE termination_attempt SET end_time=? WHERE session_uuid=? and final_sip_status = 200")) ;
+			}
+			stmt2->setDateTime(1, strTimeEnd) ;
+			stmt2->setString(2, pCdr->getUuid()) ;
+			rows = stmt2->executeUpdate();
+			SSP_LOG(log_debug) << "Successfully updated " << rows << " row in termination_attempt with call end time: " << pCdr->getUuid() << endl ;
+			assert( 1 == rows ) ;
+
+
 			
 		} catch (sql::SQLException &e) {
 				cerr << "CdrWriter::writeOriginationRequestCdr sql exception: " << e.what() << " mysql error code: " << e.getErrorCode() << ", sql state: " << e.getSQLState() << endl ;

@@ -1123,7 +1123,7 @@ namespace ssp {
             SSP_LOG(log_error) << "No " << X_SESSION_UUID << " header found on termination request; cdrs will be impaired: call-id " << strCallId << endl ;
         }
 
-        this->populateTerminationCdr( pCdr, sip, carrier, uuid ) ;
+        this->populateTerminationCdr( pCdr, sip, carrier, terminationSipAddress, uuid ) ;
 
         ostringstream dest ;
         dest << "sip:" << sip->sip_to->a_url[0].url_user << "@" << terminationSipAddress ;
@@ -1829,12 +1829,12 @@ namespace ssp {
         }
 
     }
-    void SipLbController::populateTerminationCdr( boost::shared_ptr<CdrInfo> pCdr, sip_t const *sip, const string& carrier, const string& uuid ) {
+    void SipLbController::populateTerminationCdr( boost::shared_ptr<CdrInfo> pCdr, sip_t const *sip, const string& carrier, const string& carrierAddress, const string& uuid ) {
         pCdr->setUuid( uuid ) ;
         pCdr->setCdrType( CdrInfo::termination_attempt ) ;
         pCdr->setTimeStart( time(0) ) ;
         pCdr->setTerminatingCarrier( carrier ) ;
-        pCdr->setTerminatingCarrierAddress( string( sip->sip_contact->m_url[0].url_host, strlen(sip->sip_contact->m_url[0].url_host) ) ) ;
+        pCdr->setTerminatingCarrierAddress( carrierAddress ) ;
         pCdr->setCLegCallId( string( sip->sip_call_id->i_id, strlen( sip->sip_call_id->i_id ) ) ) ;
         pCdr->setTerminatingEdgeServerAddress( string(m_my_contact->m_url[0].url_host, strlen(m_my_contact->m_url[0].url_host) ) ) ;
         pCdr->setCalledPartyNumberOut( string( sip->sip_to->a_url[0].url_user, strlen(sip->sip_to->a_url[0].url_user) ) ) ;
