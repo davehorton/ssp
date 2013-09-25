@@ -338,7 +338,7 @@ namespace ssp {
 				if( 2013 == e.getErrorCode() || 2006 == e.getErrorCode() ) {
 					stmt.reset() ;
 					conn = this->getConnection() ;
-					if( ++counter == 2 ) throw e ;
+					if( ++counter == 2 || !conn ) throw e ;
 					retry = true ;
 				}
 			} catch (std::runtime_error &e) {
@@ -386,7 +386,7 @@ namespace ssp {
 				if( 2013 == e.getErrorCode() || 2006 == e.getErrorCode() ) {
 					stmt.reset() ;
 					conn = this->getConnection() ;
-					if( ++counter == 2 ) throw e ;
+					if( ++counter == 2 || !conn ) throw e ;
 					retry = true ;
 				}
 			} catch (std::runtime_error &e) {
@@ -423,7 +423,7 @@ namespace ssp {
 				if( 2013 == e.getErrorCode() || 2006 == e.getErrorCode() ) {
 					stmt.reset() ;
 					conn = this->getConnection() ;
-					if( ++counter == 2 ) throw e ;
+					if( ++counter == 2 || !conn ) throw e ;
 					retry = true ;
 				}
 			} catch (std::runtime_error &e) {
@@ -499,7 +499,7 @@ namespace ssp {
 					stmt.reset() ;
 					stmt2.reset();
 					conn = this->getConnection() ;
-					if( ++counter == 2 ) throw e ;
+					if( ++counter == 2 || !conn ) throw e ;
 					retry = true ;
 				}
 			} catch (std::runtime_error &e) {
@@ -546,7 +546,7 @@ namespace ssp {
 				if( 2013 == e.getErrorCode() || 2006 == e.getErrorCode() ) {
 					conn = this->getConnection() ;
 					stmt.reset() ;
-					if( ++counter == 2 ) throw e ;
+					if( ++counter == 2 || !conn ) throw e ;
 					retry = true ;
 				}
 			} catch (std::runtime_error &e) {
