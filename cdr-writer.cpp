@@ -192,6 +192,7 @@ namespace ssp {
 			}
 		}
 		try {
+			SSP_LOG(log_debug) << "Creating new database connection" << endl ;
 			conn.reset( m_pDriver->connect( m_dbUrl, m_user, m_password ) ) ;
 			if( conn ) conn->setSchema( m_schema ) ;
 		} catch (sql::SQLException &e) {
@@ -268,6 +269,10 @@ namespace ssp {
 			}
 			this->releaseConnection( conn ) ;
 		} catch (sql::SQLException &e) {
+				if( 2013 == e.getErrorCode() || 2006 == e.getErrorCode() ) {
+					boost::lock_guard<boost::mutex> l( m_lock ) ;
+					m_vecConnection.clear() ;
+				}
 				cerr << "CdrWriter::writeCdr sql exception: " << e.what() << " mysql error code: " << e.getErrorCode() << ", sql state: " << e.getSQLState() << endl ;
 				SSP_LOG(log_error) << "CdrWriter::writeCdr sql exception: " << e.what() << " mysql error code: " << e.getErrorCode() << ", sql state: " << e.getSQLState() << endl ;
 		} catch (std::runtime_error &e) {
