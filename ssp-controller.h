@@ -288,7 +288,7 @@ namespace ssp {
 		void daemonize() ;
 		void initializeLogging() ;
 		void deinitializeLogging() ;
-		bool installConfig() ;
+		bool installConfig( bool initial = true ) ;
 		void logConfig() ;
 
         void generateUuid(string& uuid) ;

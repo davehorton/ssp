@@ -203,7 +203,7 @@ namespace ssp {
     SipLbController::~SipLbController() {
     }
     
-    bool SipLbController::installConfig() {
+    bool SipLbController::installConfig(bool initial) {
 
         if( m_ConfigNew ) {
             m_Config = m_ConfigNew ;
@@ -215,13 +215,15 @@ namespace ssp {
         m_current_severity_threshold = m_Config->getLoglevel() ;
 
         /* create the cdr writer */
-        string user, pass, dbUrl, schema ;
-        unsigned int poolsize ;
-        if( m_Config->getCdrConnectInfo( user, pass, dbUrl,  schema ) ) {
-            m_cdrWriter.reset( new CdrWriter(dbUrl, user, pass, schema) ) ;  
-            m_cdrWriter->testConnection() ;         
+        if( !initial ) {
+            string user, pass, dbUrl, schema ;
+            unsigned int poolsize ;
+            if( m_Config->getCdrConnectInfo( user, pass, dbUrl,  schema ) ) {
+                m_cdrWriter.reset( new CdrWriter(dbUrl, user, pass, schema) ) ;  
+                m_cdrWriter->testConnection() ;         
+            }           
         }
-        
+         
         return true ;
         
     }
@@ -677,7 +679,7 @@ namespace ssp {
         if( m_ConfigNew ) {
             SSP_LOG(log_notice) << "Installing new configuration file" << endl ;
 
-            this->installConfig() ;
+            this->installConfig(false) ;
             
             /* this has to be done outside of installConfig, because that method is also called during startup when logging is not initialized */
             logging::core::get()->set_filter(
