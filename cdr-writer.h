@@ -118,7 +118,7 @@ namespace ssp {
 
 	class CdrWriter {
 	public:
-		CdrWriter( const string& dbUrl, const string& user, const string& password, unsigned int poolsize = 3 ) ;
+		CdrWriter( const string& dbUrl, const string& user, const string& password, const string& schema) ;
 		~CdrWriter() ;
 
 		void postCdr( boost::shared_ptr<CdrInfo> pCdr ) ;
@@ -144,6 +144,7 @@ namespace ssp {
 		string 	m_user ;
 		string 	m_password ;
 		string 	m_dbUrl ;
+		string m_schema ;
 
 		boost::shared_ptr<sql::Driver> m_pDriver;
 

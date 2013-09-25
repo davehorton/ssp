@@ -136,17 +136,17 @@ namespace ssp {
 
 
 
-	CdrWriter::CdrWriter( const string& dbUrl, const string& user, const string& password, unsigned int poolSize ) : m_dbUrl(dbUrl), m_user(user), m_password(password)  {
+	CdrWriter::CdrWriter( const string& dbUrl, const string& user, const string& password, const string& schema ) : m_dbUrl(dbUrl), m_user(user), 
+		m_password(password), m_schema(schema)  {
 		try {
 			m_pDriver.reset( sql::mysql::get_driver_instance() );
 			if( !m_pDriver ) throw std::runtime_error("Error creating instance of mysql driver") ;
 
 			m_pWork.reset( new boost::asio::io_service::work(m_io_service) );
 
-			for ( unsigned int i = 0; i < poolSize; ++i) {
-				//m_threadGroup.create_thread( boost::bind(&boost::asio::io_service::run, &m_io_service) );
+			//for ( unsigned int i = 0; i < poolSize; ++i) {
 				m_threadGroup.create_thread( boost::bind(&CdrWriter::worker_thread, this) );
-			}
+			//}
 		} catch (sql::SQLException &e) {
 			cerr << "CdrWriter::CdrWriter sql exception: " << e.what() << " mysql error code: " << e.getErrorCode() << ", sql state: " << e.getSQLState() << endl ;
 			SSP_LOG(log_error) << "CdrWriter::worker_thread sql exception: " << e.what() << " mysql error code: " << e.getErrorCode() << ", sql state: " << e.getSQLState() << endl ;
@@ -193,7 +193,7 @@ namespace ssp {
 		}
 		try {
 			conn.reset( m_pDriver->connect( m_dbUrl, m_user, m_password ) ) ;
-			if( conn ) conn->setSchema("ssp") ;	//TODO: get from config
+			if( conn ) conn->setSchema( m_schema ) ;
 		} catch (sql::SQLException &e) {
 				cerr << "CdrWriter::getConnection sql exception getting a connection: " << e.what() << " mysql error code: " << e.getErrorCode() << ", sql state: " << e.getSQLState() << endl ;
 				SSP_LOG(log_error) << "CdrWriter::getConnection sql exception getting a connection: " << e.what() << " mysql error code: " << e.getErrorCode() << ", sql state: " << e.getSQLState() << endl ;
@@ -324,11 +324,12 @@ namespace ssp {
 			assert( 1 == rows ) ;
 
 		} catch (sql::SQLException &e) {
-				cerr << "CdrWriter::writeOriginationRequestCdr sql exception: " << e.what() << " mysql error code: " << e.getErrorCode() << ", sql state: " << e.getSQLState() << endl ;
-				SSP_LOG(log_error) << "CdrWriter::writeOriginationRequestCdr sql exception: " << e.what() << " mysql error code: " << e.getErrorCode() << ", sql state: " << e.getSQLState() << endl ;
+			if( 2013 == e.getErrorCode() || 2006 == e.getErrorCode() ) throw e ;
+			cerr << "CdrWriter::writeOriginationRequestCdr sql exception: " << e.what() << " mysql error code: " << e.getErrorCode() << ", sql state: " << e.getSQLState() << endl ;
+			SSP_LOG(log_error) << "CdrWriter::writeOriginationRequestCdr sql exception: " << e.what() << " mysql error code: " << e.getErrorCode() << ", sql state: " << e.getSQLState() << endl ;
 		} catch (std::runtime_error &e) {
-				cerr << "CdrWriter::writeOriginationRequestCdr runtime exception: " << e.what() << endl ;
-				SSP_LOG(log_error) << "CdrWriter::writeOriginationRequestCdr runtime exception: " << e.what() << endl ;
+			cerr << "CdrWriter::writeOriginationRequestCdr runtime exception: " << e.what() << endl ;
+			SSP_LOG(log_error) << "CdrWriter::writeOriginationRequestCdr runtime exception: " << e.what() << endl ;
 		}
 	}
 	void CdrWriter::writeOriginationFinalResponseCdr( boost::shared_ptr<CdrInfo> pCdr, boost::shared_ptr<sql::Connection> conn ) {
@@ -360,11 +361,12 @@ namespace ssp {
 			assert( 1 == rows ) ;
 			
 		} catch (sql::SQLException &e) {
-				cerr << "CdrWriter::writeOriginationFinalResponseCdr sql exception: " << e.what() << " mysql error code: " << e.getErrorCode() << ", sql state: " << e.getSQLState() << endl ;
-				SSP_LOG(log_error) << "CdrWriter::writeOriginationFinalResponseCdr sql exception: " << e.what() << " mysql error code: " << e.getErrorCode() << ", sql state: " << e.getSQLState() << endl ;
+			if( 2013 == e.getErrorCode() || 2006 == e.getErrorCode() ) throw e ;
+			cerr << "CdrWriter::writeOriginationFinalResponseCdr sql exception: " << e.what() << " mysql error code: " << e.getErrorCode() << ", sql state: " << e.getSQLState() << endl ;
+			SSP_LOG(log_error) << "CdrWriter::writeOriginationFinalResponseCdr sql exception: " << e.what() << " mysql error code: " << e.getErrorCode() << ", sql state: " << e.getSQLState() << endl ;
 		} catch (std::runtime_error &e) {
-				cerr << "CdrWriter::writeOriginationFinalResponseCdr runtime exception: " << e.what() << endl ;
-				SSP_LOG(log_error) << "CdrWriter::writeOriginationFinalResponseCdr runtime exception: " << e.what() << endl ;
+			cerr << "CdrWriter::writeOriginationFinalResponseCdr runtime exception: " << e.what() << endl ;
+			SSP_LOG(log_error) << "CdrWriter::writeOriginationFinalResponseCdr runtime exception: " << e.what() << endl ;
 		}
 
 	}
@@ -386,10 +388,11 @@ namespace ssp {
 			assert( 1 == rows ) ;
 			
 		} catch (sql::SQLException &e) {
-				cerr << "CdrWriter::writeOriginationCancelCdr sql exception: " << e.what() << " mysql error code: " << e.getErrorCode() << ", sql state: " << e.getSQLState() << endl ;
-				SSP_LOG(log_error) << "CdrWriter::writeOriginationCancelCdr sql exception: " << e.what() << " mysql error code: " << e.getErrorCode() << ", sql state: " << e.getSQLState() << endl ;
+			if( 2013 == e.getErrorCode() || 2006 == e.getErrorCode() ) throw e ;
+			cerr << "CdrWriter::writeOriginationCancelCdr sql exception: " << e.what() << " mysql error code: " << e.getErrorCode() << ", sql state: " << e.getSQLState() << endl ;
+			SSP_LOG(log_error) << "CdrWriter::writeOriginationCancelCdr sql exception: " << e.what() << " mysql error code: " << e.getErrorCode() << ", sql state: " << e.getSQLState() << endl ;
 		} catch (std::runtime_error &e) {
-				SSP_LOG(log_error) << "CdrWriter::writeOriginationCancelCdr runtime exception: " << e.what() << endl ;
+			SSP_LOG(log_error) << "CdrWriter::writeOriginationCancelCdr runtime exception: " << e.what() << endl ;
 		}
 
 	}
@@ -448,10 +451,11 @@ namespace ssp {
 
 			
 		} catch (sql::SQLException &e) {
-				cerr << "CdrWriter::writeTerminationAttemptCdr sql exception: " << e.what() << " mysql error code: " << e.getErrorCode() << ", sql state: " << e.getSQLState() << endl ;
-				SSP_LOG(log_error) << "CdrWriter::writeTerminationAttemptCdr sql exception: " << e.what() << " mysql error code: " << e.getErrorCode() << ", sql state: " << e.getSQLState() << endl ;
+			if( 2013 == e.getErrorCode() || 2006 == e.getErrorCode() ) throw e ;
+			cerr << "CdrWriter::writeTerminationAttemptCdr sql exception: " << e.what() << " mysql error code: " << e.getErrorCode() << ", sql state: " << e.getSQLState() << endl ;
+			SSP_LOG(log_error) << "CdrWriter::writeTerminationAttemptCdr sql exception: " << e.what() << " mysql error code: " << e.getErrorCode() << ", sql state: " << e.getSQLState() << endl ;
 		} catch (std::runtime_error &e) {
-				SSP_LOG(log_error) << "CdrWriter::writeTerminationAttemptCdr runtime exception: " << e.what() << endl ;
+			SSP_LOG(log_error) << "CdrWriter::writeTerminationAttemptCdr runtime exception: " << e.what() << endl ;
 		}
 
 	}
@@ -485,10 +489,11 @@ namespace ssp {
 
 			
 		} catch (sql::SQLException &e) {
-				cerr << "CdrWriter::writeOriginationRequestCdr sql exception: " << e.what() << " mysql error code: " << e.getErrorCode() << ", sql state: " << e.getSQLState() << endl ;
-				SSP_LOG(log_error) << "CdrWriter::writeOriginationRequestCdr sql exception: " << e.what() << " mysql error code: " << e.getErrorCode() << ", sql state: " << e.getSQLState() << endl ;
+			if( 2013 == e.getErrorCode() || 2006 == e.getErrorCode() ) throw e ;
+			cerr << "CdrWriter::writeOriginationRequestCdr sql exception: " << e.what() << " mysql error code: " << e.getErrorCode() << ", sql state: " << e.getSQLState() << endl ;
+			SSP_LOG(log_error) << "CdrWriter::writeOriginationRequestCdr sql exception: " << e.what() << " mysql error code: " << e.getErrorCode() << ", sql state: " << e.getSQLState() << endl ;
 		} catch (std::runtime_error &e) {
-				SSP_LOG(log_error) << "CdrWriter::writeOriginationRequestCdr runtime exception: " << e.what() << endl ;
+			SSP_LOG(log_error) << "CdrWriter::writeOriginationRequestCdr runtime exception: " << e.what() << endl ;
 		}
 
 	}

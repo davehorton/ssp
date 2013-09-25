@@ -284,8 +284,8 @@ namespace ssp {
                 m_cdrPassword = pt.get<string>("ssp.cdr.password","");
                 m_cdrHost = pt.get<string>("ssp.cdr.host","");
                 m_cdrPort = pt.get<string>("ssp.cdr.port","3306");
-                m_poolsize = pt.get<unsigned int>("ssp.cdr.num-threads",1);
-
+                m_cdrSchema = pt.get<string>("ssp.cdr.schema","3306");
+ 
                 /* sip configuration */
                 m_sipUrl = pt.get<string>("ssp.sip.contact", "sip:*") ;
                 
@@ -580,15 +580,15 @@ namespace ssp {
             address = m_statsAddress ;
             return m_statsPort ;
         }
-        bool getCdrConnectInfo( string& user, string& pass, string& dbUrl, unsigned int& poolsize ) {
-            if( 0 == m_cdrHost.length() || 0 == m_cdrUser.length() || 0 == m_cdrPassword.length() ) return false ;
+        bool getCdrConnectInfo( string& user, string& pass, string& dbUrl, string& schema ) {
+            if( 0 == m_cdrHost.length() || 0 == m_cdrUser.length() || 0 == m_cdrPassword.length() || 0 == schema.length() ) return false ;
 
             user = m_cdrUser ;
             pass = m_cdrPassword ;
+            schema = m_cdrSchema ;
             ostringstream s ;
             s << "tcp://" << m_cdrHost << ":" << m_cdrPort ;
             dbUrl = s.str() ;
-            poolsize = m_poolsize ;
             return true; 
         }
 
@@ -635,7 +635,7 @@ namespace ssp {
         string m_cdrPassword ;
         string m_cdrHost ;
         string m_cdrPort ;
-        unsigned int m_poolsize ;
+        string m_cdrSchema ;
     } ;
     
     /*
@@ -705,8 +705,8 @@ namespace ssp {
     unsigned long SspConfig::getFSHealthCheckTimerTimeMsecs(void) {
         return m_pimpl->getFSHealthCheckTimerTimeMsecs() ;
     }
-    bool SspConfig::getCdrConnectInfo( string& user, string& pass, string& dbUrl, unsigned int& poolsize ) {
-        return m_pimpl->getCdrConnectInfo( user, pass, dbUrl, poolsize ) ;
+    bool SspConfig::getCdrConnectInfo( string& user, string& pass, string& dbUrl, string& schema ) {
+        return m_pimpl->getCdrConnectInfo( user, pass, dbUrl, schema ) ;
     } 
     void SspConfig::Log() const {
         SSP_LOG(log_notice) << "Configuration:" << endl ;

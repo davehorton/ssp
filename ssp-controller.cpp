@@ -213,6 +213,14 @@ namespace ssp {
         m_nTerminationRetries = min( m_Config->getCountOfOutboundTrunks(), m_Config->getMaxTerminationAttempts() ) ;
         m_nFSTimerMsecs = m_Config->getFSHealthCheckTimerTimeMsecs() ;
         m_current_severity_threshold = m_Config->getLoglevel() ;
+
+        /* create the cdr writer */
+        string user, pass, dbUrl, schema ;
+        unsigned int poolsize ;
+        if( m_Config->getCdrConnectInfo( user, pass, dbUrl,  schema ) ) {
+            m_cdrWriter.reset( new CdrWriter(dbUrl, user, pass, schema) ) ;  
+            m_cdrWriter->testConnection() ;         
+        }
         
         return true ;
         
@@ -491,10 +499,10 @@ namespace ssp {
         }
 
         /* create the cdr writer */
-        string user, pass, dbUrl ;
+        string user, pass, dbUrl, schema ;
         unsigned int poolsize ;
-        if( m_Config->getCdrConnectInfo( user, pass, dbUrl, poolsize ) ) {
-            m_cdrWriter.reset( new CdrWriter(dbUrl, user, pass, poolsize) ) ;  
+        if( m_Config->getCdrConnectInfo( user, pass, dbUrl, schema ) ) {
+            m_cdrWriter.reset( new CdrWriter(dbUrl, user, pass, schema) ) ;  
             m_cdrWriter->testConnection() ;         
         }
         if( m_bDbTest ) {
