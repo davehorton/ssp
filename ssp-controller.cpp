@@ -460,6 +460,7 @@ namespace ssp {
                 pCdr->setUuid( uuid ) ;
                 pCdr->setTimeEnd( time(0) ) ;
                 pCdr->setReleaseCause( CdrInfo::calling_party_release) ;
+
                 m_cdrWriter->postCdr( pCdr ) ;   
             }
             else {
@@ -493,7 +494,8 @@ namespace ssp {
         string user, pass, dbUrl ;
         unsigned int poolsize ;
         if( m_Config->getCdrConnectInfo( user, pass, dbUrl, poolsize ) ) {
-            m_cdrWriter.reset( new CdrWriter(dbUrl, user, pass, poolsize) ) ;           
+            m_cdrWriter.reset( new CdrWriter(dbUrl, user, pass, poolsize) ) ;  
+            m_cdrWriter->testConnection() ;         
         }
         if( m_bDbTest ) {
             this->runDbTest() ;
@@ -917,15 +919,22 @@ namespace ssp {
                 
             case sip_method_invite:
             {
-                if( !m_Config->isActive() || 0 == m_nIterationCount ) {
-                    SSP_LOG(log_error) << "Rejecting new INVITE because we are inactive " << endl ;
-                    return 503 ;
-                }
-               nta_incoming_treply( irq, SIP_100_TRYING, TAG_END() ) ;
-                
+                  
                 string carrier ;
                 call_type_t call_type = this->determineCallType( sip, carrier ) ;
                 int rc = 0;
+
+                if( !m_Config->isActive() || 0 == m_nIterationCount ) {
+                    SSP_LOG(log_error) << "Rejecting new INVITE because we are inactive " << endl ;
+                    boost::shared_ptr<CdrInfo> pCdr = boost::make_shared<CdrInfo>(CdrInfo::origination_request) ;
+                    this->populateOriginationCdr( pCdr, sip, carrier ) ;
+                    pCdr->setSipStatus( 503 ) ;
+                    pCdr->setReleaseCause( CdrInfo::call_rejected_due_to_being_offline ) ;
+                    if( m_cdrWriter ) m_cdrWriter->postCdr( pCdr ) ;
+                    return pCdr->getSipStatus() ;
+                }
+                nta_incoming_treply( irq, SIP_100_TRYING, TAG_END() ) ;
+              
                 if( origination_call_type == call_type ) {
                     rc = this->processOriginationRequest( irq, sip, carrier ) ;
                 }
@@ -934,7 +943,12 @@ namespace ssp {
                 }
                 else {
                     SSP_LOG(log_error) << "Received invite from unknown address: " <<  sip->sip_contact->m_url[0].url_host << endl ;
-                    rc = 403 ;
+                    boost::shared_ptr<CdrInfo> pCdr = boost::make_shared<CdrInfo>(CdrInfo::origination_request) ;
+                    this->populateOriginationCdr( pCdr, sip, carrier ) ;
+                    pCdr->setSipStatus( 403 ) ;
+                    pCdr->setReleaseCause( CdrInfo::call_rejected_due_to_unauthorized_peer ) ;
+                    if( m_cdrWriter ) m_cdrWriter->postCdr( pCdr ) ;
+                    return pCdr->getSipStatus() ;
                 }
                 if( m_nIterationCount > 0 ) m_nIterationCount-- ;
                 return rc ;
@@ -962,6 +976,7 @@ namespace ssp {
         if( !m_fsMonitor.getAvailableServers( servers ) ) {
             SSP_LOG(log_error) << "No available server for incoming call; returning to carrier for busy handling " << pCdr->getALegCallId() << endl ;
             pCdr->setSipStatus( 486 ) ;
+            pCdr->setReleaseCause( CdrInfo::call_rejected_due_to_system_error ) ;
             if( m_cdrWriter ) m_cdrWriter->postCdr( pCdr ) ;
             return pCdr->getSipStatus() ;
         }
@@ -988,6 +1003,7 @@ namespace ssp {
         if( NULL == a_leg ) {
             SSP_LOG(log_error) << "Error creating a leg for  origination" << endl ;
             pCdr->setSipStatus( 503 ) ;
+            pCdr->setReleaseCause( CdrInfo::call_rejected_due_to_system_error ) ;
             if( m_cdrWriter ) m_cdrWriter->postCdr( pCdr ) ;
             return pCdr->getSipStatus() ;
         }
@@ -1015,6 +1031,7 @@ namespace ssp {
             SSP_LOG(log_error) << "Error creating b leg for origination" << endl ;
             nta_leg_destroy(a_leg) ;
             pCdr->setSipStatus( 503 ) ;
+            pCdr->setReleaseCause( CdrInfo::call_rejected_due_to_system_error ) ;
             if( m_cdrWriter ) m_cdrWriter->postCdr( pCdr ) ;
             return pCdr->getSipStatus() ;
         }
@@ -1060,6 +1077,7 @@ namespace ssp {
             nta_leg_destroy(a_leg) ;
             nta_leg_destroy(b_leg) ;
             pCdr->setSipStatus( 503 ) ;
+            pCdr->setReleaseCause( CdrInfo::call_rejected_due_to_system_error ) ;
             if( m_cdrWriter ) m_cdrWriter->postCdr( pCdr ) ;
             return pCdr->getSipStatus() ;
         }
@@ -1365,6 +1383,14 @@ namespace ssp {
                     if( nAttempt < m_nTerminationRetries - 1 ) {
                         string terminationSipAddress, carrier, chargeNumber ;
                         if( m_Config->getTerminationRouteForAltCarrier( t->getCarrier(), terminationSipAddress, carrier, chargeNumber) ) {
+
+                            /* write cdr */
+                            boost::shared_ptr<CdrInfo> pNewCdr = boost::make_shared<CdrInfo>(CdrInfo::termination_attempt) ;
+                            *pNewCdr = *pCdr ;
+                            pNewCdr->setCdrType( CdrInfo::termination_attempt ) ;
+                            populateFinalResponseCdr( pCdr, status ) ;
+                            if( m_cdrWriter ) m_cdrWriter->postCdr( pCdr ) ;
+
                             ostringstream dest ;
                             dest << "sip:" << sip->sip_to->a_url[0].url_user << "@" << terminationSipAddress ;
                             
@@ -1429,11 +1455,15 @@ namespace ssp {
         }
 
         if( status >= 200 && 487 != status && !bTermination && pCdr ) {
-            pCdr->setCdrType( CdrInfo::origination_final_response ) ;
+            boost::shared_ptr<CdrInfo> pNewCdr = boost::make_shared<CdrInfo>(CdrInfo::origination_final_response) ;
+            *pNewCdr = *pCdr ;
             populateFinalResponseCdr( pCdr, status ) ;
             if( m_cdrWriter ) m_cdrWriter->postCdr( pCdr ) ;
         }
         else if( status >= 200 && bTermination && pCdr ) {
+            boost::shared_ptr<CdrInfo> pNewCdr = boost::make_shared<CdrInfo>(CdrInfo::termination_attempt) ;
+            *pNewCdr = *pCdr ;
+            pNewCdr->setCdrType( CdrInfo::termination_attempt ) ;
             populateFinalResponseCdr( pCdr, status ) ;
             if( m_cdrWriter ) m_cdrWriter->postCdr( pCdr ) ;
         }

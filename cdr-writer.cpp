@@ -162,6 +162,25 @@ namespace ssp {
 		m_pWork.reset(); // stop all!
 		m_threadGroup.join_all(); // wait for all completition
 	}
+	bool CdrWriter::testConnection() {
+		bool bOK = false ;
+		boost::lock_guard<boost::mutex> l( m_lock ) ;
+		try {
+			m_pDriver->threadInit() ;
+			boost::shared_ptr<sql::Connection> conn ;
+			conn.reset( m_pDriver->connect( m_dbUrl, m_user, m_password ) );
+			if( conn ) {
+				SSP_LOG(log_info) << "Successfully connected to cdr database: " << m_dbUrl << " with user " << m_user << endl ;
+				bOK = true ;
+			}
+		} catch (sql::SQLException &e) {
+			cerr << "CdrWriter::getConnection sql exception getting a connection: " << e.what() << " mysql error code: " << e.getErrorCode() << ", sql state: " << e.getSQLState() << endl ;
+			SSP_LOG(log_error) << "CdrWriter::getConnection sql exception getting a connection: " << e.what() << " mysql error code: " << e.getErrorCode() << ", sql state: " << e.getSQLState() << endl ;
+		}
+		m_pDriver->threadEnd() ;
+		return bOK ;
+	}
+
 	boost::shared_ptr<sql::Connection> CdrWriter::getConnection() {
 		boost::shared_ptr<sql::Connection> conn ;
 		{
@@ -191,6 +210,7 @@ namespace ssp {
 			boost::lock_guard<boost::mutex> l( m_lock ) ;
 			try {
 				m_pDriver->threadInit() ;
+				SSP_LOG(log_debug) << "Successfully initialized mysql driver" << endl ;
 			}
 			catch (sql::SQLException &e) {
 				cerr << "CdrWriter exception calling threadInit: " << e.what() << " mysql error code: " << e.getErrorCode() << ", sql state: " << e.getSQLState() << endl ;
@@ -200,6 +220,7 @@ namespace ssp {
 		}
 		try {
 			m_io_service.run() ;
+			SSP_LOG(log_notice) << "cdr writer event loop ended" << endl ;
 		} catch (sql::SQLException &e) {
 			cerr << "CdrWriter::worker_thread sql exception: " << e.what() << " mysql error code: " << e.getErrorCode() << ", sql state: " << e.getSQLState() << endl ;
 			SSP_LOG(log_error) << "CdrWriter::worker_thread sql exception: " << e.what() << " mysql error code: " << e.getErrorCode() << ", sql state: " << e.getSQLState() << endl ;
@@ -242,6 +263,8 @@ namespace ssp {
 					this->writeByeCdr( pCdr, conn ) ;
 				break ;
 				default:
+					assert(false) ;
+					SSP_LOG(log_error) << "Unknown cdr type " << type << endl ;
 				break ;
 			}
 			this->releaseConnection( conn ) ;
@@ -298,6 +321,7 @@ namespace ssp {
 
 			int rows = stmt->executeUpdate();
 			assert( 1 == rows ) ;
+			SSP_LOG(log_debug) << "Successfully inserted " << rows << " row into cdr_session: " << pCdr->getUuid() << endl ;
 
 		} catch (sql::SQLException &e) {
 				cerr << "CdrWriter::writeOriginationRequestCdr sql exception: " << e.what() << " mysql error code: " << e.getErrorCode() << ", sql state: " << e.getSQLState() << endl ;
@@ -333,6 +357,7 @@ namespace ssp {
 
 			int rows = stmt->executeUpdate();
 			assert( 1 == rows ) ;
+			SSP_LOG(log_debug) << "Successfully updated " << rows << " row in cdr_session with final response: " << pCdr->getUuid() << endl ;
 			
 		} catch (sql::SQLException &e) {
 				cerr << "CdrWriter::writeOriginationFinalResponseCdr sql exception: " << e.what() << " mysql error code: " << e.getErrorCode() << ", sql state: " << e.getSQLState() << endl ;
@@ -358,6 +383,7 @@ namespace ssp {
 
 			int rows = stmt->executeUpdate();
 			assert( 1 == rows ) ;
+			SSP_LOG(log_debug) << "Successfully updated " << rows << " row in cdr_session with cancel: " << pCdr->getUuid() << endl ;
 			
 		} catch (sql::SQLException &e) {
 				cerr << "CdrWriter::writeOriginationCancelCdr sql exception: " << e.what() << " mysql error code: " << e.getErrorCode() << ", sql state: " << e.getSQLState() << endl ;
@@ -400,6 +426,7 @@ namespace ssp {
 
 			int rows = stmt->executeUpdate();
 			assert( 1 == rows ) ;
+			SSP_LOG(log_debug) << "Successfully inserted " << rows << " row in termination_attempt: " << pCdr->getUuid() << endl ;
 
 			static boost::thread_specific_ptr< sql::PreparedStatement > stmt2 ;
 			if( !stmt2.get() ) {
@@ -417,6 +444,7 @@ namespace ssp {
 			stmt2->setString(8, pCdr->getUuid()) ;
 			rows = stmt2->executeUpdate();
 			assert( 1 == rows ) ;
+			SSP_LOG(log_debug) << "Successfully updated " << rows << " row in cdr_session with outbound leg information: " << pCdr->getUuid() << endl ;
 
 			
 		} catch (sql::SQLException &e) {
@@ -448,6 +476,7 @@ namespace ssp {
 
 			int rows = stmt->executeUpdate();
 			assert( 1 == rows ) ;
+			SSP_LOG(log_debug) << "Successfully updated " << rows << " row in cdr_session with call clearing: " << pCdr->getUuid() << endl ;
 			
 		} catch (sql::SQLException &e) {
 				cerr << "CdrWriter::writeOriginationRequestCdr sql exception: " << e.what() << " mysql error code: " << e.getErrorCode() << ", sql state: " << e.getSQLState() << endl ;

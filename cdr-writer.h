@@ -34,6 +34,8 @@ namespace ssp {
 			,call_canceled
 			,call_rejected_due_to_termination_carriers
  			,call_rejected_due_to_system_error
+			,call_rejected_due_to_unauthorized_peer
+			,call_rejected_due_to_being_offline
 		} ;
 
 		CdrInfo( CdrEvent_t cdrType ) ;
@@ -120,6 +122,7 @@ namespace ssp {
 		~CdrWriter() ;
 
 		void postCdr( boost::shared_ptr<CdrInfo> pCdr ) ;
+		bool testConnection() ;
 
 	private:
 		void worker_thread() ;
