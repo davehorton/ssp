@@ -1,0 +1,1 @@
+/usr/bin/gcc   -Wall -Os -g -fno-strict-aliasing -DDBUG_OFF -Wl,-search_paths_first -Wl,-headerpad_max_install_names   CMakeFiles/conf_to_src.dir/conf_to_src.c.o  -o conf_to_src  -lpthread libstrings.a -lpthread 

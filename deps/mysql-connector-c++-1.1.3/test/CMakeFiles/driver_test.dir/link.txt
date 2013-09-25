@@ -1,0 +1,1 @@
+/usr/bin/c++    -Wl,-search_paths_first -Wl,-headerpad_max_install_names     CMakeFiles/driver_test.dir/driver_test.cpp.o  -o driver_test  -L/usr/local/mysql/lib ../driver/libmysqlcppconn.7.1.1.3.dylib -lmysqlclient_r -lpthread 

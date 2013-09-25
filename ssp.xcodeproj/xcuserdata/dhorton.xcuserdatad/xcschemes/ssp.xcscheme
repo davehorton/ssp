@@ -47,10 +47,6 @@
             argument = "--file /Users/dhorton/beachdog-enterprises/beachdog-networks/git/ssp/ssp.conf.xml"
             isEnabled = "YES">
          </CommandLineArgument>
-         <CommandLineArgument
-            argument = "--nd"
-            isEnabled = "YES">
-         </CommandLineArgument>
       </CommandLineArguments>
       <AdditionalOptions>
       </AdditionalOptions>

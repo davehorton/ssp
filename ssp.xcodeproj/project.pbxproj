@@ -22,6 +22,7 @@
 		3D6425271656E64D007F1493 /* ssp-config.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = "ssp-config.cpp"; sourceTree = "<group>"; };
 		3D6425281656E64D007F1493 /* ssp-config.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "ssp-config.h"; sourceTree = "<group>"; };
 		3D861D5216863065003A7FDB /* ssp.log */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; name = ssp.log; path = ../../../../Documents/logs/ssp.log; sourceTree = "<group>"; };
+		3DB2525117BC8FEF0068F651 /* check-ssp.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = "check-ssp.cpp"; sourceTree = "<group>"; };
 		3DB442461652B332002D0A07 /* ssp.1 */ = {isa = PBXFileReference; lastKnownFileType = text.man; path = ssp.1; sourceTree = "<group>"; };
 		3DB442511652B457002D0A07 /* aclocal.m4 */ = {isa = PBXFileReference; lastKnownFileType = text; path = aclocal.m4; sourceTree = "<group>"; };
 		3DB442521652B457002D0A07 /* AUTHORS */ = {isa = PBXFileReference; lastKnownFileType = text; path = AUTHORS; sourceTree = "<group>"; };
@@ -43142,6 +43143,8 @@
 		3DB4FA9C1652B482002D0A07 /* ssp-controller.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "ssp-controller.h"; sourceTree = "<group>"; };
 		3DB4FA9D1652B482002D0A07 /* ssp.conf.xml */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = ssp.conf.xml; sourceTree = "<group>"; };
 		3DB4FA9E1652B482002D0A07 /* main.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = main.cpp; sourceTree = "<group>"; };
+		3DC019AC17BAA48600980BB5 /* nagios-connector.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = "nagios-connector.cpp"; sourceTree = "<group>"; };
+		3DC019AD17BAA48600980BB5 /* nagios-connector.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "nagios-connector.h"; sourceTree = "<group>"; };
 		3DDE7B6A16612679007F0472 /* ssp.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ssp.h; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -118746,6 +118749,9 @@
 				3DDE7B6A16612679007F0472 /* ssp.h */,
 				3D16358B16668D2900702662 /* ssp.cpp */,
 				3D00CCFD177F6D68001F21CC /* fs-spoofer.cpp */,
+				3DC019AC17BAA48600980BB5 /* nagios-connector.cpp */,
+				3DC019AD17BAA48600980BB5 /* nagios-connector.h */,
+				3DB2525117BC8FEF0068F651 /* check-ssp.cpp */,
 			);
 			name = source;
 			sourceTree = "<group>";

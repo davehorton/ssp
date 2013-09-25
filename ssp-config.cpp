@@ -91,7 +91,10 @@ namespace ssp {
 
     class CarrierAddressSpace_t {
     public:
-        CarrierAddressSpace_t( const string& carrier, const string& address, unsigned int port = 5060, const string& netmask = "255.255.255.255") : m_address(address), m_netmask(netmask), m_port(port), m_carrier(carrier) {}
+        CarrierAddressSpace_t( const string& carrier, const string& address, unsigned int port = 5060, 
+            const string& netmask = "255.255.255.255", unsigned int qty = 1) : m_address(address), m_netmask(netmask), m_port(port), m_carrier(carrier), 
+            m_qty(qty), m_selectCount(0) {
+        }
         ~CarrierAddressSpace_t() {}
         
         bool operator==( const CarrierAddressSpace_t& other ) const {
@@ -109,6 +112,14 @@ namespace ssp {
         const string& getAddress() const { return m_address; }
         const string& getNetmask() const { return m_netmask; }
         unsigned int getPort() const { return m_port; }
+        bool haveAdvancedToEnd() {
+            if( m_selectCount == m_qty ) {
+                m_selectCount = 0 ;
+                return true ;
+            }
+            m_selectCount++ ;
+            return false ;
+        }
         
     private:
         CarrierAddressSpace_t() ;
@@ -117,6 +128,8 @@ namespace ssp {
         string m_address ;
         string m_netmask ;
         unsigned int m_port ;
+        unsigned int m_qty ;
+        unsigned int m_selectCount ;
     } ;
     /* needed to be able to live in a boost unordered container */
     size_t hash_value( const CarrierAddressSpace_t& c) {
@@ -128,7 +141,45 @@ namespace ssp {
     }
     
     typedef boost::unordered_map< string, CarrierAddressSpace_t > CarrierServerMap_t ;
-    //typedef boost::unordered_map< string, boost::unordered_set<CarrierAddressSpace_t> > CarrierServerMap_t ;
+
+    class TerminationRoute_t {
+    public:
+        TerminationRoute_t(const vector<CarrierAddressSpace_t>& v, const string& chargeNumber) : m_currentTrunk(0), m_vecTrunks(v), m_chargeNumber(chargeNumber) {}
+        ~TerminationRoute_t() {}
+        
+        void advanceTrunk() {
+            if( ++m_currentTrunk >= m_vecTrunks.size() ) m_currentTrunk = 0 ;
+        }
+        void getNextTrunk( string& trunk, string& chargeNumber ) {
+            stringstream s ;
+            CarrierAddressSpace_t& c = m_vecTrunks.at( m_currentTrunk ) ;
+
+            if( c.haveAdvancedToEnd() ) {
+                this->advanceTrunk() ;
+                CarrierAddressSpace_t& d = m_vecTrunks.at( m_currentTrunk ) ;
+                d.haveAdvancedToEnd() ;
+                s << d.getAddress() ;
+                if( 5060 != d.getPort() ) s << ":" << d.getPort() ;
+            }
+            else {
+                s << c.getAddress() ;
+                if( 5060 != c.getPort() ) s << ":" << c.getPort() ;
+            }
+
+            trunk = s.str() ;
+            chargeNumber = m_chargeNumber ;
+        }
+        unsigned int getCountOfTrunks() {
+            return m_vecTrunks.size() ;
+        }
+    private:
+        TerminationRoute_t() {};
+        
+        vector<CarrierAddressSpace_t> m_vecTrunks ;
+        unsigned int m_currentTrunk ;
+        string m_chargeNumber ;
+    } ;
+    typedef std::map<string, boost::shared_ptr<TerminationRoute_t> > TerminationCarrierMap_t ;
  
     class Appserver_t {
     public:
@@ -187,127 +238,13 @@ namespace ssp {
     }
     typedef boost::unordered_map< string, AppserverGroup_t > AppserverGroupMap_t ;
     
-    class Routing_t {
-    public:
-        class Route_t {
-        public:
-            Route_t() :m_bIsValid(false) {}
-            /*
-            Route_t( route_selector sel, const string& target, routing_strategy strat ) : m_selector(sel), m_target(target), m_strategy(strat)  {
-            
-                m_bIsValid = true ;
-            }
-             */
-            Route_t( const string& sel, const string& target, const string& strategy, const boost::unordered_set<string>& values ) : m_setValue(values) {
-                m_strategy = String2RoutingStrategy( strategy ) ;
-                if( unknown_routing_strategy == m_strategy ) {
-                    return ;
-                }
-                
-                m_selector = String2RouteSelector( sel ) ;
-                if( unknown_route_selector == m_selector ) {
-                    return ;
-                }
-            
-                m_bIsValid = true; 
-            }
-            ~Route_t() {}
-            bool operator==(const Route_t& other ) const {
-                return m_selector == other.m_selector && m_target == other.m_target && m_strategy == other.m_strategy && m_setValue == other.m_setValue ;
-            }
-            bool isValid() { return m_bIsValid ; }
-            
-            route_selector getRouteSelector() const { return m_selector ;}
-            const string& getTarget() const { return m_target ; }
-            routing_strategy getRoutingStrategy() const { return m_strategy; }
-            const boost::unordered_set<string> getValues() const { return m_setValue; }
-            
-        private:
-            route_selector m_selector ;
-            string m_target ;
-            routing_strategy m_strategy ;
-            boost::unordered_set<string> m_setValue ;
-            bool m_bIsValid ;
-            
-        } ;
-       
-        Routing_t() : m_inboundStrategy(round_robin), m_outboundStrategy(same_in_same_out_server) {} ;
-        Routing_t( routing_strategy ib, routing_strategy ob, const AppserverGroup_t& ibGroup, const string& obTarget ) : m_inboundStrategy(ib), m_outboundStrategy(ob),
-            m_inboundGroup(ibGroup), m_outboundTarget(obTarget) {}
-        ~Routing_t() {}
-        
-        routing_strategy getInboundRoutingStrategy() const { return m_inboundStrategy ; }
-        routing_strategy getOutboundRoutingStrategy() const { return m_outboundStrategy ; }
-        const AppserverGroup_t& getInboundAppserverGroup() const { return m_inboundGroup; }
-        const string& getOutboundTarget() const { return m_outboundTarget; }
-
-        bool getInboundRouteForSelector( route_selector r, const string& strValue, Route_t& route )  const {
-            boost::unordered_map< route_selector, boost::unordered_set< Route_t > >::const_iterator it = m_mapInboundRoutes.find( r ) ;
-            if( m_mapInboundRoutes.end() == it ) return false ; //no routes for that selector
-            
-            /* check if our value (ani/dnis) is in the set for this route */
-            BOOST_FOREACH( const Route_t& r, it->second ) {
-                boost::unordered_set<string>::const_iterator itValues = route.getValues().find( strValue ) ;
-                if( r.getValues().end() != itValues ) {
-                    route = r;
-                    return true ;
-                }
-            }
-            return false ;
-        }
-        
-        bool getOutboundRouteForSelector( route_selector r, const string& strValue, Route_t& route )  const {
-            boost::unordered_map< route_selector, boost::unordered_set< Route_t > >::const_iterator it = m_mapOutboundRoutes.find( r ) ;
-            if( m_mapOutboundRoutes.end() == it ) return false ; //no routes for that selector
-            
-            /* check if our value (ani/dnis) is in the set for this route */
-            BOOST_FOREACH( const Route_t& r, it->second ) {
-                boost::unordered_set<string>::const_iterator itValues = route.getValues().find( strValue ) ;
-                if( r.getValues().end() != itValues ) {
-                    route = r;
-                    return true ;
-                }
-            }
-            return false ;
-        }
-        
-        Routing_t& setInboundStrategy( routing_strategy strat ) { m_inboundStrategy = strat; return *this; }
-        Routing_t& setOutboundStrategy(routing_strategy strat ) { m_outboundStrategy = strat; return *this; }
-        Routing_t& setInboundAppserverGroup( const AppserverGroup_t group ) { m_inboundGroup = group; return *this; }
-        Routing_t& setOutboundTarget( const string& target) { m_outboundTarget = target; return *this; }
-        Routing_t& addInboundRoute( const Route_t& r ) { m_mapInboundRoutes[r.getRouteSelector()].insert( r ) ; return *this ; }
-        Routing_t& addOutboundRoute( const Route_t& r ) { m_mapOutboundRoutes[r.getRouteSelector()].insert( r ) ; return *this ; }
-                
-         
-    private:
-        
-        routing_strategy m_inboundStrategy ; ;
-        AppserverGroup_t m_inboundGroup ;
-        routing_strategy m_outboundStrategy;
-        string m_outboundTarget ;
-        
-        boost::unordered_map< route_selector, boost::unordered_set< Route_t > > m_mapInboundRoutes ;
-        boost::unordered_map< route_selector, boost::unordered_set< Route_t > > m_mapOutboundRoutes ;        
-        
-    } ;
-    /* needed to be able to live in a boost unordered container */
-    size_t hash_value( const Routing_t::Route_t& r) {
-        std::size_t seed = 0;
-        
-        /* hash the selector, and the first value -- since values (ie phone numbers, customer names) can only live in one container, each will be unique in that container */
-        boost::hash_combine(seed, r.getRouteSelector() ) ;
-        if( r.getValues().size() > 0 ) boost::hash_combine( seed, *r.getValues().begin() ) ;
-        return seed;
-    }
-
     
     /**
      Internal implementation class
     */
     class SspConfig::Impl {
     public:
-        Impl( const char* szFilename) : m_bIsValid(false), m_agent_mode(agent_mode_stateless) {
-            cout << "reading configuration file: " << szFilename << endl ;
+        Impl( const char* szFilename) : m_bIsValid(false), m_agent_mode(agent_mode_stateless), m_nCurrentTerminationCarrier(0), m_bIsActive(true), m_statsPort(0) {
             try {
                 std::filebuf fb;
                 if( !fb.open (szFilename,std::ios::in) ) {
@@ -319,25 +256,54 @@ namespace ssp {
                 ptree pt;
                 read_xml(is, pt);
                 
+                /* stats configuration */
+                try {
+                    pt.get_child("ssp.stats") ; // will throw if doesn't exist
+                    m_statsPort = pt.get<unsigned int>("ssp.stats.<xmlattr>.port", 8022) ;
+                    m_statsAddress = pt.get<string>("ssp.stats") ;
+                } catch( boost::property_tree::ptree_bad_path& e ) {
+                }
+                
                 /* logging configuration  */
                 m_syslogAddress = pt.get<string>("ssp.logging.syslog.address", "localhost") ;
                 m_sysLogPort = pt.get<unsigned int>("ssp.logging.syslog.address", 516) ;
                 m_syslogFacility = pt.get<string>("ssp.logging.syslog.facility","local7") ;
                 m_nSofiaLogLevel = pt.get<unsigned int>("ssp.logging.sofia-loglevel", 1) ;
                 
-                /* sip configuration */
-                m_inboundSipUrl = pt.get<string>("ssp.inbound.sip.contact", "sip:*") ;
-                m_outboundSipUrl = pt.get<string>("ssp.outbound.sip.contact", "sip:*") ;
+                string loglevel = pt.get<string>("ssp.logging.loglevel", "info") ;
                 
-                string inboundMode = pt.get<string>("ssp.inbound.sip.agent-mode", "stateless") ;
+                if( 0 == loglevel.compare("notice") ) m_loglevel = log_notice ;
+                else if( 0 == loglevel.compare("error") ) m_loglevel = log_error ;
+                else if( 0 == loglevel.compare("warning") ) m_loglevel = log_warning ;
+                else if( 0 == loglevel.compare("info") ) m_loglevel = log_info ;
+                else if( 0 == loglevel.compare("debug") ) m_loglevel = log_debug ;
+                else m_loglevel = log_info ;
+                
+                /* cdr database configuration */
+                m_cdrUser = pt.get<string>("ssp.cdr.user","");
+                m_cdrPassword = pt.get<string>("ssp.cdr.password","");
+                m_cdrHost = pt.get<string>("ssp.cdr.host","");
+                m_cdrPort = pt.get<string>("ssp.cdr.port","3306");
+                m_cdrSchema = pt.get<string>("ssp.cdr.schema","ssp");
+ 
+                /* sip configuration */
+                m_sipUrl = pt.get<string>("ssp.sip.contact", "sip:*") ;
+                
+                string inboundMode = pt.get<string>("ssp.sip.agent-mode", "stateful") ;
                 if( 0 == inboundMode.compare("stateful") ) {
                     m_agent_mode = agent_mode_stateful ;
                 }
                 
+                if( 0 == pt.get<string>("ss.sip.<xmlattr>.status", "active").compare("inactive") ) {
+                    m_bIsActive = false ;
+                }
+                m_nOriginationSessionTimer = pt.get<unsigned long>("ssp.inbound.session-timer", 0) ;
+                
                 /* routing strategy: round robin for a configurable interval (0=always), then send the next call to least loaded server */
                 m_nMaxRoundRobins = pt.get<unsigned int>("ssp.inbound.max-round-robins", 0) ;
+                m_nMaxTerminationAttempts = pt.get<unsigned int>("ssp.outbound.max-termination-attempts", 1) ;
+                m_nFSTimerMsecs = pt.get<unsigned long>("ssp.inbound.freeswitch-health-check-interval", 5000) ;
                 
-                m_strAcl = pt.get<string>("ssp.inbound.acl","carrier") ;
                 
                 string ibStrategy = pt.get<string>("ssp.routing.inbound.<xmlattr>.strategy", "") ;
                 string ibTarget = pt.get<string>("ssp.routing.inbound.<xmlattr>.target", "") ;
@@ -352,7 +318,6 @@ namespace ssp {
                         if( !getXmlAttribute( v, "name", appserverName ) ) {
                             appserverName = address ;
                         }
-                        
                         
                         Appserver_t as( v.second.data(), v.second.get("event-socket-port", 8021) ) ;
                         
@@ -428,76 +393,53 @@ namespace ssp {
                         if( !getXmlAttribute( v, "name", carrierName ) )
                             return ;
 
-                        boost::unordered_set<CarrierAddressSpace_t> setInbound ;
-                        BOOST_FOREACH( ptree::value_type const& v2, v.second.get_child("inbound") ) {
-                            if( v2.first == "address") {
-                                CarrierAddressSpace_t c( carrierName, v2.second.data(), v2.second.get("<xmlattr>.port", 5060), v2.second.get("<xmlattr>.netmask", "255.255.255.255") ) ;
-                                pair<CarrierServerMap_t::iterator, bool> ret = m_mapInboundCarrier.insert( CarrierServerMap_t::value_type( c.getAddress(), c ) ) ;
-                                if( !ret.second ) {
-                                    cerr << "Multiple carrier elements have duplicate address attribute values" << endl ;
-                                    return ;
+                        try {
+                            BOOST_FOREACH( ptree::value_type const& v2, v.second.get_child("inbound") ) {
+                                if( v2.first == "address") {
+                                    CarrierAddressSpace_t c( carrierName, v2.second.data(), v2.second.get("<xmlattr>.port", 5060), v2.second.get("<xmlattr>.netmask", "255.255.255.255") ) ;
+                                    pair<CarrierServerMap_t::iterator, bool> ret = m_mapInboundCarrier.insert( CarrierServerMap_t::value_type( c.getAddress(), c ) ) ;
+                                    if( !ret.second ) {
+                                        cerr << "Multiple carrier elements have duplicate address attribute values" << endl ;
+                                        return ;
+                                    }
+                                    
                                 }
-                                
                             }
+                            
+                        } catch( boost::property_tree::ptree_bad_path &e) {
                         }
-                        /*
-                        BOOST_FOREACH( ptree::value_type const& v2, v.second.get_child("outbound") ) {
-                            CarrierAddressSpace_t c( v2.second.data(), v2.second.get("<xmlattr>.port", 5060), v2.second.get("<xmlattr>.netmask", "255.255.255.255") ) ;
-                            setOutbound.insert( c ) ;
-                        } 
-                         */
-                    }
-                     else if( v.first == "routing" ) {
-                        BOOST_FOREACH( const ptree::value_type& v2, v.second.get_child("inbound") ) {
-                            if( v2.first == "route") {
-                                string selector = v2.second.get("<xmlattr>.selector","") ;
-                                string target = v2.second.get("<xmlattr>.target", ibTarget) ;
-                                string strategy = v2.second.get("<xmlattr>.strategy", ibStrategy) ;
-                                boost::unordered_set<string> setValues ;
-                                BOOST_FOREACH( const ptree::value_type& v3, v2.second ) {
-                                    if( v3.first == "item") setValues.insert( v3.second.data() ) ;
+                        
+                        /* outbound */
+                        string status = v.second.get<string>("outbound.<xmlattr>.status", "active");
+                        if( 0 == status.compare("active") ) {
+                            unsigned int qty =  v.second.get<unsigned int>("outbound.<xmlattr>.qty", 1) ;
+                            string chargeNumber = v.second.get<string>("outbound.<xmlattr>.charge-number", "");
+                            vector<CarrierAddressSpace_t> vecTrunks ;
+                            try {
+                                BOOST_FOREACH( ptree::value_type const& v2, v.second.get_child("outbound") ) {
+                                    if( v2.first == "address") {
+                                        if( 0 == v2.second.get<string>("<xmlattr>.status","active").compare("inactive") ) continue ;
+                                        CarrierAddressSpace_t c( carrierName, v2.second.data(), v2.second.get("<xmlattr>.port", 5060), "255.255.255.255", 
+                                            v2.second.get<unsigned int>("<xmlattr>.qty",1) )  ;
+                                        vecTrunks.push_back( c ) ;
+                                    }
+                                }
+                                if( !vecTrunks.empty() ) {
+                                    boost::shared_ptr<TerminationRoute_t> t = boost::make_shared<TerminationRoute_t>( vecTrunks, chargeNumber) ;
+                                    m_mapTerminationCarrierByName.insert ( TerminationCarrierMap_t::value_type( carrierName,  t) ) ;
+                                    while( qty-- ) m_vecTerminationCarrier.push_back( carrierName ) ;
                                 }
                                 
-                                if( setValues.empty() ) {
-                                    cerr << "You must supply at least one <item/> child of the <inbound/> element" << endl ;
-                                    return ;
-                                }
-                                
-                                Routing_t::Route_t r( selector, target, strategy, setValues ) ;
-                                if( !r.isValid() ) {
-                                    return ;
-                                }
-                                m_routing.addInboundRoute( r ) ;
-                                
-                            }
-                        }
-                        BOOST_FOREACH( const ptree::value_type& v2, v.second.get_child("outbound") ) {
-                            if( v2.first == "route") {
-                                string selector = v2.second.get("<xmlattr>.selector","") ;
-                                string target = v2.second.get("<xmlattr>.target", ibTarget) ;
-                                string strategy = v2.second.get("<xmlattr>.strategy", ibStrategy) ;
-                                boost::unordered_set<string> setValues ;
-                                BOOST_FOREACH( const ptree::value_type& v3, v2.second ) {
-                                    if( v3.first == "item") setValues.insert( v3.second.data() ) ;
-                                }
-                                
-                                if( setValues.empty() ) {
-                                    cout << "You must supply at least one <item/> child of the <outbound/> element" << endl ;
-                                    return ;
-                                }
-                                
-                                Routing_t::Route_t r( selector, target, strategy, setValues ) ;
-                                if( !r.isValid() ) {
-                                    return ;
-                                }
-                                m_routing.addOutboundRoute( r ) ;
-                                
+                            } catch( boost::property_tree::ptree_bad_path &e) {
                             }
                         }
                     }
                 }
                 fb.close() ;
-                
+                if( 0 == m_vecTerminationCarrier.size() ) {
+                    cerr << "Must have at least one termination carrier specified in the configuration file " << endl ;
+                    return ;
+                }
                 if( 0 == m_mapAppserver.size() ) {
                     cerr << "Must have at least one appserver defined in the configuration file" << endl ;
                     return ;
@@ -515,8 +457,7 @@ namespace ssp {
         const string& getSyslogAddress() const { return m_syslogAddress; }
         unsigned int getSyslogPort() const { return m_sysLogPort ; }
         
-        const string& getInboundSipUrl() const { return m_inboundSipUrl; }
-        const string& getOutboundSipUrl() const { return m_outboundSipUrl; }
+        const string& getSipUrl() const { return m_sipUrl; }
         
         bool getSyslogTarget( std::string& address, unsigned int& port ) const {
             address = m_syslogAddress ;
@@ -540,90 +481,10 @@ namespace ssp {
             CarrierAddressSpace_t c = it->second ;
             carrier = c.getCarrier() ;
             return true ;
-         }
-        bool getInboundRoutes( const std::string& sourceAddress, const std::string& dnis, const std::string& ani, std::vector<std::string>& routes, routing_strategy& strategy, routing_error& error ) const {
-            Routing_t::Route_t route ;
-            string carrierName, customerName ;
-            if( !getCarrier( sourceAddress, carrierName ) ) {
-                error = invalid_sender ;
-                return false ;
-            }
-            if( !getCustomer( dnis, customerName ) ) {
-                error = dnis_not_provisioned ;
-                return false ;
-            }
-            
-            
-            /* ani-based routing takes precedence, then customer/dnis-based routing */
-            AppserverGroup_t group ;
-            if( m_routing.getInboundRouteForSelector( ani_selector, ani, route ) || m_routing.getInboundRouteForSelector( customer_selector, customerName, route ) ) {
-                
-                string s = route.getTarget()  ;
-                strategy = route.getRoutingStrategy() ;
-                AppserverGroupMap_t::const_iterator it = m_mapAppserverGroup.find( s ) ;
-                if( m_mapAppserverGroup.end() == it ) {
-                    error = no_routes_provisioned ;
-                    return false ;
-                }
-                group = it->second ;
-            }
-            
-             /* default routing */
-            else {
-                group = m_routing.getInboundAppserverGroup() ;
-                strategy = m_routing.getInboundRoutingStrategy() ;
-            }
-            
-            /* resolve appserver group into a set of addresses */
-            BOOST_FOREACH( const Appserver_t& as, group.getAppservers() ) {
-                routes.push_back( as.getAddress() ) ;
-            }
-            return true ;
-
-        }
-        bool getOutboundRoutes( const std::string& dnis, const std::string& ani, std::vector<std::string>& routes, routing_strategy& strategy, routing_error& error ) const {
-            Routing_t::Route_t route ;
-            string customerName ;
-            if( !getCustomer( dnis, customerName ) ) {
-                error = dnis_not_provisioned ;
-                return false ;
-            }
-            
-            
-            /* ani-based routing takes precedence, then customer/dnis-based routing */
-            string carrierName  ;
-            if( m_routing.getOutboundRouteForSelector( ani_selector, ani, route ) || m_routing.getOutboundRouteForSelector( customer_selector, customerName, route ) ) {
-                
-                carrierName = route.getTarget()  ;
-                strategy = route.getRoutingStrategy() ;
-            }
-            
-            /* default routing */
-            else {
-                carrierName = m_routing.getOutboundTarget();  ;
-                strategy = m_routing.getOutboundRoutingStrategy() ;
-            }
-            
-            /* resolve carrier name into a set of server addresses */
-            CarrierServerMap_t::const_iterator it = m_mapOutboundCarrier.find( carrierName ) ;
-            if( m_mapOutboundCarrier.end() == it ) {
-                error = no_routes_provisioned ;
-                return false ;
-            }
-            
-            /*
-            BOOST_FOREACH( const CarrierAddressSpace_t& c, it->second ) {
-                routes.push_back( c.getAddress() ) ;
-            }
-             */
-            return true ;
-            
         }
         
         bool getSyslogFacility( sinks::syslog::facility& facility ) const {
         
-	    std::cout << "syslog facility " << m_syslogFacility << endl ;
-
             if( m_syslogFacility.empty() ) return false ;
             
             if( m_syslogFacility == "local0" ) facility = sinks::syslog::local0 ;
@@ -663,9 +524,74 @@ namespace ssp {
         
         agent_mode getAgentMode(void) { return m_agent_mode; }
         
-        bool getAcl(string& strAcl) { strAcl =  m_strAcl ;}
+        bool getTerminationRoute( std::string& destAddress, std::string& carrier, std::string& chargeNumber ) {
+            if( m_vecTerminationCarrier.empty() ) return false ;
+            carrier = m_vecTerminationCarrier.at( m_nCurrentTerminationCarrier ) ;
+            TerminationCarrierMap_t::iterator it = m_mapTerminationCarrierByName.find( carrier ) ;
+            if( m_mapTerminationCarrierByName.end() == it ) {
+                assert(false) ;
+                return false ;
+            }
+            boost::shared_ptr<TerminationRoute_t>& route = it->second ;
+            route->getNextTrunk( destAddress, chargeNumber ) ;
+            if( ++m_nCurrentTerminationCarrier >= m_vecTerminationCarrier.size() ) m_nCurrentTerminationCarrier = 0 ;
+            return true;
+        }
 
+        /* try to find a different carrier for a failed attempt */
+        bool getTerminationRouteForAltCarrier( const std::string& failedCarrier, std::string& destAddress, std::string& carrier, std::string& chargeNumber ) {
+            for( TerminationCarrierMap_t::iterator it = m_mapTerminationCarrierByName.begin(); it != m_mapTerminationCarrierByName.end(); it++ ) {
+                carrier = it->first ;
+                if( 0 != carrier.compare(failedCarrier) ) {
+                    boost::shared_ptr<TerminationRoute_t>& route = it->second ;
+                    route->getNextTrunk( destAddress, chargeNumber ) ;   
+                    return true ;             
+                }
+            }
+
+            /* may not have multiple carriers, just return the next route */
+            return getTerminationRoute( destAddress, carrier, chargeNumber ) ;
+        }
         
+        bool isActive() {
+            return m_bIsActive ;
+        }
+        unsigned int getCountOfOutboundTrunks() {
+            int count = 0 ;
+            for( TerminationCarrierMap_t::iterator it = m_mapTerminationCarrierByName.begin(); it != m_mapTerminationCarrierByName.end(); it++ ) {
+                boost::shared_ptr<TerminationRoute_t>& route = it->second ;
+                count += route->getCountOfTrunks();
+            }
+            return count ;
+        }
+        unsigned int getMaxTerminationAttempts() {
+            return m_nMaxTerminationAttempts ;
+        }
+        unsigned long getOriginationSessionTimer() {
+            return m_nOriginationSessionTimer ;
+        }
+        unsigned long getFSHealthCheckTimerTimeMsecs() {
+            return m_nFSTimerMsecs ;
+        }
+        severity_levels getLoglevel() {
+            return m_loglevel ;
+        }
+        unsigned int getStatsPort( string& address ) {
+            address = m_statsAddress ;
+            return m_statsPort ;
+        }
+        bool getCdrConnectInfo( string& user, string& pass, string& dbUrl, string& schema ) {
+            if( 0 == m_cdrHost.length() || 0 == m_cdrUser.length() || 0 == m_cdrPassword.length() || 0 == m_cdrSchema.length() ) return false ;
+
+            user = m_cdrUser ;
+            pass = m_cdrPassword ;
+            schema = m_cdrSchema ;
+            ostringstream s ;
+            s << "tcp://" << m_cdrHost << ":" << m_cdrPort ;
+            dbUrl = s.str() ;
+            return true; 
+        }
+
     private:
         
         bool getXmlAttribute( ptree::value_type const& v, const string& attrName, string& value ) {
@@ -683,21 +609,33 @@ namespace ssp {
         
         
         bool m_bIsValid ;
+        bool m_bIsActive ;
         string m_syslogAddress ;
         unsigned int m_sysLogPort ;
         string m_syslogFacility ;
-        string m_inboundSipUrl ;
-        string m_outboundSipUrl ;
+        string m_sipUrl ;
         CustomerDnisMap_t m_mapCustomerDnis ;
         CarrierServerMap_t m_mapInboundCarrier ;
         CarrierServerMap_t m_mapOutboundCarrier ;
+        TerminationCarrierMap_t m_mapTerminationCarrierByName ;
+        vector<string> m_vecTerminationCarrier ;
+        unsigned int m_nCurrentTerminationCarrier ;
         AppserverMap_t m_mapAppserver;
         AppserverGroupMap_t m_mapAppserverGroup ;
-        Routing_t m_routing ;
         agent_mode m_agent_mode ;
         unsigned int m_nSofiaLogLevel ;
         unsigned int m_nMaxRoundRobins ;
-        string m_strAcl ;
+        unsigned int m_nMaxTerminationAttempts;
+        unsigned long m_nOriginationSessionTimer ;
+        unsigned long m_nFSTimerMsecs ;
+        severity_levels m_loglevel ;
+        string m_statsAddress ;
+        unsigned int m_statsPort ;
+        string m_cdrUser ;
+        string m_cdrPassword ;
+        string m_cdrHost ;
+        string m_cdrPort ;
+        string m_cdrSchema ;
     } ;
     
     /*
@@ -714,12 +652,8 @@ namespace ssp {
         return m_pimpl->isValid() ;
     }
     
-    bool SspConfig::getInboundSipUrl( std::string& sipUrl ) const {
-        sipUrl = m_pimpl->getInboundSipUrl() ;
-        return true ;
-    }
-    bool SspConfig::getOutboundSipUrl( std::string& sipUrl ) const {
-        sipUrl = m_pimpl->getOutboundSipUrl() ;
+    bool SspConfig::getSipUrl( std::string& sipUrl ) const {
+        sipUrl = m_pimpl->getSipUrl() ;
         return true ;
     }
     
@@ -732,12 +666,7 @@ namespace ssp {
     bool SspConfig::getCarrier( const std::string& sourceAddress, std::string& customer) const {
         return m_pimpl->getCarrier( sourceAddress, customer ) ;
     }
-    bool SspConfig::getInboundRoutes( const std::string& sourceAddress, const std::string& dnis, const std::string& ani, std::vector<std::string>& routes, routing_strategy& strategy, routing_error& error ) const {
-        return m_pimpl->getInboundRoutes( sourceAddress, dnis, ani, routes, strategy,  error );
-    }
-    bool SspConfig::getOutboundRoutes( const std::string& dnis, const std::string& ani, std::vector<std::string>& routes, routing_strategy& strategy, routing_error& error ) const {
-        return m_pimpl->getOutboundRoutes( dnis, ani, routes, strategy, error ) ;
-    }
+
     bool SspConfig::getSyslogFacility( sinks::syslog::facility& facility ) const {
         return m_pimpl->getSyslogFacility( facility ) ;
     }
@@ -755,18 +684,38 @@ namespace ssp {
     unsigned int SspConfig::getMaxRoundRobins() {
         return m_pimpl->getMaxRoundRobins() ;
     }
-    bool SspConfig::getAcl( string& strAcl ) {
-        m_pimpl->getAcl( strAcl ) ;
-        return true ;
+    bool SspConfig::getTerminationRoute( std::string& destAddress, std::string& carrier, std::string& chargeNumber ) {
+        return m_pimpl->getTerminationRoute( destAddress, carrier, chargeNumber ) ;
     }
-    bool SspConfig::isAcl( const string& s ) {
-        string strAcl ;
-        m_pimpl->getAcl( strAcl ) ;
-        return 0 == s.compare( strAcl ) ;
+    bool SspConfig::getTerminationRouteForAltCarrier( const std::string& failedCarrier, std::string& destAddress, std::string& carrier, std::string& chargeNumber ) {
+        return m_pimpl->getTerminationRouteForAltCarrier( failedCarrier, destAddress, carrier, chargeNumber ) ;
     }
-    
-
+    bool SspConfig::isActive() {
+        return m_pimpl->isActive() ;
+    }
+    unsigned int SspConfig::getCountOfOutboundTrunks(void) {
+        return m_pimpl->getCountOfOutboundTrunks(); 
+    }
+    unsigned int SspConfig::getMaxTerminationAttempts(void) {
+        return m_pimpl->getMaxTerminationAttempts() ;
+    }
+    unsigned long SspConfig::getOriginationSessionTimer() {
+        return m_pimpl->getOriginationSessionTimer() ;
+    }
+    unsigned long SspConfig::getFSHealthCheckTimerTimeMsecs(void) {
+        return m_pimpl->getFSHealthCheckTimerTimeMsecs() ;
+    }
+    bool SspConfig::getCdrConnectInfo( string& user, string& pass, string& dbUrl, string& schema ) {
+        return m_pimpl->getCdrConnectInfo( user, pass, dbUrl, schema ) ;
+    } 
     void SspConfig::Log() const {
         SSP_LOG(log_notice) << "Configuration:" << endl ;
     }
+    severity_levels SspConfig::getLoglevel() {
+        return m_pimpl->getLoglevel() ;
+    }
+    unsigned int SspConfig::getStatsPort( string& address ) {
+        return m_pimpl->getStatsPort( address ) ;
+    }
+
 }

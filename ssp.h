@@ -37,6 +37,7 @@ namespace src = boost::log::sources;
 namespace sinks = boost::log::sinks;
 namespace fmt = boost::log::formatters;
 namespace keywords = boost::log::keywords;
+namespace filters = boost::log::filters ;
 
 
 namespace ssp {
@@ -83,6 +84,12 @@ namespace ssp {
     enum agent_mode {
         agent_mode_stateless,
         agent_mode_stateful
+    } ;
+    
+    enum call_type_t {
+        unknown_call_type,
+        origination_call_type,
+        termination_call_type
     } ;
     
 }
