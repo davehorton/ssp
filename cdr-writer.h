@@ -150,6 +150,9 @@ namespace ssp {
 
 		deque< boost::shared_ptr<sql::Connection> > m_vecConnection ;
 
+		boost::shared_ptr<sql::PreparedStatement> m_stmtOrig, m_stmtFinal, m_stmtCancel, m_stmtTerm1, m_stmtTerm2, m_stmtBye1, m_stmtBye2 ;
+
+
 	} ;
 
 }
