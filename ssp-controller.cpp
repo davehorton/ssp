@@ -1497,6 +1497,18 @@ namespace ssp {
                 this->populateCancelCdr( pCdr ) ;
                 if( m_cdrWriter ) m_cdrWriter->postCdr( pCdr ) ;
             }
+            else {
+                mapTerminationAttempts::iterator it = m_mapTerminationAttempts.find( orq ) ;
+                if( m_mapTerminationAttempts.end() != it ) {
+                    boost::shared_ptr<TerminationAttempt> t = it->second ;
+                    boost::shared_ptr<CdrInfo> pCdr = boost::make_shared<CdrInfo>(CdrInfo::termination_attempt) ;
+                    *pCdr = *(t->getCdrInfo()) ;
+                    populateFinalResponseCdr( pCdr, 487 ) ;
+                    pCdr->setCdrType( CdrInfo::termination_attempt ) ;
+                    if( m_cdrWriter ) m_cdrWriter->postCdr( pCdr ) ;
+                }
+
+            }
 
             nta_outgoing_cancel( orq ) ;
             nta_outgoing_destroy( orq ) ;
