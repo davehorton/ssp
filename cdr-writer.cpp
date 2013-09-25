@@ -474,7 +474,7 @@ namespace ssp {
 
 			static boost::thread_specific_ptr< sql::PreparedStatement > stmt2 ;
 			if( !stmt2.get() ) {
-				stmt2.reset( conn->prepareStatement("UPDATE termination_attempt SET end_time=? WHERE session_uuid=? and final_sip_status = 200")) ;
+				stmt2.reset( conn->prepareStatement("UPDATE termination_attempt SET end_time=? WHERE cdr_session_uuid=? and final_sip_status = 200")) ;
 			}
 			stmt2->setDateTime(1, strTimeEnd) ;
 			stmt2->setString(2, pCdr->getUuid()) ;
