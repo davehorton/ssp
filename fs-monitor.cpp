@@ -32,7 +32,7 @@ namespace ssp {
     }
     
     FsMonitor::~FsMonitor() {
-        
+        this->stop() ;
     }
     
     void FsMonitor::run() {
@@ -57,6 +57,7 @@ namespace ssp {
         
         //TODO: destroy existing servers ?  Or add new ones, drop only missing ones?
         m_servers.clear() ;
+        m_setServers.clear() ;
         
         boost::char_separator<char> sep(":");
         string strAddress ;
@@ -69,9 +70,11 @@ namespace ssp {
                 if( 1 == i ) nPort = ::atoi( token.c_str() ) ;
                 i++ ;
             }
-            boost::shared_ptr<FsInstance> ptr( new FsInstance( m_ioService, strAddress, nPort ) )  ;
+            boost::shared_ptr<FsInstance> ptr( new FsInstance( this, m_ioService, strAddress, nPort ) )  ;
             ptr->start() ;
             m_servers.push_back( ptr ) ;
+            
+            m_setServers.insert( strAddress ) ;
         }
     }
 
@@ -124,6 +127,9 @@ namespace ssp {
                 results.push_back( m_servers[current] ) ;
                 
             }
+            else if( m_nLastServer == current ) {
+                m_nLastServer++ ;
+            }
             current = ++current < total_servers ? current: 0 ;
             if( current == start ) exhaustedServers = true ;
             
@@ -152,6 +158,10 @@ namespace ssp {
         SSP_LOG(log_debug) << "Available freeswitch servers " << (doLeastLoaded ? "(least loaded): " : "(round robin): ") << s.str() << endl ;        
         
         return true ;
+    }
+    void FsMonitor::notifySipServerAddress( const string& fsAddress, const string& sipAddress, unsigned int& sipPort ) {
+        m_setServers.erase( fsAddress ) ;
+        m_setServers.insert( sipAddress ) ;
     }
 
     void FsMonitor::toString( deque< boost::shared_ptr<FsInstance> >& d, std::stringstream& s ) {

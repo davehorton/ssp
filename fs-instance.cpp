@@ -11,6 +11,7 @@
 #include "fs-instance.h"
 #include "fs-exception.h"
 #include "ssp-controller.h"
+#include "fs-monitor.h"
 
 #define MY_COORDS   m_strAddress << ":" << m_nEventSocketPort << " - "
 #define MY_SIP_COORDS   m_strSipAddress << ":" << m_nSipPort << " - "
@@ -18,15 +19,15 @@
 namespace ssp {
  
  
-    FsInstance::FsInstance( boost::asio::io_service& ioService, const string& address, unsigned int port, bool busyOut ):
-        m_ioService(ioService), m_socket(ioService), m_resolver(ioService), m_timer(ioService),
+    FsInstance::FsInstance( FsMonitor* pMonitor, boost::asio::io_service& ioService, const string& address, unsigned int port, bool busyOut ):
+        m_pMonitor(pMonitor), m_ioService(ioService), m_socket(ioService), m_resolver(ioService), m_timer(ioService),
         m_strAddress(address), m_nEventSocketPort(port), m_lastCheck(0), m_nSipPort(0),
-        m_bConnected(false), m_nMaxSessions(0), m_nCurrentSessions(0), m_bBusyOut(busyOut), m_state(starting),m_bDisconnected(false) {
+        m_bConnected(false), m_nMaxSessions(0), m_nCurrentSessions(0), m_bBusyOut(busyOut), m_state(starting),m_bDisconnected(false), m_bReloadingXml(false) {
             
     }
     
     FsInstance::~FsInstance() {
-        SSP_LOG(log_notice) << "Destroying FsInstance" << endl ;
+        SSP_LOG(log_debug) << "Destroying FsInstance" << endl ;
     }
     
     void FsInstance::start() {
@@ -58,7 +59,7 @@ namespace ssp {
             SSP_LOG(log_error) << MY_COORDS << "Unable to resolve FS at " << m_strAddress << ":" << m_nEventSocketPort << " --> " << ec.message() << endl;
             
             m_state = resolve_failed ;
-            start_timer( 5 ) ;
+            start_timer( 5000 ) ;
          }
     }
     
@@ -81,7 +82,7 @@ namespace ssp {
             SSP_LOG(log_error) << MY_COORDS << "Unable to connect to FS at " << m_strAddress << ":" << m_nEventSocketPort << " --> " << ec.message() << endl;
     
             m_state = connect_failed ;
-            start_timer( 5 ) ;
+            start_timer( 5000 ) ;
          }
        
     }
@@ -112,7 +113,7 @@ namespace ssp {
                 m_socket.close();
                 m_bDisconnected = true ;
                 m_state = starting ;
-                start_timer(1) ;
+                start_timer(1000) ;
                 throw FsDisconnectException( m_strAddress, m_nEventSocketPort, "Disconnected; freeswitch was shut down") ;
             }
             
@@ -154,18 +155,22 @@ namespace ssp {
                             out = "api status\r\n\r\n" ;
                             m_state = querying_status ; //we've reached the "normal" querying state
                             bReadAgain = true ;
+                            m_pMonitor->notifySipServerAddress( m_strAddress, m_strSipAddress, m_nSipPort ) ;
                         }
                      }
                     break ;
                     
                 case querying_status:
                     if( FsMessage::api == m_fsMsg.getCategory() && FsMessage::response == m_fsMsg.getType() ) {
-                        if( !m_fsMsg.getFsStatus( m_nCurrentSessions, m_nMaxSessions ) ) {
+                        if( m_bReloadingXml ) {
+                            m_bReloadingXml = false ;
+                        }
+                        else if( !m_fsMsg.getFsStatus( m_nCurrentSessions, m_nMaxSessions ) ) {
                             SSP_LOG(log_error) << MY_SIP_COORDS << "Failed to parse freeswitch status from response: " << data << endl ;
                             bSetTimer = true ;
                         }
                         else {
-                            SSP_LOG(log_info) << MY_SIP_COORDS << "FS at " << m_strSipAddress << ":" << m_nSipPort << " has active sessions: " << m_nCurrentSessions << ", max sessions: " << m_nMaxSessions << endl ;
+                            SSP_LOG(log_debug) << m_strSipAddress << ":" << m_nSipPort << " (" << m_nCurrentSessions << "/" << m_nMaxSessions << ")" << endl ;
                             bSetTimer = true ;
                             if( m_bDisconnected ) {
                                 m_bDisconnected = false ;
@@ -190,7 +195,7 @@ namespace ssp {
                                          boost::bind( &FsInstance::read_handler, shared_from_this(), boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred ) ) ;
             }
             if( bSetTimer ) {
-                start_timer( 5 ) ;
+                start_timer( querying_status == m_state ? theOneAndOnlyController->getFSHealthCheckTimerTimeMsecs() : 5000 ) ;
             }
             if( bNotifyReconnect ) throw FsReconnectException( m_strAddress, m_nEventSocketPort, "Reconnected") ;
         }
@@ -201,7 +206,6 @@ namespace ssp {
     
     void FsInstance::timer_handler(const boost::system::error_code& ec) {
         bool bReadAgain = false ;
-        bool bSetTimer = false ;
         string out ;
         if( !ec ) {
             SSP_LOG(log_debug) << "FsInstance timer went off " << m_strAddress << ":" << m_nEventSocketPort << " state is: " << m_state << endl ;
@@ -240,18 +244,27 @@ namespace ssp {
                 m_socket.async_read_some(boost::asio::buffer(m_buffer),
                                          boost::bind( &FsInstance::read_handler, shared_from_this(), boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred ) ) ;
             }
-            if( bSetTimer ) {
-                start_timer( 5 ) ;
-            }
         }
         else {
             SSP_LOG(log_error) << MY_COORDS << "FsInstance timer error " << m_strAddress << ":" << m_nEventSocketPort << " --> " << ec.message() << endl;
         }
     }
 
-    void FsInstance::start_timer( unsigned int nSeconds ) {
-        m_timer.expires_from_now(boost::posix_time::seconds(nSeconds));
+    void FsInstance::start_timer( unsigned long nMilliseconds ) {
+        m_timer.expires_from_now(boost::posix_time::milliseconds(nMilliseconds));
         m_timer.async_wait( boost::bind( &FsInstance::timer_handler, shared_from_this(), boost::asio::placeholders::error )) ;
+    }
+    
+    void FsInstance::reloadxml() {
+        if( m_state != querying_status ) return ;
+        
+        string out = "api reloadxml\r\n\r\n" ;
+        if( m_strSipAddress.length() > 0 )  SSP_LOG(log_debug) <<  MY_SIP_COORDS  << "Write " << out.length() << " bytes" << endl << out << endl ;
+        else SSP_LOG(log_debug) <<  MY_COORDS  << "Write " << out.length() << " bytes" << endl << out << endl ;
+        boost::asio::write( m_socket, boost::asio::buffer(out) ) ;
+        m_bReloadingXml = true ;
+        m_socket.async_read_some(boost::asio::buffer(m_buffer),
+                                 boost::bind( &FsInstance::read_handler, shared_from_this(), boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred ) ) ;
     }
     
     FsInstance::operator const char * () {

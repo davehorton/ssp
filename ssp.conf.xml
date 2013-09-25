@@ -5,15 +5,39 @@
     If no other configuration is supplied, inbound routing is round-robin and outbound routing is same-in-same-out-ip-address
     -->
     
+    <stats port="8022">localhost</stats>
+    
+    <sip status="active">
+        <!-- local sip address to bind to.  Default: 'sip:*' -->
+        <contact>sip:209.251.49.135</contact>
+        
+        <!-- 'stateless' or 'stateful'.  Default: 'stateless' -->
+        <agent-mode>stateful</agent-mode>
+    </sip>
+ 
+    <cdr>
+        <user>ssp</user>
+        <password>ssp</password>
+        <host>util02</host>
+        <schema>ssp</schema>
+        <port>3306</port>
+    </cdr>
+
+   <!-- logging configuration -->
+    <logging>
+        <syslog>
+            <address>localhost</address>
+            <port>514</port>
+            <facility>local6</facility>
+        </syslog>
+        <sofia-loglevel>7</sofia-loglevel>
+        
+        <!-- notice, warning, error, info, debug.  Default: info -->
+        <loglevel>debug</loglevel>
+    </logging>
+
     <!-- configuration specific to ssp handling inbound calls (originations) -->
     <inbound>
-        <sip>
-            <!-- local sip address to bind to.  Default: 'sip:*' -->
-            <contact>sip:209.251.49.135</contact>
-            
-            <!-- 'stateless' or 'stateful'.  Default: 'stateless' -->
-            <agent-mode>stateful</agent-mode>
-        </sip>
         <!-- Number of sequential calls to distribute in round robin fashion to available servers;
          after round-robining that number of calls, the next will be sent to the least loaded available server.
          This feature is intended to level out the number of calls across servers over time, even when they are
@@ -23,50 +47,45 @@
          -->
         <max-round-robins>3</max-round-robins>
         
-        <!-- 'carrier', or 'none'; specifies whether or not to restrict calls to known carriers (defined below).  Default: 'carrier' -->
-        <acl>none</acl>
+        <session-timer>1800</session-timer>
         
-        <!-- internal app servers that we distribute calls across -->
+        <freeswitch-health-check-interval>5000</freeswitch-health-check-interval>
+        
+        
+        <!-- freeswitch servers that we distribute calls across -->
         <appserver event-socket-port="8021">localhost</appserver>
         <!--
          <appserver event-socket-port="8021">209.251.49.139</appserver>
          <appserver event-socket-port="8021">209.251.49.140</appserver>
+        -->
     </inbound>
     
     <!-- configuration specific to ssp handling outbound calls (terminations) -->
     <outbound>
+        <!-- max number of different outbound trunks to try when completing a call.  Default is 1.
+             note that the actual number of attempts will be the lesser of this number and the total number of outbound trunks.
+         -->
+        <max-termination-attempts>3</max-termination-attempts>
     </outbound>
-            
-    <!-- logging configuration -->
-    <logging>
-        <syslog>
-            <address>localhost</address>
-            <port>514</port>
-            <facility>local6</facility>
-        </syslog>
-        <sofia-loglevel>7</sofia-loglevel>
-    </logging>
-    
-    <!-- grouping of DNISs into customers -->
-    <dnis-list name="apple">
-        <dnis>1001</dnis>
-        <dnis-block>
-            <first>6172370000</first>
-            <last>6172379999</last>
-        </dnis-block>
-    </dnis-list>
-
+                
     <!-- grouping of external sip endpoints into carriers/service providers -->
     <carrier name="level3">
         <inbound>
             <address>192.168.1.54</address>
             <address port="5061">192.168.1.59</address>
         </inbound>
-        <outbound>
+        <outbound qty="2">
             <address>172.21.3.96</address>
             <address port="5061">172.21.3.97</address>
         </outbound>
     </carrier>
-    
+    <carrier name="intermetro">
+        <outbound qty="3" charge-number="6172375089">
+            <address qty="2">10.10.10.1</address>
+            <address>10.10.10.2</address>
+            <address>10.10.10.3</address>
+            <address status="inactive">10.10.10.4</address>
+        </outbound>
+    </carrier>
     
 </ssp>

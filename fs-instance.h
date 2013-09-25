@@ -23,9 +23,11 @@ using  boost::asio::ip::tcp ;
 
 namespace ssp {
     
+    class FsMonitor ;
+    
     class FsInstance : public boost::enable_shared_from_this<FsInstance> {
     public:
-        FsInstance( boost::asio::io_service& ioService, const string& strAddress, unsigned int port, bool busyOut = false) ;
+        FsInstance( FsMonitor* pMonitor, boost::asio::io_service& ioService, const string& strAddress, unsigned int port, bool busyOut = false) ;
         ~FsInstance() ;
         bool operator==(FsInstance& other) { return m_strAddress == other.m_strAddress && m_nEventSocketPort == other.m_nEventSocketPort ; }
         
@@ -45,7 +47,8 @@ namespace ssp {
         unsigned int getAvailableSessions() const { return m_nMaxSessions - m_nCurrentSessions; }
         unsigned int getSipPort() const { return m_nSipPort ; }
         bool isAvailable() const { return querying_status == m_state && m_nCurrentSessions < m_nMaxSessions - 2 ;}
-        
+        bool isOnline() const { return querying_status == m_state ;}
+        void reloadxml() ;
         
         void resolve_handler( const boost::system::error_code& ec, boost::asio::ip::tcp::resolver::iterator it) ;
         void connect_handler( const boost::system::error_code& ec, boost::asio::ip::tcp::resolver::iterator it ) ;
@@ -68,14 +71,16 @@ namespace ssp {
             disconnecting
         } ;
         
-        void start_timer( unsigned int nSeconds ) ;
+        void start_timer( unsigned long nMilliseconds ) ;
         
     private:
+        FsMonitor*      m_pMonitor;
         string          m_strAddress ;
         unsigned int    m_nEventSocketPort ;
         time_t          m_lastCheck ;
         bool            m_bDisconnected ;
         bool            m_bConnected ;
+        bool            m_bReloadingXml ;
         unsigned int    m_nMaxSessions ;
         unsigned int    m_nCurrentSessions ;
         string          m_strSipAddress ;
