@@ -288,6 +288,7 @@ namespace ssp {
 
 			try {
 				if( !stmt.get() ) {
+					SSP_LOG(log_debug) << "CdrWriter::writeOriginationRequestCdr: Preparing statement" << endl ;
 					stmt.reset( conn->prepareStatement("INSERT INTO cdr_session "
 									"(session_uuid,start_time,originating_carrier,originating_carrier_ip_address,originating_edge_server_ip_address,"
 									"fs_ip_address,calling_party_number,called_party_number_in,a_leg_sip_call_id,b_leg_sip_call_id,final_sip_status,release_cause,end_time) "
@@ -332,13 +333,14 @@ namespace ssp {
 				assert( 1 == rows ) ;
 
 			} catch (sql::SQLException &e) {
+				cerr << "CdrWriter::writeOriginationRequestCdr sql exception: " << e.what() << " mysql error code: " << e.getErrorCode() << ", sql state: " << e.getSQLState() << endl ;
+				SSP_LOG(log_error) << "CdrWriter::writeOriginationRequestCdr sql exception: " << e.what() << " mysql error code: " << e.getErrorCode() << ", sql state: " << e.getSQLState() << endl ;
 				if( 2013 == e.getErrorCode() || 2006 == e.getErrorCode() ) {
 					stmt.reset() ;
+					conn = this->getConnection() ;
 					if( ++counter == 2 ) throw e ;
 					retry = true ;
 				}
-				cerr << "CdrWriter::writeOriginationRequestCdr sql exception: " << e.what() << " mysql error code: " << e.getErrorCode() << ", sql state: " << e.getSQLState() << endl ;
-				SSP_LOG(log_error) << "CdrWriter::writeOriginationRequestCdr sql exception: " << e.what() << " mysql error code: " << e.getErrorCode() << ", sql state: " << e.getSQLState() << endl ;
 			} catch (std::runtime_error &e) {
 				cerr << "CdrWriter::writeOriginationRequestCdr runtime exception: " << e.what() << endl ;
 				SSP_LOG(log_error) << "CdrWriter::writeOriginationRequestCdr runtime exception: " << e.what() << endl ;
@@ -346,168 +348,212 @@ namespace ssp {
 		} while( retry ) ;
 	}
 	void CdrWriter::writeOriginationFinalResponseCdr( boost::shared_ptr<CdrInfo> pCdr, boost::shared_ptr<sql::Connection> conn ) {
-		try {
-			static boost::thread_specific_ptr< sql::PreparedStatement > stmt ;
-			if( !stmt.get() ) {
-				stmt.reset( conn->prepareStatement("UPDATE cdr_session SET final_sip_status=?,connect_time=?,end_time=?,release_cause=? WHERE session_uuid=?") );
-			}
+		static boost::thread_specific_ptr< sql::PreparedStatement > stmt ;
+		bool retry = false ;
+		int counter = 0 ;
+		do {
 
-			string strTimeConnect, strTimeEnd ;
-			pCdr->getTimeConnectFormatted( strTimeConnect ) ;
-			pCdr->getTimeEndFormatted( strTimeEnd ) ;
+			try {
+				if( !stmt.get() ) {
+					SSP_LOG(log_debug) << "CdrWriter::writeOriginationFinalResponseCdr: Preparing statement" << endl ;
+					stmt.reset( conn->prepareStatement("UPDATE cdr_session SET final_sip_status=?,connect_time=?,end_time=?,release_cause=? WHERE session_uuid=?") );
+				}
 
-			stmt->setInt(1, pCdr->getSipStatus() ) ;
-			if( 200 == pCdr->getSipStatus() ) {
-				stmt->setDateTime(2, strTimeConnect) ;
-				stmt->setNull(3,sql::DataType::TIMESTAMP) ;
-				stmt->setInt(4, 0) ;
-			}
-			else {
-				stmt->setNull(2, sql::DataType::TIMESTAMP) ;
-				stmt->setDateTime(3, strTimeEnd) ;
-				stmt->setInt(4, (int32_t) CdrInfo::call_rejected_due_to_termination_carriers) ;
-			}
-			stmt->setString(5,pCdr->getUuid()) ;
+				string strTimeConnect, strTimeEnd ;
+				pCdr->getTimeConnectFormatted( strTimeConnect ) ;
+				pCdr->getTimeEndFormatted( strTimeEnd ) ;
 
-			int rows = stmt->executeUpdate();
-			SSP_LOG(log_debug) << "Successfully updated " << rows << " row in cdr_session with final response: " << pCdr->getUuid() << endl ;
-			assert( 1 == rows ) ;
+				stmt->setInt(1, pCdr->getSipStatus() ) ;
+				if( 200 == pCdr->getSipStatus() ) {
+					stmt->setDateTime(2, strTimeConnect) ;
+					stmt->setNull(3,sql::DataType::TIMESTAMP) ;
+					stmt->setInt(4, 0) ;
+				}
+				else {
+					stmt->setNull(2, sql::DataType::TIMESTAMP) ;
+					stmt->setDateTime(3, strTimeEnd) ;
+					stmt->setInt(4, (int32_t) CdrInfo::call_rejected_due_to_termination_carriers) ;
+				}
+				stmt->setString(5,pCdr->getUuid()) ;
+
+				int rows = stmt->executeUpdate();
+				SSP_LOG(log_debug) << "Successfully updated " << rows << " row in cdr_session with final response: " << pCdr->getUuid() << endl ;
+				assert( 1 == rows ) ;
 			
-		} catch (sql::SQLException &e) {
-			if( 2013 == e.getErrorCode() || 2006 == e.getErrorCode() ) throw e ;
-			cerr << "CdrWriter::writeOriginationFinalResponseCdr sql exception: " << e.what() << " mysql error code: " << e.getErrorCode() << ", sql state: " << e.getSQLState() << endl ;
-			SSP_LOG(log_error) << "CdrWriter::writeOriginationFinalResponseCdr sql exception: " << e.what() << " mysql error code: " << e.getErrorCode() << ", sql state: " << e.getSQLState() << endl ;
-		} catch (std::runtime_error &e) {
-			cerr << "CdrWriter::writeOriginationFinalResponseCdr runtime exception: " << e.what() << endl ;
-			SSP_LOG(log_error) << "CdrWriter::writeOriginationFinalResponseCdr runtime exception: " << e.what() << endl ;
-		}
+			} catch (sql::SQLException &e) {
+				cerr << "CdrWriter::writeOriginationFinalResponseCdr sql exception: " << e.what() << " mysql error code: " << e.getErrorCode() << ", sql state: " << e.getSQLState() << endl ;
+				SSP_LOG(log_error) << "CdrWriter::writeOriginationFinalResponseCdr sql exception: " << e.what() << " mysql error code: " << e.getErrorCode() << ", sql state: " << e.getSQLState() << endl ;
+				if( 2013 == e.getErrorCode() || 2006 == e.getErrorCode() ) {
+					stmt.reset() ;
+					conn = this->getConnection() ;
+					if( ++counter == 2 ) throw e ;
+					retry = true ;
+				}
+			} catch (std::runtime_error &e) {
+				cerr << "CdrWriter::writeOriginationFinalResponseCdr runtime exception: " << e.what() << endl ;
+				SSP_LOG(log_error) << "CdrWriter::writeOriginationFinalResponseCdr runtime exception: " << e.what() << endl ;
+			}
+		} while( retry ) ;
 
 	}
 	void CdrWriter::writeOriginationCancelCdr( boost::shared_ptr<CdrInfo> pCdr, boost::shared_ptr<sql::Connection> conn  ) {
-		try {
-			static boost::thread_specific_ptr< sql::PreparedStatement > stmt ;
-			if( !stmt.get() ) {
-				stmt.reset( conn->prepareStatement("UPDATE cdr_session SET final_sip_status=487,end_time=?,release_cause=? WHERE session_uuid=?") );
-			}
-			string strTimeEnd ;
-			pCdr->getTimeEndFormatted( strTimeEnd ) ;
+		static boost::thread_specific_ptr< sql::PreparedStatement > stmt ;
+		bool retry = false ;
+		int counter = 0 ;
+		do {
+			try {
+				if( !stmt.get() ) {
+					SSP_LOG(log_debug) << "CdrWriter::writeOriginationCancelCdr: Preparing statement" << endl ;
+					stmt.reset( conn->prepareStatement("UPDATE cdr_session SET final_sip_status=487,end_time=?,release_cause=? WHERE session_uuid=?") );
+				}
+				string strTimeEnd ;
+				pCdr->getTimeEndFormatted( strTimeEnd ) ;
 
-			stmt->setDateTime(1, strTimeEnd) ;
-			stmt->setInt(2, (int32_t) CdrInfo::call_canceled) ;
-			stmt->setString(3,pCdr->getUuid()) ;
+				stmt->setDateTime(1, strTimeEnd) ;
+				stmt->setInt(2, (int32_t) CdrInfo::call_canceled) ;
+				stmt->setString(3,pCdr->getUuid()) ;
 
-			int rows = stmt->executeUpdate();
-			SSP_LOG(log_debug) << "Successfully updated " << rows << " row in cdr_session with cancel: " << pCdr->getUuid() << endl ;
-			assert( 1 == rows ) ;
+				int rows = stmt->executeUpdate();
+				SSP_LOG(log_debug) << "Successfully updated " << rows << " row in cdr_session with cancel: " << pCdr->getUuid() << endl ;
+				assert( 1 == rows ) ;
 			
-		} catch (sql::SQLException &e) {
-			if( 2013 == e.getErrorCode() || 2006 == e.getErrorCode() ) throw e ;
-			cerr << "CdrWriter::writeOriginationCancelCdr sql exception: " << e.what() << " mysql error code: " << e.getErrorCode() << ", sql state: " << e.getSQLState() << endl ;
-			SSP_LOG(log_error) << "CdrWriter::writeOriginationCancelCdr sql exception: " << e.what() << " mysql error code: " << e.getErrorCode() << ", sql state: " << e.getSQLState() << endl ;
-		} catch (std::runtime_error &e) {
-			SSP_LOG(log_error) << "CdrWriter::writeOriginationCancelCdr runtime exception: " << e.what() << endl ;
-		}
+			} catch (sql::SQLException &e) {
+				cerr << "CdrWriter::writeOriginationCancelCdr sql exception: " << e.what() << " mysql error code: " << e.getErrorCode() << ", sql state: " << e.getSQLState() << endl ;
+				SSP_LOG(log_error) << "CdrWriter::writeOriginationCancelCdr sql exception: " << e.what() << " mysql error code: " << e.getErrorCode() << ", sql state: " << e.getSQLState() << endl ;
+				if( 2013 == e.getErrorCode() || 2006 == e.getErrorCode() ) {
+					stmt.reset() ;
+					conn = this->getConnection() ;
+					if( ++counter == 2 ) throw e ;
+					retry = true ;
+				}
+			} catch (std::runtime_error &e) {
+				cerr << "CdrWriter::writeOriginationCancelCdr runtime exception: " << e.what() << endl ;
+				SSP_LOG(log_error) << "CdrWriter::writeOriginationCancelCdr runtime exception: " << e.what() << endl ;
+			}
+		} while( retry ) ;
 
 	}
 	void CdrWriter::writeTerminationAttemptCdr( boost::shared_ptr<CdrInfo> pCdr,  boost::shared_ptr<sql::Connection> conn ) {
-		try {
-			static boost::thread_specific_ptr< sql::PreparedStatement > stmt ;
-			if( !stmt.get() ) {
-				stmt.reset( conn->prepareStatement("INSERT into termination_attempt(cdr_session_uuid,start_time,connect_time,end_time,"
-					"final_sip_status,sip_call_id,terminating_carrier,terminating_carrier_ip_address) "
-					"VALUES(?,?,?,?,?,?,?,?)") );
-			}
+		static boost::thread_specific_ptr< sql::PreparedStatement > stmt ;
+		static boost::thread_specific_ptr< sql::PreparedStatement > stmt2 ;
+		bool retry = false ;
+		int counter = 0 ;
+		do {
+			try {
+				if( !stmt.get() ) {
+					SSP_LOG(log_debug) << "CdrWriter::writeTerminationAttemptCdr: Preparing statement" << endl ;
+					stmt.reset( conn->prepareStatement("INSERT into termination_attempt(cdr_session_uuid,start_time,connect_time,end_time,"
+						"final_sip_status,sip_call_id,terminating_carrier,terminating_carrier_ip_address) "
+						"VALUES(?,?,?,?,?,?,?,?)") );
+				}
 
-			string strTimeStart, strTimeConnect, strTimeEnd ;
-			pCdr->getTimeStartFormatted( strTimeStart ) ;
-			pCdr->getTimeConnectFormatted( strTimeConnect ) ;
-			pCdr->getTimeEndFormatted( strTimeEnd ) ;
+				string strTimeStart, strTimeConnect, strTimeEnd ;
+				pCdr->getTimeStartFormatted( strTimeStart ) ;
+				pCdr->getTimeConnectFormatted( strTimeConnect ) ;
+				pCdr->getTimeEndFormatted( strTimeEnd ) ;
 
 
-			stmt->setString(1, pCdr->getUuid()) ;
-			stmt->setDateTime(2, strTimeStart);
+				stmt->setString(1, pCdr->getUuid()) ;
+				stmt->setDateTime(2, strTimeStart);
 
-			if( 200 == pCdr->getSipStatus() ) {
-				stmt->setDateTime(3, strTimeConnect) ;
-				stmt->setNull(4, sql::DataType::TIMESTAMP) ;
-			}
-			else {
-				stmt->setNull(3, sql::DataType::TIMESTAMP) ;
-				stmt->setDateTime(4, strTimeEnd) ;
-			}
-			stmt->setInt(5, pCdr->getSipStatus() ) ;
-			stmt->setString(6,pCdr->getDLegCallId() ) ;
-			stmt->setString(7,pCdr->getTerminatingCarrier()) ;
-			stmt->setString(8,pCdr->getTerminatingCarrierAddress()) ;
+				if( 200 == pCdr->getSipStatus() ) {
+					stmt->setDateTime(3, strTimeConnect) ;
+					stmt->setNull(4, sql::DataType::TIMESTAMP) ;
+				}
+				else {
+					stmt->setNull(3, sql::DataType::TIMESTAMP) ;
+					stmt->setDateTime(4, strTimeEnd) ;
+				}
+				stmt->setInt(5, pCdr->getSipStatus() ) ;
+				stmt->setString(6,pCdr->getDLegCallId() ) ;
+				stmt->setString(7,pCdr->getTerminatingCarrier()) ;
+				stmt->setString(8,pCdr->getTerminatingCarrierAddress()) ;
 
-			int rows = stmt->executeUpdate();
-			SSP_LOG(log_debug) << "Successfully inserted " << rows << " row in termination_attempt: " << pCdr->getUuid() << endl ;
-			assert( 1 == rows ) ;
+				int rows = stmt->executeUpdate();
+				SSP_LOG(log_debug) << "Successfully inserted " << rows << " row in termination_attempt: " << pCdr->getUuid() << endl ;
+				assert( 1 == rows ) ;
 
-			static boost::thread_specific_ptr< sql::PreparedStatement > stmt2 ;
-			if( !stmt2.get() ) {
-				stmt2.reset( conn->prepareStatement("UPDATE cdr_session SET terminating_edge_server_ip_address=?,terminating_carrier=?,"
-					"terminating_carrier_ip_address=?,c_leg_sip_call_id=?,d_leg_sip_call_id=?,fs_assigned_customer=?,called_party_number_out=? "
-					" WHERE session_uuid=?")) ;
-			}
-			stmt2->setString(1, pCdr->getTerminatingEdgeServerAddress()) ;
-			stmt2->setString(2, pCdr->getTerminatingCarrier()) ;
-			stmt2->setString(3, pCdr->getTerminatingCarrierAddress()) ;
-			stmt2->setString(4, pCdr->getCLegCallId()) ;
-			stmt2->setString(5, pCdr->getDLegCallId()) ;
-			stmt2->setString(6, pCdr->getCustomerName()) ;
-			stmt2->setString(7, pCdr->getCalledPartyNumberOut()) ;
-			stmt2->setString(8, pCdr->getUuid()) ;
-			rows = stmt2->executeUpdate();
-			SSP_LOG(log_debug) << "Successfully updated " << rows << " row in cdr_session with outbound leg information: " << pCdr->getUuid() << endl ;
-			assert( 1 == rows ) ;
+				if( !stmt2.get() ) {
+					SSP_LOG(log_debug) << "CdrWriter::writeTerminationAttemptCdr: Preparing statement2" << endl ;
+					stmt2.reset( conn->prepareStatement("UPDATE cdr_session SET terminating_edge_server_ip_address=?,terminating_carrier=?,"
+						"terminating_carrier_ip_address=?,c_leg_sip_call_id=?,d_leg_sip_call_id=?,fs_assigned_customer=?,called_party_number_out=? "
+						" WHERE session_uuid=?")) ;
+				}
+				stmt2->setString(1, pCdr->getTerminatingEdgeServerAddress()) ;
+				stmt2->setString(2, pCdr->getTerminatingCarrier()) ;
+				stmt2->setString(3, pCdr->getTerminatingCarrierAddress()) ;
+				stmt2->setString(4, pCdr->getCLegCallId()) ;
+				stmt2->setString(5, pCdr->getDLegCallId()) ;
+				stmt2->setString(6, pCdr->getCustomerName()) ;
+				stmt2->setString(7, pCdr->getCalledPartyNumberOut()) ;
+				stmt2->setString(8, pCdr->getUuid()) ;
+				rows = stmt2->executeUpdate();
+				SSP_LOG(log_debug) << "Successfully updated " << rows << " row in cdr_session with outbound leg information: " << pCdr->getUuid() << endl ;
+				assert( 1 == rows ) ;
 
 			
-		} catch (sql::SQLException &e) {
-			if( 2013 == e.getErrorCode() || 2006 == e.getErrorCode() ) throw e ;
-			cerr << "CdrWriter::writeTerminationAttemptCdr sql exception: " << e.what() << " mysql error code: " << e.getErrorCode() << ", sql state: " << e.getSQLState() << endl ;
-			SSP_LOG(log_error) << "CdrWriter::writeTerminationAttemptCdr sql exception: " << e.what() << " mysql error code: " << e.getErrorCode() << ", sql state: " << e.getSQLState() << endl ;
-		} catch (std::runtime_error &e) {
-			SSP_LOG(log_error) << "CdrWriter::writeTerminationAttemptCdr runtime exception: " << e.what() << endl ;
-		}
+			} catch (sql::SQLException &e) {
+				cerr << "CdrWriter::writeTerminationAttemptCdr sql exception: " << e.what() << " mysql error code: " << e.getErrorCode() << ", sql state: " << e.getSQLState() << endl ;
+				SSP_LOG(log_error) << "CdrWriter::writeTerminationAttemptCdr sql exception: " << e.what() << " mysql error code: " << e.getErrorCode() << ", sql state: " << e.getSQLState() << endl ;
+				if( 2013 == e.getErrorCode() || 2006 == e.getErrorCode() ) {
+					stmt.reset() ;
+					stmt2.reset();
+					conn = this->getConnection() ;
+					if( ++counter == 2 ) throw e ;
+					retry = true ;
+				}
+			} catch (std::runtime_error &e) {
+				cerr << "CdrWriter::writeTerminationAttemptCdr runtime exception: " << e.what() << endl ;
+				SSP_LOG(log_error) << "CdrWriter::writeTerminationAttemptCdr runtime exception: " << e.what() << endl ;
+			}
+		} while( retry ) ;
 
 	}
 	void CdrWriter::writeByeCdr( boost::shared_ptr<CdrInfo> pCdr, boost::shared_ptr<sql::Connection> conn ) {
-		try {
-			static boost::thread_specific_ptr< sql::PreparedStatement > stmt ;
-			if( !stmt.get() ) {
-				stmt.reset( conn->prepareStatement("UPDATE cdr_session SET end_time=?,release_cause=? WHERE session_uuid=?") );
-			}
-			string strTimeEnd ;
-			pCdr->getTimeEndFormatted( strTimeEnd ) ;
+		static boost::thread_specific_ptr< sql::PreparedStatement > stmt ;
+		bool retry = false ;
+		int counter = 0 ;
+		do {
+			try {
+				if( !stmt.get() ) {
+					SSP_LOG(log_debug) << "CdrWriter::writeByeCdr: Preparing statement" << endl ;
+					stmt.reset( conn->prepareStatement("UPDATE cdr_session SET end_time=?,release_cause=? WHERE session_uuid=?") );
+				}
+				string strTimeEnd ;
+				pCdr->getTimeEndFormatted( strTimeEnd ) ;
 
-			stmt->setDateTime(1, strTimeEnd) ;
-			stmt->setInt(2, (int32_t) pCdr->getReleaseCause() ) ;
-			stmt->setString(3,pCdr->getUuid()) ;
+				stmt->setDateTime(1, strTimeEnd) ;
+				stmt->setInt(2, (int32_t) pCdr->getReleaseCause() ) ;
+				stmt->setString(3,pCdr->getUuid()) ;
 
-			int rows = stmt->executeUpdate();
-			SSP_LOG(log_debug) << "Successfully updated " << rows << " row in cdr_session with call clearing: " << pCdr->getUuid() << endl ;
-			assert( 1 == rows ) ;
+				int rows = stmt->executeUpdate();
+				SSP_LOG(log_debug) << "Successfully updated " << rows << " row in cdr_session with call clearing: " << pCdr->getUuid() << endl ;
+				assert( 1 == rows ) ;
 
-			static boost::thread_specific_ptr< sql::PreparedStatement > stmt2 ;
-			if( !stmt2.get() ) {
-				stmt2.reset( conn->prepareStatement("UPDATE termination_attempt SET end_time=? WHERE cdr_session_uuid=? and final_sip_status = 200")) ;
-			}
-			stmt2->setDateTime(1, strTimeEnd) ;
-			stmt2->setString(2, pCdr->getUuid()) ;
-			rows = stmt2->executeUpdate();
-			SSP_LOG(log_debug) << "Successfully updated " << rows << " row in termination_attempt with call end time: " << pCdr->getUuid() << endl ;
-			assert( 1 == rows ) ;
-
-
+				static boost::thread_specific_ptr< sql::PreparedStatement > stmt2 ;
+				if( !stmt2.get() ) {
+					stmt2.reset( conn->prepareStatement("UPDATE termination_attempt SET end_time=? WHERE cdr_session_uuid=? and final_sip_status = 200")) ;
+				}
+				stmt2->setDateTime(1, strTimeEnd) ;
+				stmt2->setString(2, pCdr->getUuid()) ;
+				rows = stmt2->executeUpdate();
+				SSP_LOG(log_debug) << "Successfully updated " << rows << " row in termination_attempt with call end time: " << pCdr->getUuid() << endl ;
+				assert( 1 == rows ) ;
 			
-		} catch (sql::SQLException &e) {
-			if( 2013 == e.getErrorCode() || 2006 == e.getErrorCode() ) throw e ;
-			cerr << "CdrWriter::writeOriginationRequestCdr sql exception: " << e.what() << " mysql error code: " << e.getErrorCode() << ", sql state: " << e.getSQLState() << endl ;
-			SSP_LOG(log_error) << "CdrWriter::writeOriginationRequestCdr sql exception: " << e.what() << " mysql error code: " << e.getErrorCode() << ", sql state: " << e.getSQLState() << endl ;
-		} catch (std::runtime_error &e) {
-			SSP_LOG(log_error) << "CdrWriter::writeOriginationRequestCdr runtime exception: " << e.what() << endl ;
-		}
+			} catch (sql::SQLException &e) {
+				cerr << "CdrWriter::writeByeCdr sql exception: " << e.what() << " mysql error code: " << e.getErrorCode() << ", sql state: " << e.getSQLState() << endl ;
+				SSP_LOG(log_error) << "CdrWriter::writeByeCdr sql exception: " << e.what() << " mysql error code: " << e.getErrorCode() << ", sql state: " << e.getSQLState() << endl ;
+				if( 2013 == e.getErrorCode() || 2006 == e.getErrorCode() ) {
+					conn = this->getConnection() ;
+					stmt.reset() ;
+					if( ++counter == 2 ) throw e ;
+					retry = true ;
+				}
+			} catch (std::runtime_error &e) {
+				cerr << "CdrWriter::writeByeCdr runtime exception: " << e.what() << endl ;
+				SSP_LOG(log_error) << "CdrWriter::writeByeCdr runtime exception: " << e.what() << endl ;
+			}
+		} while( retry ) ;
 
 	}
 
