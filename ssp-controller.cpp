@@ -505,6 +505,9 @@ namespace ssp {
             m_cdrWriter.reset( new CdrWriter(dbUrl, user, pass, schema) ) ;  
             m_cdrWriter->testConnection() ;         
         }
+        else {
+            SSP_LOG(log_notice) << "Call detail records will not be written, as database connectivity has not been provided" << endl ;
+        }
         if( m_bDbTest ) {
             this->runDbTest() ;
             return ;

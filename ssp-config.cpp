@@ -284,7 +284,7 @@ namespace ssp {
                 m_cdrPassword = pt.get<string>("ssp.cdr.password","");
                 m_cdrHost = pt.get<string>("ssp.cdr.host","");
                 m_cdrPort = pt.get<string>("ssp.cdr.port","3306");
-                m_cdrSchema = pt.get<string>("ssp.cdr.schema","3306");
+                m_cdrSchema = pt.get<string>("ssp.cdr.schema","ssp");
  
                 /* sip configuration */
                 m_sipUrl = pt.get<string>("ssp.sip.contact", "sip:*") ;
@@ -581,7 +581,7 @@ namespace ssp {
             return m_statsPort ;
         }
         bool getCdrConnectInfo( string& user, string& pass, string& dbUrl, string& schema ) {
-            if( 0 == m_cdrHost.length() || 0 == m_cdrUser.length() || 0 == m_cdrPassword.length() || 0 == schema.length() ) return false ;
+            if( 0 == m_cdrHost.length() || 0 == m_cdrUser.length() || 0 == m_cdrPassword.length() || 0 == m_cdrSchema.length() ) return false ;
 
             user = m_cdrUser ;
             pass = m_cdrPassword ;
