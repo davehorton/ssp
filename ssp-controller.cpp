@@ -1457,6 +1457,7 @@ namespace ssp {
         if( status >= 200 && 487 != status && !bTermination && pCdr ) {
             boost::shared_ptr<CdrInfo> pNewCdr = boost::make_shared<CdrInfo>(CdrInfo::origination_final_response) ;
             *pNewCdr = *pCdr ;
+            pNewCdr->setCdrType( CdrInfo::origination_final_response ) ;
             populateFinalResponseCdr( pCdr, status ) ;
             if( m_cdrWriter ) m_cdrWriter->postCdr( pCdr ) ;
         }
