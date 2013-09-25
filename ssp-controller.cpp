@@ -1812,9 +1812,11 @@ namespace ssp {
     void SipLbController::populateOriginationCdr( boost::shared_ptr<CdrInfo> pCdr, sip_t const *sip, const string& carrier ) {
         string uuid ;
 
+
         this->generateUuid( uuid ) ;
 
         pCdr->setUuid( uuid ) ;
+        pCdr->setCdrType( CdrInfo::origination_request ) ;
         pCdr->setTimeStart( time(0) ) ;
         pCdr->setOriginatingCarrier( carrier ) ;
         pCdr->setOriginatingCarrierAddress( string( sip->sip_contact->m_url[0].url_host, strlen(sip->sip_contact->m_url[0].url_host) ) ) ;
@@ -1829,6 +1831,7 @@ namespace ssp {
     }
     void SipLbController::populateTerminationCdr( boost::shared_ptr<CdrInfo> pCdr, sip_t const *sip, const string& carrier, const string& uuid ) {
         pCdr->setUuid( uuid ) ;
+        pCdr->setCdrType( CdrInfo::termination_attempt ) ;
         pCdr->setTimeStart( time(0) ) ;
         pCdr->setTerminatingCarrier( carrier ) ;
         pCdr->setTerminatingCarrierAddress( string( sip->sip_contact->m_url[0].url_host, strlen(sip->sip_contact->m_url[0].url_host) ) ) ;
@@ -1837,7 +1840,8 @@ namespace ssp {
         pCdr->setCalledPartyNumberOut( string( sip->sip_to->a_url[0].url_user, strlen(sip->sip_to->a_url[0].url_user) ) ) ;
     }
     void SipLbController::populateFinalResponseCdr( boost::shared_ptr<CdrInfo> pCdr, unsigned int status ) {
-        pCdr->setSipStatus( status ) ;
+       pCdr->setCdrType( CdrInfo::origination_final_response ) ;
+         pCdr->setSipStatus( status ) ;
         if( 200 == status ) {
             pCdr->setTimeConnect( time(0) ) ;
         }
