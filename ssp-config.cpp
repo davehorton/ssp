@@ -158,10 +158,12 @@ namespace ssp {
                 this->advanceTrunk() ;
                 CarrierAddressSpace_t& d = m_vecTrunks.at( m_currentTrunk ) ;
                 d.haveAdvancedToEnd() ;
-                s << d.getAddress() << ":" << d.getPort() ;
+                s << d.getAddress() ;
+                if( 5060 != d.getPort() ) s << ":" << d.getPort() ;
             }
             else {
-                s << c.getAddress() << ":" << c.getPort() ;
+                s << c.getAddress() ;
+                if( 5060 != c.getPort() ) s << ":" << c.getPort() ;
             }
 
             trunk = s.str() ;
