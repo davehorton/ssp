@@ -425,8 +425,8 @@ namespace ssp {
 			stmt->setString(8,pCdr->getTerminatingCarrierAddress()) ;
 
 			int rows = stmt->executeUpdate();
-			assert( 1 == rows ) ;
 			SSP_LOG(log_debug) << "Successfully inserted " << rows << " row in termination_attempt: " << pCdr->getUuid() << endl ;
+			assert( 1 == rows ) ;
 
 			static boost::thread_specific_ptr< sql::PreparedStatement > stmt2 ;
 			if( !stmt2.get() ) {

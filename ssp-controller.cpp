@@ -48,7 +48,7 @@ namespace ssp {
 
 #define MAXLOGLEN (8192)
 
-#define X_SESSION_UUID "X-session-uuid"
+#define X_SESSION_UUID "X-Session-uuid"
 
 /* from sofia */
 #define MSG_SEPARATOR \
@@ -1387,8 +1387,8 @@ namespace ssp {
                             /* write cdr */
                             boost::shared_ptr<CdrInfo> pNewCdr = boost::make_shared<CdrInfo>(CdrInfo::termination_attempt) ;
                             *pNewCdr = *pCdr ;
-                            pNewCdr->setCdrType( CdrInfo::termination_attempt ) ;
                             populateFinalResponseCdr( pCdr, status ) ;
+                            pNewCdr->setCdrType( CdrInfo::termination_attempt ) ;
                             if( m_cdrWriter ) m_cdrWriter->postCdr( pCdr ) ;
 
                             ostringstream dest ;
@@ -1458,15 +1458,15 @@ namespace ssp {
             boost::shared_ptr<CdrInfo> pNewCdr = boost::make_shared<CdrInfo>(CdrInfo::origination_final_response) ;
             *pNewCdr = *pCdr ;
             pNewCdr->setCdrType( CdrInfo::origination_final_response ) ;
-            populateFinalResponseCdr( pCdr, status ) ;
-            if( m_cdrWriter ) m_cdrWriter->postCdr( pCdr ) ;
+            populateFinalResponseCdr( pNewCdr, status ) ;
+            if( m_cdrWriter ) m_cdrWriter->postCdr( pNewCdr ) ;
         }
         else if( status >= 200 && bTermination && pCdr ) {
             boost::shared_ptr<CdrInfo> pNewCdr = boost::make_shared<CdrInfo>(CdrInfo::termination_attempt) ;
             *pNewCdr = *pCdr ;
+            populateFinalResponseCdr( pNewCdr, status ) ;
             pNewCdr->setCdrType( CdrInfo::termination_attempt ) ;
-            populateFinalResponseCdr( pCdr, status ) ;
-            if( m_cdrWriter ) m_cdrWriter->postCdr( pCdr ) ;
+            if( m_cdrWriter ) m_cdrWriter->postCdr( pNewCdr ) ;
         }
 
         return 0 ;
@@ -1840,8 +1840,8 @@ namespace ssp {
         pCdr->setCalledPartyNumberOut( string( sip->sip_to->a_url[0].url_user, strlen(sip->sip_to->a_url[0].url_user) ) ) ;
     }
     void SipLbController::populateFinalResponseCdr( boost::shared_ptr<CdrInfo> pCdr, unsigned int status ) {
-       pCdr->setCdrType( CdrInfo::origination_final_response ) ;
-         pCdr->setSipStatus( status ) ;
+        pCdr->setCdrType( CdrInfo::origination_final_response ) ;
+        pCdr->setSipStatus( status ) ;
         if( 200 == status ) {
             pCdr->setTimeConnect( time(0) ) ;
         }
