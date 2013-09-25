@@ -241,7 +241,6 @@ namespace ssp {
 		try {
 			boost::shared_ptr<sql::Connection> conn = this->getConnection() ;
 			if( !conn ) {
-				assert(false) ;
 				SSP_LOG(log_error) << "Error retrieving connection" << endl ;
 				return ;
 			}
