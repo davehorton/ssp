@@ -54,6 +54,7 @@ namespace ssp {
 		CdrInfo& setCalledPartyNumberIn( const string& str ) ;
 		CdrInfo& setCalledPartyNumberOut( const string& str ) ;
 		CdrInfo& setCustomerName( const string& str ) ;
+		CdrInfo& setAvokeCallId( const string& str ) ;
 		CdrInfo& setALegCallId( const string& str ) ;
 		CdrInfo& setBLegCallId( const string& str ) ;
 		CdrInfo& setCLegCallId( const string& str ) ;
@@ -79,6 +80,7 @@ namespace ssp {
 		const string& getCalledPartyNumberIn() const { return m_calledPartyNumberIn; }
 		const string& getCalledPartyNumberOut() const { return m_calledPartyNumberOut; }
 		const string& getCustomerName() const { return m_customerName; }
+		const string& getAvokeCallId() const { return m_avokeCallId; }
 		const string& getALegCallId() const { return m_alegCallId; }
 		const string& getBLegCallId() const { return m_blegCallId; }
 		const string& getCLegCallId() const { return m_clegCallId; }
@@ -106,6 +108,7 @@ namespace ssp {
 		string 	m_calledPartyNumberIn ;
 		string 	m_calledPartyNumberOut ;
 		string 	m_customerName ;
+		string  m_avokeCallId ;
 		string 	m_alegCallId ;
 		string 	m_blegCallId ;
 		string 	m_clegCallId ;

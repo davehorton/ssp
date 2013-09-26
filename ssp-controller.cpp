@@ -49,7 +49,8 @@ namespace ssp {
 #define MAXLOGLEN (8192)
 
 #define X_SESSION_UUID "X-Session-uuid"
-#define X_BROWSER "X-Browser"
+#define X_AVOKE_BROWSER "X-Avoke-Browser"
+#define X_AVOKE_CALL_ID "X-Avoke-Call-ID"
 
 /* from sofia */
 #define MSG_SEPARATOR \
@@ -1133,7 +1134,7 @@ namespace ssp {
         unsigned int terminationSipPort ;
         boost::shared_ptr<CdrInfo> pCdr = boost::make_shared<CdrInfo>(CdrInfo::termination_attempt) ;
         string strCallId( sip->sip_call_id->i_id, strlen(sip->sip_call_id->i_id) ) ;
-        string uuid, browser ;
+        string uuid, avokeBrowser, avokeCallId ;
         
         if( !m_Config->getTerminationRoute( terminationSipAddress, carrier, chargeNumber) ) {
             SSP_LOG(log_error) << "No termination providers configured" << endl ;
@@ -1143,9 +1144,10 @@ namespace ssp {
         if( !this->findCustomHeaderValue( sip, X_SESSION_UUID, uuid) ) {
             SSP_LOG(log_error) << "No " << X_SESSION_UUID << " header found on termination request; cdrs will be impaired: call-id " << strCallId << endl ;
         }
-        this->findCustomHeaderValue( sip, X_BROWSER, browser);
+        this->findCustomHeaderValue( sip, X_AVOKE_BROWSER, avokeBrowser);
+        this->findCustomHeaderValue( sip, X_AVOKE_CALL_ID, avokeCallId);
  
-        this->populateTerminationCdr( pCdr, sip, carrier, terminationSipAddress, browser, uuid ) ;
+        this->populateTerminationCdr( pCdr, sip, carrier, terminationSipAddress, avokeBrowser, avokeCallId, uuid ) ;
 
 
         ostringstream dest ;
@@ -1866,7 +1868,7 @@ namespace ssp {
 
     }
     void SipLbController::populateTerminationCdr( boost::shared_ptr<CdrInfo> pCdr, sip_t const *sip, const string& carrier, const string& carrierAddress, 
-        const string& browser, const string& uuid ) {
+        const string& avokeBrowser, const string& avokeCallId, const string& uuid ) {
         pCdr->setUuid( uuid ) ;
         pCdr->setCdrType( CdrInfo::termination_attempt ) ;
         pCdr->setTimeStart( time(0) ) ;
@@ -1875,7 +1877,8 @@ namespace ssp {
         pCdr->setCLegCallId( sip->sip_call_id->i_id ) ;
         pCdr->setTerminatingEdgeServerAddress( m_my_contact->m_url[0].url_host ) ;
         pCdr->setCalledPartyNumberOut( sip->sip_to->a_url[0].url_user ) ;
-        pCdr->setCustomerName( browser );
+        if( !avokeBrowser.empty() ) pCdr->setCustomerName( avokeBrowser );
+        if( !avokeCallId.empty() ) pCdr->setAvokeCallId( avokeCallId );
     }
     void SipLbController::populateFinalResponseCdr( boost::shared_ptr<CdrInfo> pCdr, unsigned int status ) {
         pCdr->setCdrType( CdrInfo::origination_final_response ) ;

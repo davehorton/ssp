@@ -21,6 +21,7 @@ CREATE TABLE cdr_session (
 	,called_party_number_in varchar(32) NOT NULL
 	,called_party_number_out varchar(32)
 	,fs_assigned_customer varchar(32)
+	,fs_assigned_call_id varchar(64)
 	,a_leg_sip_call_id varchar(64) NOT NULL
 	,b_leg_sip_call_id varchar(64)
 	,c_leg_sip_call_id varchar(64)

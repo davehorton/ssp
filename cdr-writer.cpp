@@ -66,6 +66,10 @@ namespace ssp {
 		m_customerName = str ;
 		return *this ;
 	}
+	CdrInfo& CdrInfo::setAvokeCallId( const string& str ) {
+		m_avokeCallId = str ;
+		return *this ;
+	}
 	CdrInfo& CdrInfo::setALegCallId( const string& str ) {
 		m_alegCallId = str ;
 		return *this ;
@@ -453,7 +457,7 @@ namespace ssp {
 			if( !m_stmtTerm2 ) {
 				SSP_LOG(log_debug) << "CdrWriter::writeTerminationAttemptCdr: Preparing statement2" << endl ;
 				m_stmtTerm2.reset( conn->prepareStatement("UPDATE cdr_session SET terminating_edge_server_ip_address=?,terminating_carrier=?,"
-					"terminating_carrier_ip_address=?,c_leg_sip_call_id=?,d_leg_sip_call_id=?,fs_assigned_customer=?,called_party_number_out=? "
+					"terminating_carrier_ip_address=?,c_leg_sip_call_id=?,d_leg_sip_call_id=?,fs_assigned_customer=?,fs_assigned_call_id=?,called_party_number_out=? "
 					" WHERE session_uuid=?")) ;
 			}
 			m_stmtTerm2->clearParameters() ;
@@ -462,14 +466,20 @@ namespace ssp {
 			m_stmtTerm2->setString(3, pCdr->getTerminatingCarrierAddress()) ;
 			m_stmtTerm2->setString(4, pCdr->getCLegCallId()) ;
 			m_stmtTerm2->setString(5, pCdr->getDLegCallId()) ;
-			if( pCdr->getCustomerName().length() > 0 ) {
+			if( !pCdr->getCustomerName().empty() ) {
 				m_stmtTerm2->setString(6, pCdr->getCustomerName()) ;
 			}
 			else {
 				m_stmtTerm2->setNull(6, sql::DataType::VARCHAR) ;
 			}
-			m_stmtTerm2->setString(7, pCdr->getCalledPartyNumberOut()) ;
-			m_stmtTerm2->setString(8, pCdr->getUuid()) ;
+			if( !pCdr->getAvokeCallId().empty() ) {
+				m_stmtTerm2->setString(7, pCdr->getAvokeCallId()) ;
+			}
+			else {
+				m_stmtTerm2->setNull(7, sql::DataType::VARCHAR) ;
+			}
+			m_stmtTerm2->setString(8, pCdr->getCalledPartyNumberOut()) ;
+			m_stmtTerm2->setString(9, pCdr->getUuid()) ;
 			rows = m_stmtTerm2->executeUpdate();
 			SSP_LOG(log_debug) << "Successfully updated " << rows << " row in cdr_session with outbound leg information: " << pCdr->getUuid() << endl ;
 
