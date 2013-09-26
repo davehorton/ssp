@@ -663,14 +663,19 @@ namespace ssp {
             
             if( 0 == m_nIterationCount && 0 == m_dialogs.size() && 0 == m_mapTerminationAttempts.size() && 0 == m_transactions.size() ) {
                 
-                if( --counter == 0  ) {
+                usize_t irq_used = -1, orq_used = -1;
+                nta_agent_get_stats(m_nta, NTATAG_S_IRQ_HASH_USED_REF(irq_used), NTATAG_S_ORQ_HASH_USED_REF(orq_used), TAG_END()) ;
+                if( 0 == irq_used + orq_used ) {
+                    this->logAgentStats() ;
+                    m_mapTrunkStats.clear() ;
                     SSP_LOG(log_notice) << "shutting down, interation count reached" << endl ;
+                    if( m_cdrWriter ) m_cdrWriter.reset() ;
                     nta_agent_destroy( m_nta ) ;
                     m_nta = NULL ;
                     su_root_break( m_root ) ;
                     su_timer_reset( m_timer ) ;
                     su_timer_destroy( m_timer ) ;
-                    m_timer = NULL ;
+                    m_timer = NULL ;                   
                 }
             }
         }
@@ -1095,11 +1100,13 @@ namespace ssp {
             return pCdr->getSipStatus() ;
         }
 
-        sip_t* invite = sip_object( nta_outgoing_getrequest(orq) ) ;
+        msg_t* m = nta_outgoing_getrequest(orq) ;
+        sip_t* invite = sip_object( m ) ;
+        pCdr->setBLegCallId( invite->sip_call_id->i_id ) ;
+        msg_destroy( m ) ;
 
         pCdr->setFsAddress( server->getSipAddress() ) ;
-        pCdr->setBLegCallId( string( invite->sip_call_id->i_id, strlen(invite->sip_call_id->i_id) ) ) ;
-        
+
         /* set a session timer, if configured and supported by remote (note: currently we only support the remote leg acting as refresher) */
         unsigned long nSessionTimer = 0 ;
         if( m_Config->getOriginationSessionTimer() > 0 && NULL != sip->sip_session_expires ) {
@@ -1243,10 +1250,11 @@ namespace ssp {
             nta_leg_destroy(b_leg) ;
             return false ;            
         }
-        sip_t* invite = sip_object( nta_outgoing_getrequest(orq) ) ;
-        t->getCdrInfo()->setDLegCallId( string( invite->sip_call_id->i_id, strlen(invite->sip_call_id->i_id) ) ) ;
-
-
+ 
+        msg_t* m = nta_outgoing_getrequest(orq) ;
+        sip_t* invite = sip_object( m ) ;
+        t->getCdrInfo()->setDLegCallId( invite->sip_call_id->i_id ) ;
+        msg_destroy( m ) ;
 
         mapTrunkStats::iterator it = m_mapTrunkStats.find( t->getSipTrunk() ) ;
         if( m_mapTrunkStats.end() != it ) {
@@ -1400,9 +1408,9 @@ namespace ssp {
                             /* write cdr */
                             boost::shared_ptr<CdrInfo> pNewCdr = boost::make_shared<CdrInfo>(CdrInfo::termination_attempt) ;
                             *pNewCdr = *pCdr ;
-                            populateFinalResponseCdr( pCdr, status ) ;
+                            populateFinalResponseCdr( pNewCdr, status ) ;
                             pNewCdr->setCdrType( CdrInfo::termination_attempt ) ;
-                            if( m_cdrWriter ) m_cdrWriter->postCdr( pCdr ) ;
+                            if( m_cdrWriter ) m_cdrWriter->postCdr( pNewCdr ) ;
 
                             ostringstream dest ;
                             dest << "sip:" << sip->sip_to->a_url[0].url_user << "@" << terminationSipAddress ;
@@ -1844,11 +1852,11 @@ namespace ssp {
         pCdr->setCdrType( CdrInfo::origination_request ) ;
         pCdr->setTimeStart( time(0) ) ;
         pCdr->setOriginatingCarrier( carrier ) ;
-        pCdr->setOriginatingCarrierAddress( string( sip->sip_contact->m_url[0].url_host, strlen(sip->sip_contact->m_url[0].url_host) ) ) ;
-        pCdr->setALegCallId( string( sip->sip_call_id->i_id, strlen( sip->sip_call_id->i_id ) ) ) ;
-        pCdr->setOriginatingEdgeServerAddress( string(m_my_contact->m_url[0].url_host, strlen(m_my_contact->m_url[0].url_host) ) ) ;
-        pCdr->setCalledPartyNumberIn( string( sip->sip_to->a_url[0].url_user, strlen(sip->sip_to->a_url[0].url_user) ) ) ;
-        pCdr->setCallingPartyNumber( string( sip->sip_from->a_url[0].url_user, strlen(sip->sip_to->a_url[0].url_user) ) ) ;
+        pCdr->setOriginatingCarrierAddress( sip->sip_contact->m_url[0].url_host ) ;
+        pCdr->setALegCallId( sip->sip_call_id->i_id )  ;
+        pCdr->setOriginatingEdgeServerAddress( m_my_contact->m_url[0].url_host ) ;
+        pCdr->setCalledPartyNumberIn( sip->sip_to->a_url[0].url_user ) ;
+        pCdr->setCallingPartyNumber( sip->sip_from->a_url[0].url_user ) ;
         if( 0 != pCdr->getSipStatus() ) {
             pCdr->setReleaseCause( CdrInfo::call_rejected_due_to_system_error ) ;
         }
@@ -1860,9 +1868,9 @@ namespace ssp {
         pCdr->setTimeStart( time(0) ) ;
         pCdr->setTerminatingCarrier( carrier ) ;
         pCdr->setTerminatingCarrierAddress( carrierAddress ) ;
-        pCdr->setCLegCallId( string( sip->sip_call_id->i_id, strlen( sip->sip_call_id->i_id ) ) ) ;
-        pCdr->setTerminatingEdgeServerAddress( string(m_my_contact->m_url[0].url_host, strlen(m_my_contact->m_url[0].url_host) ) ) ;
-        pCdr->setCalledPartyNumberOut( string( sip->sip_to->a_url[0].url_user, strlen(sip->sip_to->a_url[0].url_user) ) ) ;
+        pCdr->setCLegCallId( sip->sip_call_id->i_id ) ;
+        pCdr->setTerminatingEdgeServerAddress( m_my_contact->m_url[0].url_host ) ;
+        pCdr->setCalledPartyNumberOut( sip->sip_to->a_url[0].url_user ) ;
     }
     void SipLbController::populateFinalResponseCdr( boost::shared_ptr<CdrInfo> pCdr, unsigned int status ) {
         pCdr->setCdrType( CdrInfo::origination_final_response ) ;

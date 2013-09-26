@@ -140,7 +140,7 @@ namespace ssp {
 	CdrWriter::CdrWriter( const string& dbUrl, const string& user, const string& password, const string& schema ) : m_dbUrl(dbUrl), m_user(user), 
 		m_password(password), m_schema(schema)  {
 		try {
-			m_pDriver.reset( sql::mysql::get_driver_instance() );
+			m_pDriver = sql::mysql::get_driver_instance() ;
 			if( !m_pDriver ) throw std::runtime_error("Error creating instance of mysql driver") ;
 
 			m_pWork.reset( new boost::asio::io_service::work(m_io_service) );
@@ -160,12 +160,13 @@ namespace ssp {
 		}		
 	}
 	CdrWriter::~CdrWriter() {
+		SSP_LOG(log_debug) << "CdrWriter::~CdrWriter cdr writer stopping" << endl ;
 		m_pWork.reset(); // stop all!
 		m_threadGroup.join_all(); // wait for all completition
+		SSP_LOG(log_debug) << "CdrWriter::~CdrWriter cdr writer stopped" << endl ;
 	}
 	bool CdrWriter::testConnection() {
 		bool bOK = false ;
-		boost::lock_guard<boost::mutex> l( m_lock ) ;
 		try {
 			m_pDriver->threadInit() ;
 			boost::shared_ptr<sql::Connection> conn ;
@@ -185,7 +186,6 @@ namespace ssp {
 	boost::shared_ptr<sql::Connection> CdrWriter::getConnection() {
 		boost::shared_ptr<sql::Connection> conn ;
 		{
-			boost::lock_guard<boost::mutex> l( m_lock ) ;
 			if( !m_vecConnection.empty() ) {
 				conn = m_vecConnection.front() ;
 				m_vecConnection.pop_front() ;
@@ -195,7 +195,10 @@ namespace ssp {
 		try {
 			SSP_LOG(log_debug) << "Creating new database connection" << endl ;
 			conn.reset( m_pDriver->connect( m_dbUrl, m_user, m_password ) ) ;
-			if( conn ) conn->setSchema( m_schema ) ;
+			if( conn ) {
+				conn->setSchema( m_schema ) ;
+				conn->setAutoCommit( true ) ;
+			}
 		} catch (sql::SQLException &e) {
 				cerr << "CdrWriter::getConnection sql exception getting a connection: " << e.what() << " mysql error code: " << e.getErrorCode() << ", sql state: " << e.getSQLState() << endl ;
 				SSP_LOG(log_error) << "CdrWriter::getConnection sql exception getting a connection: " << e.what() << " mysql error code: " << e.getErrorCode() << ", sql state: " << e.getSQLState() << endl ;
@@ -203,13 +206,11 @@ namespace ssp {
 		return conn ;
 	}
 	void CdrWriter::releaseConnection( boost::shared_ptr<sql::Connection> conn ) {
-		boost::lock_guard<boost::mutex> l( m_lock ) ;
 		m_vecConnection.push_back( conn ) ;
 	}
 
 	void CdrWriter::worker_thread() {
 		{
-			boost::lock_guard<boost::mutex> l( m_lock ) ;
 			try {
 				m_pDriver->threadInit() ;
 				SSP_LOG(log_debug) << "Successfully initialized mysql driver" << endl ;

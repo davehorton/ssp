@@ -146,7 +146,7 @@ namespace ssp {
 		string 	m_dbUrl ;
 		string m_schema ;
 
-		boost::shared_ptr<sql::Driver> m_pDriver;
+		sql::Driver* m_pDriver;
 
 		deque< boost::shared_ptr<sql::Connection> > m_vecConnection ;
 

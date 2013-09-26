@@ -65,6 +65,10 @@ namespace ssp {
             m_carrier = carrier ;
             m_sipTrunk = sipTrunk ;
             m_nAttemptCount++ ;
+            if( m_pCdr ) {
+                m_pCdr->setTerminatingCarrier(carrier) ;
+                m_pCdr->setTerminatingCarrierAddress(sipTrunk) ;
+            }
         }
 
         void crankback( const string& url ) {
