@@ -297,7 +297,8 @@ namespace ssp {
 
         void generateUuid(string& uuid) ;
         void populateOriginationCdr( boost::shared_ptr<CdrInfo> pCdr, sip_t const *sip, const string& carrier ) ;
-        void populateTerminationCdr( boost::shared_ptr<CdrInfo> pCdr, sip_t const *sip, const string& carrier, const string& carrierAddress, const string& uuid ) ;
+        void populateTerminationCdr( boost::shared_ptr<CdrInfo> pCdr, sip_t const *sip, const string& carrier, const string& carrierAddress, 
+            const string& browser, const string& uuid ) ;
         void populateFinalResponseCdr( boost::shared_ptr<CdrInfo> pCdr, unsigned int status )  ;      
         void populateCancelCdr( boost::shared_ptr<CdrInfo> pCdr )  ;      
         void populateByeCdr( boost::shared_ptr<CdrInfo> pCdr, bool callingPartyRelease )  ;      

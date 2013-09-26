@@ -462,7 +462,12 @@ namespace ssp {
 			m_stmtTerm2->setString(3, pCdr->getTerminatingCarrierAddress()) ;
 			m_stmtTerm2->setString(4, pCdr->getCLegCallId()) ;
 			m_stmtTerm2->setString(5, pCdr->getDLegCallId()) ;
-			m_stmtTerm2->setString(6, pCdr->getCustomerName()) ;
+			if( pCdr->getCustomerName().length() > 0 ) {
+				m_stmtTerm2->setString(6, pCdr->getCustomerName()) ;
+			}
+			else {
+				m_stmtTerm2->setNull(6, sql::DataType::VARCHAR) ;
+			}
 			m_stmtTerm2->setString(7, pCdr->getCalledPartyNumberOut()) ;
 			m_stmtTerm2->setString(8, pCdr->getUuid()) ;
 			rows = m_stmtTerm2->executeUpdate();
