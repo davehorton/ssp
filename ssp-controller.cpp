@@ -1487,7 +1487,7 @@ namespace ssp {
             populateFinalResponseCdr( pNewCdr, status ) ;
             if( m_cdrWriter ) m_cdrWriter->postCdr( pNewCdr ) ;
         }
-        else if( status >= 200 && bTermination && pCdr ) {
+        else if( status >= 200 && bTermination && bProxyResponse && pCdr ) {
             boost::shared_ptr<CdrInfo> pNewCdr = boost::make_shared<CdrInfo>(CdrInfo::termination_attempt) ;
             *pNewCdr = *pCdr ;
             populateFinalResponseCdr( pNewCdr, status ) ;
