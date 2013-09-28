@@ -61,3 +61,4 @@ CREATE TABLE termination_attempt (
  CREATE TRIGGER before_insert_termination_attempt before insert on termination_attempt
  for each row
   set NEW.attempt_sequence = (select ifnull( max(attempt_sequence), 0) + 1 from termination_attempt where  cdr_session_uuid = NEW.cdr_session_uuid) ;
+
