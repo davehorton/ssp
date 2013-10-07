@@ -138,7 +138,18 @@ namespace ssp {
 		strftime( sz, 64, "%F %T", gmt ) ;
 		str.assign( sz, strlen(sz) ) ;
 	}
-
+	CdrInfo& CdrInfo::setSipHdrFrom( const string& str ) {
+		m_strSipHdrFrom = str ;
+		return *this ;
+	}
+	CdrInfo& CdrInfo::setSipHdrPAssertedIdentity( const string& str ) {
+		m_strSipHdrPAssertedIdentity = str ;
+		return *this ;
+	}
+	CdrInfo& CdrInfo::setSipHdrRemotePartyId( const string& str) {
+		m_strSipHdrRemotePartyId = str ;
+		return *this ;
+	}
 
 
 	CdrWriter::CdrWriter( const string& dbUrl, const string& user, const string& password, const string& schema ) : m_dbUrl(dbUrl), m_user(user), 

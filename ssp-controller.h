@@ -60,10 +60,11 @@ namespace ssp {
         ~TerminationAttempt() {
         }
         
-        void crankback( const string& url, const string& carrier, const string& sipTrunk ) {
+        void crankback( const string& url, const string& carrier, const string& sipTrunk, const string& chargeNumber ) {
             m_url = url ;
             m_carrier = carrier ;
             m_sipTrunk = sipTrunk ;
+            m_p_charge_info_header = chargeNumber ;
             m_nAttemptCount++ ;
             if( m_pCdr ) {
                 m_pCdr->setTerminatingCarrier(carrier) ;

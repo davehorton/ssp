@@ -1086,7 +1086,10 @@ namespace ssp {
                                                     SIPTAG_ALLOW(sip->sip_allow),
                                                     SIPTAG_PRIVACY(sip->sip_privacy),
                                                     SIPTAG_SESSION_EXPIRES(sip->sip_session_expires),
-                                                    SIPTAG_P_ASSERTED_IDENTITY(sip_p_asserted_identity( sip )),
+                                                    SIPTAG_P_ASSERTED_IDENTITY(sip_p_asserted_identity( sip )),    
+                                                    SIPTAG_REMOTE_PARTY_ID(sip_remote_party_id( sip )),           
+                                                    SIPTAG_PROXY_REQUIRE(sip->sip_proxy_require),
+                                                    SIPTAG_PRIVACY(sip->sip_privacy),
                                                     SIPTAG_UNKNOWN(sip_unknown(sip)),
                                                     SIPTAG_UNKNOWN_STR(carrierString.str().c_str()),
                                                     SIPTAG_UNKNOWN_STR(carrierTrunk.str().c_str()),
@@ -1211,10 +1214,11 @@ namespace ssp {
     bool SipLbController::generateTerminationRequest( boost::shared_ptr<TerminationAttempt>& t, nta_incoming_t* irq, nta_outgoing_t*& orq, nta_leg_t*& b_leg ) {
         sip_t const *sip = t->getSip() ;
         b_leg =  nta_leg_tcreate(m_nta,
-                                        legCallback, this,
-                                        SIPTAG_FROM_STR(t->getFrom().c_str()),
-                                        SIPTAG_TO_STR(t->getTo().c_str()),
-                                        TAG_END());
+            legCallback, this,
+            SIPTAG_FROM_STR(t->getFrom().c_str()),
+            SIPTAG_TO_STR(t->getTo().c_str()),
+            TAG_END());
+        
         if( NULL == b_leg ) {
             SSP_LOG(log_error) << "Failure creating outgoing leg for termination request" << endl ;
             return false ;
@@ -1230,25 +1234,27 @@ namespace ssp {
         strncpy( str, url.c_str(), url.length() ) ;
         
         orq = nta_outgoing_tcreate(b_leg, response_to_invite, this,
-                                                   NULL,
-                                                   SIP_METHOD_INVITE,
-                                                   URL_STRING_MAKE(str),
-                                                   SIPTAG_CONTACT_STR(t->getContact().c_str()),
-                                                   SIPTAG_CONTENT_TYPE(sip->sip_content_type),
-                                                   SIPTAG_CONTENT_DISPOSITION(sip->sip_content_disposition),
-                                                   SIPTAG_CONTENT_LENGTH(sip->sip_content_length),
-                                                   SIPTAG_PAYLOAD(sip->sip_payload),
-                                                   SIPTAG_SUPPORTED(sip->sip_supported),
-                                                   SIPTAG_SUBJECT(sip->sip_subject),
-                                                   SIPTAG_UNSUPPORTED(sip->sip_unsupported),
-                                                   SIPTAG_REQUIRE(sip->sip_require),
-                                                   SIPTAG_USER_AGENT(sip->sip_user_agent),
-                                                   SIPTAG_ALLOW(sip->sip_allow),
-                                                   SIPTAG_PRIVACY(sip->sip_privacy),
-                                                   SIPTAG_P_ASSERTED_IDENTITY(sip_p_asserted_identity( sip )),
-                                                   //SIPTAG_UNKNOWN(sip_unknown(sip)),
-                                                   SIPTAG_UNKNOWN_STR(t->getPChargeInfoHeader().c_str()),
-                                                   TAG_END());
+                NULL,
+                SIP_METHOD_INVITE,
+                URL_STRING_MAKE(str),
+                SIPTAG_CONTACT_STR(t->getContact().c_str()),
+                SIPTAG_CONTENT_TYPE(sip->sip_content_type),
+                SIPTAG_CONTENT_DISPOSITION(sip->sip_content_disposition),
+                SIPTAG_CONTENT_LENGTH(sip->sip_content_length),
+                SIPTAG_PAYLOAD(sip->sip_payload),
+                SIPTAG_SUPPORTED(sip->sip_supported),
+                SIPTAG_SUBJECT(sip->sip_subject),
+                SIPTAG_UNSUPPORTED(sip->sip_unsupported),
+                SIPTAG_REQUIRE(sip->sip_require),
+                SIPTAG_USER_AGENT(sip->sip_user_agent),
+                SIPTAG_ALLOW(sip->sip_allow),
+                SIPTAG_PRIVACY(sip->sip_privacy),
+                SIPTAG_P_ASSERTED_IDENTITY(sip_p_asserted_identity( sip )),    
+                SIPTAG_REMOTE_PARTY_ID(sip_remote_party_id( sip )),             
+                SIPTAG_PROXY_REQUIRE(sip->sip_proxy_require),
+                SIPTAG_UNKNOWN(sip_unknown(sip)),
+                SIPTAG_UNKNOWN_STR(t->getPChargeInfoHeader().c_str()),
+                TAG_END());
         
         if( NULL == orq ) {
             SSP_LOG(log_error) << "Failure creating outgoing transaction for termination request" << endl ;
@@ -1422,7 +1428,10 @@ namespace ssp {
                             
                             SSP_LOG(log_info) << "Attempting alternate route due to outbound failure: " << sip->sip_call_id->i_id << ": " << terminationSipAddress << " (" << carrier << ")" << endl ;
                             
-                            t->crankback( dest.str(), carrier, terminationSipAddress ) ;
+                            ostringstream chargeInfoHeader ;
+                            chargeInfoHeader << "P-Charge-Info: <sip:" << chargeNumber << "@" << terminationSipAddress << ">" ;
+ 
+                            t->crankback( dest.str(), carrier, terminationSipAddress, chargeInfoHeader.str() ) ;
                             
                             nta_leg_t* b_legNew ;
                             nta_outgoing_t* orqNew ;
@@ -1865,6 +1874,10 @@ namespace ssp {
         if( 0 != pCdr->getSipStatus() ) {
             pCdr->setReleaseCause( CdrInfo::call_rejected_due_to_system_error ) ;
         }
+
+        char hdr[256] ;
+        msg_header_field_e(hdr, 256, (msg_header_t*) sip->sip_from, 0) ;
+        pCdr->setSipHdrFrom( hdr ) ;
 
     }
     void SipLbController::populateTerminationCdr( boost::shared_ptr<CdrInfo> pCdr, sip_t const *sip, const string& carrier, const string& carrierAddress, 

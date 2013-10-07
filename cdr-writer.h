@@ -64,6 +64,9 @@ namespace ssp {
 		CdrInfo& setTimeStart( time_t time ) ;
 		CdrInfo& setTimeConnect( time_t time ) ;
 		CdrInfo& setTimeEnd( time_t time ) ;
+		CdrInfo& setSipHdrFrom( const string& str ) ;
+		CdrInfo& setSipHdrPAssertedIdentity( const string& str ) ;
+		CdrInfo& setSipHdrRemotePartyId( const string& str ) ;
 
 
 		CdrEvent_t getCdrType() const { return m_cdrType; }
@@ -92,6 +95,9 @@ namespace ssp {
 		bool getTimeStartFormatted(string& str) const ;
 		bool getTimeConnectFormatted(string& str) const ;
 		bool getTimeEndFormatted(string& str) const ;
+		const string& getSipHdrFrom() const { return m_strSipHdrFrom ;}
+		const string& getSipHdrPAssertedIdentify() const { return m_strSipHdrPAssertedIdentity ;}
+		const string& getSipHdrRemotePartyId() const { return m_strSipHdrRemotePartyId ;}
 
 	private:
 		CdrEvent_t m_cdrType ;
@@ -117,6 +123,9 @@ namespace ssp {
 		time_t	m_tmStart ;
 		time_t 	m_tmConnect ;
 		time_t 	m_tmEnd ;
+		string  m_strSipHdrFrom ;
+		string  m_strSipHdrPAssertedIdentity ;
+		string  m_strSipHdrRemotePartyId ;
 	} ;
 
 	class CdrWriter {
