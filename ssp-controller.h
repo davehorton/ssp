@@ -122,6 +122,7 @@ namespace ssp {
             m_strCarrier = other.m_strCarrier;
             m_attempts = other.m_attempts ;
             memcpy( m_fails, other.m_fails, sizeof( m_fails) ) ;
+            return *this ;
         }
         void incrementAttemptCount() {
             if( 0 == ++m_attempts ) {
@@ -177,7 +178,7 @@ namespace ssp {
         bool isOrigination(void) { return m_bOrigination; }
         unsigned int getSessionTimerSecs(void) { return m_nSessionTimer; }
         su_timer_t* getSessionTimerTimer(void) { return m_timerSessionRefresh; }
-        void setSessionTimerTimer( su_timer_t* t ) {m_timerSessionRefresh; }
+        void setSessionTimerTimer( su_timer_t* t ) {m_timerSessionRefresh = t; }
         const string& getLocalSdp(void) { return m_localSdp; }
         void setLocalSdp( char* pl_data, usize_t pl_size ) {
             m_localSdp.assign( pl_data, pl_size ) ;

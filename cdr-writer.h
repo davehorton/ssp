@@ -8,6 +8,7 @@
 #include <boost/thread/thread.hpp>
 #include <boost/bind.hpp>
 #include <boost/thread/mutex.hpp>
+#include <boost/enable_shared_from_this.hpp>
 
 #include <driver/mysql_public_iface.h>
 
@@ -128,13 +129,15 @@ namespace ssp {
 		string  m_strSipHdrRemotePartyId ;
 	} ;
 
-	class CdrWriter {
+	class CdrWriter : public boost::enable_shared_from_this<CdrWriter> {
 	public:
 		CdrWriter( const string& dbUrl, const string& user, const string& password, const string& schema) ;
 		~CdrWriter() ;
 
 		void postCdr( boost::shared_ptr<CdrInfo> pCdr ) ;
 		bool testConnection() ;
+
+        void timer_handler(const boost::system::error_code& error) ;
 
 	private:
 		void worker_thread() ;
@@ -147,6 +150,8 @@ namespace ssp {
 
 		boost::shared_ptr<sql::Connection> getConnection() ;
 		void releaseConnection( boost::shared_ptr<sql::Connection> conn ) ;
+
+		void startSqlTimer() ;
 
 		boost::asio::io_service m_io_service;
 		boost::shared_ptr<boost::asio::io_service::work> m_pWork;
@@ -164,6 +169,8 @@ namespace ssp {
 
 		boost::shared_ptr<sql::PreparedStatement> m_stmtOrig, m_stmtFinal, m_stmtCancel, m_stmtTerm1, m_stmtTerm2, m_stmtBye1, m_stmtBye2 ;
 
+
+        boost::asio::deadline_timer m_timerSqlTest ;
 
 	} ;
 

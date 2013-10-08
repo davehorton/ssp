@@ -828,7 +828,8 @@ namespace ssp {
             int rv = nta_msg_tsend( m_nta, msg, NULL, TAG_NULL(), TAG_END() ) ;
             return 0 ;
 
-        }        
+        }      
+        return 0 ;  
     }
     void SipLbController::setCompleted( iip_map_t::const_iterator& it )  {
         shared_ptr<SipInboundCall> iip = it->second ;

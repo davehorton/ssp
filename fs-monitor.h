@@ -38,6 +38,7 @@ namespace ssp {
 
         bool getAllServers( deque< boost::shared_ptr<FsInstance> >& servers ) {
             servers = m_servers ;
+            return true ;
         }
         
         bool isAppserver( const string& sourceAddress ) { return m_setServers.end() != m_setServers.find( sourceAddress ) ; }
