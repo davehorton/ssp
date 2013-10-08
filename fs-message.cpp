@@ -98,7 +98,7 @@ namespace ssp {
         }
   
         if( request == m_type ||
-           reply == m_type && undefined != m_replyStatus ||
+           (reply == m_type && undefined != m_replyStatus) ||
            (m_nContentLength> 0 && m_strContent.length() == m_nContentLength ) ) {
             
             m_bComplete = true ;

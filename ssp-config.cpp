@@ -221,7 +221,7 @@ namespace ssp {
             return m_name == other.m_name ;
         }
         
-        AppserverGroup_t& addServer( const Appserver_t& appserver ) { m_setAppserver.insert( appserver ); }
+        AppserverGroup_t& addServer( const Appserver_t& appserver ) { m_setAppserver.insert( appserver ); return *this; }
         const string& getName() const { return m_name; }
         const boost::unordered_set<Appserver_t>& getAppservers() const { return m_setAppserver; }
         
