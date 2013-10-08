@@ -44,6 +44,8 @@ namespace ssp {
 #include "ssp-controller.h"
 #include "fs-instance.h"
 
+const char* version() ;
+
 #define DEFAULT_CONFIG_FILENAME "/etc/ssp.conf.xml"
 
 #define MAXLOGLEN (8192)
@@ -252,6 +254,7 @@ namespace ssp {
 
     bool SipLbController::parseCmdArgs( int argc, char* argv[] ) {        
         int c ;
+        int bVersion = 0 ;
         while (1)
         {
             static struct option long_options[] =
@@ -265,6 +268,7 @@ namespace ssp {
                 {"file",    required_argument, 0, 'f'},
                 {"iterations",    required_argument, 0, 'i'},
                 {"user",    required_argument, 0, 'u'},
+                {"version",    no_argument, 0, 'v'},
                 {0, 0, 0, 0}
             };
             /* getopt_long stores the option index here. */
@@ -302,6 +306,10 @@ namespace ssp {
                     cout << "option iteration count set; program will exit after handling " << m_nIterationCount << " INVITES !!" << endl ;
                     break ;
                     
+                case 'v':
+                    cerr << version() << endl ;
+                    exit(0) ;
+                   
                 case '?':
                     /* getopt_long already printed an error message. */
                     break;
