@@ -208,6 +208,7 @@ namespace ssp {
 			if( !m_vecConnection.empty() ) {
 				conn = m_vecConnection.front() ;
 				m_vecConnection.pop_front() ;
+				SSP_LOG(log_debug) << "Retrieving existing database connection" << endl ;
 				return conn ;
 			}
 		}
@@ -569,10 +570,13 @@ namespace ssp {
 				}
 
 				boost::scoped_ptr< sql::Statement > stmt(conn->createStatement());
-				stmt->execute("SELECT curtime() from dual");
-
-				SSP_LOG(log_debug) << "Succesfully tested mysql connection" << endl ;
-
+				bool ok = stmt->execute("SELECT curtime() as curtime from dual");
+				if( ok ) {
+			        boost::scoped_ptr< sql::ResultSet > res( stmt->getResultSet() ) ;
+			        while( res->next() ) {
+		                SSP_LOG(log_debug) << "Successfully tested mysql connection, server time is " << res->getString("curtime") << endl ;
+			        }
+				}
 				this->releaseConnection( conn ) ;
 
 			} catch (sql::SQLException &e) {
