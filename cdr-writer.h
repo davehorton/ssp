@@ -8,6 +8,7 @@
 #include <boost/thread/thread.hpp>
 #include <boost/bind.hpp>
 #include <boost/thread/mutex.hpp>
+#include <boost/enable_shared_from_this.hpp>
 
 #include <driver/mysql_public_iface.h>
 
@@ -64,6 +65,9 @@ namespace ssp {
 		CdrInfo& setTimeStart( time_t time ) ;
 		CdrInfo& setTimeConnect( time_t time ) ;
 		CdrInfo& setTimeEnd( time_t time ) ;
+		CdrInfo& setSipHdrFrom( const string& str ) ;
+		CdrInfo& setSipHdrPAssertedIdentity( const string& str ) ;
+		CdrInfo& setSipHdrRemotePartyId( const string& str ) ;
 
 
 		CdrEvent_t getCdrType() const { return m_cdrType; }
@@ -92,6 +96,9 @@ namespace ssp {
 		bool getTimeStartFormatted(string& str) const ;
 		bool getTimeConnectFormatted(string& str) const ;
 		bool getTimeEndFormatted(string& str) const ;
+		const string& getSipHdrFrom() const { return m_strSipHdrFrom ;}
+		const string& getSipHdrPAssertedIdentify() const { return m_strSipHdrPAssertedIdentity ;}
+		const string& getSipHdrRemotePartyId() const { return m_strSipHdrRemotePartyId ;}
 
 	private:
 		CdrEvent_t m_cdrType ;
@@ -117,15 +124,20 @@ namespace ssp {
 		time_t	m_tmStart ;
 		time_t 	m_tmConnect ;
 		time_t 	m_tmEnd ;
+		string  m_strSipHdrFrom ;
+		string  m_strSipHdrPAssertedIdentity ;
+		string  m_strSipHdrRemotePartyId ;
 	} ;
 
-	class CdrWriter {
+	class CdrWriter : public boost::enable_shared_from_this<CdrWriter> {
 	public:
 		CdrWriter( const string& dbUrl, const string& user, const string& password, const string& schema) ;
 		~CdrWriter() ;
 
 		void postCdr( boost::shared_ptr<CdrInfo> pCdr ) ;
 		bool testConnection() ;
+
+        void timer_handler(const boost::system::error_code& error) ;
 
 	private:
 		void worker_thread() ;
@@ -138,6 +150,8 @@ namespace ssp {
 
 		boost::shared_ptr<sql::Connection> getConnection() ;
 		void releaseConnection( boost::shared_ptr<sql::Connection> conn ) ;
+
+		void startSqlTimer() ;
 
 		boost::asio::io_service m_io_service;
 		boost::shared_ptr<boost::asio::io_service::work> m_pWork;
@@ -155,6 +169,8 @@ namespace ssp {
 
 		boost::shared_ptr<sql::PreparedStatement> m_stmtOrig, m_stmtFinal, m_stmtCancel, m_stmtTerm1, m_stmtTerm2, m_stmtBye1, m_stmtBye2 ;
 
+
+        boost::asio::deadline_timer m_timerSqlTest ;
 
 	} ;
 

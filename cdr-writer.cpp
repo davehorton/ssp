@@ -117,6 +117,7 @@ namespace ssp {
 		gmt = gmtime( &m_tmStart ) ;
 		strftime( sz, 64, "%F %T", gmt ) ;
 		str.assign( sz, strlen(sz) ) ;
+		return true ;
 	}
 	bool CdrInfo::getTimeConnectFormatted(string& str) const {
 		struct tm* gmt = NULL ;
@@ -127,6 +128,7 @@ namespace ssp {
 		gmt = gmtime( &m_tmConnect ) ;
 		strftime( sz, 64, "%F %T", gmt ) ;
 		str.assign( sz, strlen(sz) ) ;
+		return true ;
 	}
 	bool CdrInfo::getTimeEndFormatted(string& str) const {
 		struct tm* gmt = NULL ;
@@ -137,21 +139,33 @@ namespace ssp {
 		gmt = gmtime( &m_tmEnd ) ;
 		strftime( sz, 64, "%F %T", gmt ) ;
 		str.assign( sz, strlen(sz) ) ;
+		return true ;
+	}
+	CdrInfo& CdrInfo::setSipHdrFrom( const string& str ) {
+		m_strSipHdrFrom = str ;
+		return *this ;
+	}
+	CdrInfo& CdrInfo::setSipHdrPAssertedIdentity( const string& str ) {
+		m_strSipHdrPAssertedIdentity = str ;
+		return *this ;
+	}
+	CdrInfo& CdrInfo::setSipHdrRemotePartyId( const string& str) {
+		m_strSipHdrRemotePartyId = str ;
+		return *this ;
 	}
 
 
-
 	CdrWriter::CdrWriter( const string& dbUrl, const string& user, const string& password, const string& schema ) : m_dbUrl(dbUrl), m_user(user), 
-		m_password(password), m_schema(schema)  {
+		m_password(password), m_schema(schema),m_timerSqlTest(m_io_service)  {
 		try {
 			m_pDriver = sql::mysql::get_driver_instance() ;
 			if( !m_pDriver ) throw std::runtime_error("Error creating instance of mysql driver") ;
 
 			m_pWork.reset( new boost::asio::io_service::work(m_io_service) );
 
-			//for ( unsigned int i = 0; i < poolSize; ++i) {
-				m_threadGroup.create_thread( boost::bind(&CdrWriter::worker_thread, this) );
-			//}
+			m_threadGroup.create_thread( boost::bind(&CdrWriter::worker_thread, this) );
+
+
 		} catch (sql::SQLException &e) {
 			cerr << "CdrWriter::CdrWriter sql exception: " << e.what() << " mysql error code: " << e.getErrorCode() << ", sql state: " << e.getSQLState() << endl ;
 			SSP_LOG(log_error) << "CdrWriter::worker_thread sql exception: " << e.what() << " mysql error code: " << e.getErrorCode() << ", sql state: " << e.getSQLState() << endl ;
@@ -165,6 +179,7 @@ namespace ssp {
 	}
 	CdrWriter::~CdrWriter() {
 		SSP_LOG(log_debug) << "CdrWriter::~CdrWriter cdr writer stopping" << endl ;
+		m_timerSqlTest.cancel() ;
 		m_pWork.reset(); // stop all!
 		m_threadGroup.join_all(); // wait for all completition
 		SSP_LOG(log_debug) << "CdrWriter::~CdrWriter cdr writer stopped" << endl ;
@@ -193,6 +208,7 @@ namespace ssp {
 			if( !m_vecConnection.empty() ) {
 				conn = m_vecConnection.front() ;
 				m_vecConnection.pop_front() ;
+				SSP_LOG(log_debug) << "Retrieving existing database connection" << endl ;
 				return conn ;
 			}
 		}
@@ -218,6 +234,9 @@ namespace ssp {
 			try {
 				m_pDriver->threadInit() ;
 				SSP_LOG(log_debug) << "Successfully initialized mysql driver" << endl ;
+
+				this->startSqlTimer() ;
+
 			}
 			catch (sql::SQLException &e) {
 				cerr << "CdrWriter exception calling threadInit: " << e.what() << " mysql error code: " << e.getErrorCode() << ", sql state: " << e.getSQLState() << endl ;
@@ -536,5 +555,42 @@ namespace ssp {
 			SSP_LOG(log_error) << "CdrWriter::writeByeCdr runtime exception: " << e.what() << endl ;
 		}
 	}
+	void CdrWriter::startSqlTimer() {
+		m_timerSqlTest.expires_from_now(boost::posix_time::seconds(180));
+		m_timerSqlTest.async_wait( boost::bind( &CdrWriter::timer_handler, shared_from_this(), boost::asio::placeholders::error )) ;		
+	}
+   void CdrWriter::timer_handler(const boost::system::error_code& ec) {
+        if( !ec ) {
+	 		try {
+				boost::shared_ptr<sql::Connection> conn = this->getConnection() ;
+				if( !conn ) {
+					SSP_LOG(log_error) << "Error retrieving connection for sql test " << endl ;
+					this->startSqlTimer() ;
+					return ;
+				}
 
+				boost::scoped_ptr< sql::Statement > stmt(conn->createStatement());
+				bool ok = stmt->execute("SELECT curtime() as curtime from dual");
+				if( ok ) {
+			        boost::scoped_ptr< sql::ResultSet > res( stmt->getResultSet() ) ;
+			        while( res->next() ) {
+		                SSP_LOG(log_debug) << "Successfully tested mysql connection, server time is " << res->getString("curtime") << endl ;
+			        }
+				}
+				this->releaseConnection( conn ) ;
+
+			} catch (sql::SQLException &e) {
+					if( 2013 == e.getErrorCode() || 2006 == e.getErrorCode() ) {
+						boost::lock_guard<boost::mutex> l( m_lock ) ;
+						m_vecConnection.clear() ;
+					}
+					cerr << "CdrWriter::timer_handler sql exception: " << e.what() << " mysql error code: " << e.getErrorCode() << ", sql state: " << e.getSQLState() << endl ;
+					SSP_LOG(log_error) << "CdrWriter::timer_handler sql exception: " << e.what() << " mysql error code: " << e.getErrorCode() << ", sql state: " << e.getSQLState() << endl ;
+			} catch (std::runtime_error &e) {
+					cerr << "CdrWriter::timer_handler runtime exception: " << e.what() << endl ;
+					SSP_LOG(log_error) << "CdrWriter::timer_handler runtime exception: " << e.what() << endl ;
+			}
+			this->startSqlTimer() ;
+		}
+	}
 }

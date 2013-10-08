@@ -37,11 +37,57 @@ BEGIN
 	 DEALLOCATE PREPARE stmt;
 END //
 
+
+DROP PROCEDURE IF EXISTS getAttemptsByCustomerHourlyEDT //
+CREATE PROCEDURE getAttemptsByCustomerHourlyEDT(IN _date DATETIME)
+BEGIN
+
+	SET @sql = NULL;
+	SELECT
+	  GROUP_CONCAT(DISTINCT
+	    CONCAT(
+	      "COUNT(IF(fs_assigned_customer = '",
+	      fs_assigned_customer,
+	      "', start_time, NULL)) AS ",
+	      fs_assigned_customer
+	    )
+	  ) INTO @sql
+	FROM cdr_session ;
+
+	SET @sql = CONCAT("select hour(date_sub(start_time, INTERVAL 4 HOUR)) as hour, ", @sql, " from cdr_session where start_time >= DATE_ADD('", _date, "', INTERVAL 4 HOUR) and start_time <= date_add('", _date,"', INTERVAL 28 HOUR) group by hour(start_time) order by 1 asc ");
+	PREPARE stmt FROM @sql;
+	EXECUTE stmt;
+	DEALLOCATE PREPARE stmt;
+END //
+
+DROP PROCEDURE IF EXISTS getShortCallsByCustomerHourly //
+CREATE PROCEDURE getShortCallsByCustomerHourly(IN _date DATETIME)
+BEGIN
+
+	SET @sql = NULL;
+	SELECT
+	  GROUP_CONCAT(DISTINCT
+	    CONCAT(
+	      "COUNT(IF(fs_assigned_customer = '",
+	      fs_assigned_customer,
+	      "', start_time, NULL)) AS ",
+	      fs_assigned_customer
+	    )
+	  ) INTO @sql
+	FROM cdr_session ;
+
+	SET @sql = CONCAT("select hour(start_time) as hour, ", @sql, " from cdr_session where connect_time is not null and TIME_TO_SEC(TIMEDIFF(end_time,connect_time)) < 10 and start_time >= '", _date, "' and start_time <= date_add('", _date,"', INTERVAL 1 DAY) group by hour(start_time) order by 1 asc ");
+
+	 PREPARE stmt FROM @sql;
+	 EXECUTE stmt;
+	 DEALLOCATE PREPARE stmt;
+END //
+
 DROP PROCEDURE IF EXISTS getTerminationsByCarrier //
 CREATE PROCEDURE getTerminationsByCarrier( IN _date DATETIME ) 
 BEGIN
 	SELECT terminating_carrier, terminating_carrier_ip_address, count(*) as attempts, count(connect_time) as completions,
-	count(*)-count(connect_time) as failures, (count(*)-count(connect_time))/100.0 as "failure rate"
+	count(*)-count(connect_time) as failures, ((count(*)-count(connect_time))/count(*))*100.0 as "failure rate"
 	from termination_attempt
 	where start_time > _date 
 	and start_time <= date_add( _date, INTERVAL 1 day)
@@ -61,4 +107,27 @@ BEGIN
 	order by 3 desc ;	
 END //
 
+DROP PROCEDURE IF EXISTS getStandingCallCount //
+CREATE PROCEDURE getStandingCallCount()
+BEGIN
+	select fs_assigned_customer as CUSTOMER, count(*) as 'STANDING CALLS' 
+	from cdr_session 
+	where start_time is not null 
+	and connect_time is not null 
+	and end_time is null 
+	group by 1
+	order by 1 desc ;
+END //
+
+DROP PROCEDURE IF EXISTS updateTrafficSummary() //
+CREATE PROCEDURE updateTrafficSummary()
+BEGIN
+	INSERT into traffic_summary(customer,originating_carrier,terminating_carrier,call_count)
+	select fs_assigned_customer, originating_carrier, terminating_carrier, count(*)
+	from cdr_session 
+	where start_time is not null and connect_time is not null and end_time is null
+	group by 1, 2, 3 ;
+END //
+
 DELIMITER ;
+
