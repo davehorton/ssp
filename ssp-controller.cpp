@@ -274,7 +274,7 @@ namespace ssp {
             /* getopt_long stores the option index here. */
             int option_index = 0;
             
-            c = getopt_long (argc, argv, "f:i:",
+            c = getopt_long (argc, argv, "vf:i:",
                              long_options, &option_index);
             
             /* Detect the end of the options. */
