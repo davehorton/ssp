@@ -234,6 +234,7 @@ namespace ssp {
 				m_pDriver->threadInit() ;
 				SSP_LOG(log_debug) << "Successfully initialized mysql driver" << endl ;
 
+				this->startSqlTimer() ;
 
 			}
 			catch (sql::SQLException &e) {
