@@ -1,9 +1,10 @@
+MYVERSION=$(shell git describe)
 INCLUDES= -I/usr/local/include -I${srcdir}/deps/boost_1_52_0 -I${srcdir}/deps/sofia-sip-1.12.11/libsofia-sip-ua/su -I${srcdir}/deps/sofia-sip-1.12.11/libsofia-sip-ua/nta -I${srcdir}/deps/sofia-sip-1.12.11/libsofia-sip-ua/sip -I${srcdir}/deps/sofia-sip-1.12.11/libsofia-sip-ua/msg -I${srcdir}/deps/sofia-sip-1.12.11/libsofia-sip-ua/url -I${srcdir}/deps/mysql-connector-c++-1.1.3
 AM_LDFLAGS= -L/usr/local/lib -L/usr/local/mysql/lib
 LDADD= -lboost_thread -lpthread -lssl
 bin_PROGRAMS= ssp fsspoofer check-ssp
-ssp_SOURCES= main.cpp ssp-controller.cpp ssp-config.cpp fs-monitor.cpp fs-instance.cpp fs-message.cpp fs-exception.cpp sip-inbound-call.cpp ssp.cpp nagios-connector.cpp cdr-writer.cpp version.cpp
-ssp_CPPFLAGS=-D_REENTRANT
+ssp_SOURCES= main.cpp ssp-controller.cpp ssp-config.cpp fs-monitor.cpp fs-instance.cpp fs-message.cpp fs-exception.cpp sip-inbound-call.cpp ssp.cpp nagios-connector.cpp cdr-writer.cpp
+ssp_CPPFLAGS=-D_REENTRANT -DSSP_VERSION=\"$(MYVERSION)\"
 ssp_LDADD= ${srcdir}/deps/sofia-sip-1.12.11/libsofia-sip-ua/.libs/libsofia-sip-ua.a ${srcdir}/deps/boost_1_52_0/stage/lib/libboost_thread.a ${srcdir}/deps/boost_1_52_0/stage/lib/libboost_system.a ${srcdir}/deps/boost_1_52_0/stage/lib/libboost_log.a ${srcdir}/deps/mysql-connector-c++-1.1.3/driver/libmysqlcppconn-static.a -lmysqlclient -lpthread -lssl -lcrypto -lz
 fsspoofer_SOURCES= fs-spoofer.cpp
 fsspoofer_CPPFLAGS=-D_REENTRANT

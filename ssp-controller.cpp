@@ -44,8 +44,6 @@ namespace ssp {
 #include "ssp-controller.h"
 #include "fs-instance.h"
 
-const char* version() ;
-
 #define DEFAULT_CONFIG_FILENAME "/etc/ssp.conf.xml"
 
 #define MAXLOGLEN (8192)
@@ -141,16 +139,6 @@ namespace {
     int handleAckOrCancel( nta_incoming_magic_t* controller, nta_incoming_t* irq, sip_t const *sip ) {
         return controller->processAckOrCancel( irq, sip ) ;
     }
-    
-    
-/*
-    int uasCallback( nta_outgoing_magic_t* b2bCall,
-                    nta_incoming_t* request,
-                    sip_t const* sip ) {
-        
-        return b2bCall->processUasMsgInsideDialog( request, sip ) ;
-    }
-    */
     int stateless_callback( nta_leg_magic_t* controller, nta_agent_t* agent, msg_t *msg, sip_t *sip) {
         return controller->statelessCallback( msg, sip ) ;
     }
@@ -181,12 +169,10 @@ namespace {
         boost::hash_combine(seed, d.getLeg() );
         return seed;
     }
-
 }
 
 namespace ssp {
     
-
 
     SipLbController::SipLbController( int argc, char* argv[] ) : m_bDaemonize(false), m_bLoggingInitialized(false),
         m_configFilename(DEFAULT_CONFIG_FILENAME), m_bInbound(false), m_bOutbound(false), m_nIterationCount(-1), m_nTerminationRetries(0), m_bDbTest(false) {
@@ -311,7 +297,7 @@ namespace ssp {
                     break ;
                     
                 case 'v':
-                    cerr << version() << endl ;
+                    cout << SSP_VERSION << endl ;
                     exit(0) ;
                    
                 case '?':
