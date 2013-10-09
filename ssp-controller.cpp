@@ -227,7 +227,7 @@ namespace ssp {
                 m_cdrWriter->testConnection() ;         
             }           
         }
-         
+        
         return true ;
         
     }
@@ -235,6 +235,10 @@ namespace ssp {
         SSP_LOG(log_notice) << "Logging threshold:                     " << (int) m_current_severity_threshold << endl ;
         SSP_LOG(log_notice) << "Freeswitch health check timer (msecs): " << m_nFSTimerMsecs << endl ;
         SSP_LOG(log_notice) << "Number of termination routes to try:   " << m_nTerminationRetries << endl ;
+        if( !m_Config->isActive() ) {
+          SSP_LOG(log_notice) << "SSP mode is set to inactive!  Existing calls will be allowed to finish but new calls (and OPTIONS requests) will receive a 503 " << endl ;
+        }
+ 
     }
 
     void SipLbController::handleSigHup( int signal ) {
@@ -953,19 +957,21 @@ namespace ssp {
                 call_type_t call_type = this->determineCallType( sip, carrier ) ;
                 int rc = 0;
 
-                if( !m_Config->isActive() || 0 == m_nIterationCount ) {
-                    SSP_LOG(log_error) << "Rejecting new INVITE because we are inactive " << endl ;
-                    boost::shared_ptr<CdrInfo> pCdr = boost::make_shared<CdrInfo>(CdrInfo::origination_request) ;
-                    this->populateOriginationCdr( pCdr, sip, carrier ) ;
-                    pCdr->setSipStatus( 503 ) ;
-                    pCdr->setReleaseCause( CdrInfo::call_rejected_due_to_being_offline ) ;
-                    if( m_cdrWriter ) m_cdrWriter->postCdr( pCdr ) ;
-                    return pCdr->getSipStatus() ;
-                }
                 nta_incoming_treply( irq, SIP_100_TRYING, TAG_END() ) ;
               
                 if( origination_call_type == call_type ) {
-                    rc = this->processOriginationRequest( irq, sip, carrier ) ;
+                    if( !m_Config->isActive() || 0 == m_nIterationCount ) {
+                        SSP_LOG(log_error) << "Rejecting new INVITE because we are inactive " << endl ;
+                        boost::shared_ptr<CdrInfo> pCdr = boost::make_shared<CdrInfo>(CdrInfo::origination_request) ;
+                        this->populateOriginationCdr( pCdr, sip, carrier ) ;
+                        pCdr->setSipStatus( 503 ) ;
+                        pCdr->setReleaseCause( CdrInfo::call_rejected_due_to_being_offline ) ;
+                        if( m_cdrWriter ) m_cdrWriter->postCdr( pCdr ) ;
+                        return pCdr->getSipStatus() ;
+                    }
+                    else {
+                        rc = this->processOriginationRequest( irq, sip, carrier ) ;
+                    }
                 }
                 else if( termination_call_type == call_type ) {
                     rc = this->processTerminationRequest( irq, sip ) ;
