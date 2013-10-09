@@ -294,7 +294,7 @@ namespace ssp {
                     m_agent_mode = agent_mode_stateful ;
                 }
                 
-                if( 0 == pt.get<string>("ss.sip.<xmlattr>.status", "active").compare("inactive") ) {
+                if( 0 == pt.get<string>("ssp.sip.<xmlattr>.status", "active").compare("inactive") ) {
                     m_bIsActive = false ;
                 }
                 m_nOriginationSessionTimer = pt.get<unsigned long>("ssp.inbound.session-timer", 0) ;
