@@ -1091,7 +1091,7 @@ namespace ssp {
                                                     SIPTAG_REMOTE_PARTY_ID(sip_remote_party_id( sip )),           
                                                     SIPTAG_PROXY_REQUIRE(sip->sip_proxy_require),
                                                     SIPTAG_PRIVACY(sip->sip_privacy),
-                                                    SIPTAG_UNKNOWN(sip_unknown(sip)),
+                                                    //SIPTAG_UNKNOWN(sip_unknown(sip)),   
                                                     SIPTAG_UNKNOWN_STR(carrierString.str().c_str()),
                                                     SIPTAG_UNKNOWN_STR(carrierTrunk.str().c_str()),
                                                     SIPTAG_UNKNOWN_STR(xuuid.str().c_str()),
@@ -1253,7 +1253,7 @@ namespace ssp {
                 SIPTAG_P_ASSERTED_IDENTITY(sip_p_asserted_identity( sip )),    
                 SIPTAG_REMOTE_PARTY_ID(sip_remote_party_id( sip )),             
                 SIPTAG_PROXY_REQUIRE(sip->sip_proxy_require),
-                SIPTAG_UNKNOWN(sip_unknown(sip)),
+                SIPTAG_UNKNOWN(sip_unknown(sip)),  
                 SIPTAG_UNKNOWN_STR(t->getPChargeInfoHeader().c_str()),
                 TAG_END());
         
