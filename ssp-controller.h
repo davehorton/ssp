@@ -259,6 +259,7 @@ namespace ssp {
 		SipLbController() {} ;
         
         call_type_t determineCallType( sip_t const *sip, string& carrier ) ;
+        int validateSipMessage( sip_t const *sip ) ;
 
         bool generateTerminationRequest( boost::shared_ptr<TerminationAttempt>& t, nta_incoming_t* irq, nta_outgoing_t*& orq, nta_leg_t*& b_leg ) ;
         
