@@ -1869,7 +1869,7 @@ namespace ssp {
             SSP_LOG(log_error) << "Invalid or missing call-id header" << endl ;
             return 400 ;
         }
-        if( !!sip->sip_to || !sip->sip_to->a_url[0].url_user ) {
+        if( sip_method_invite == sip->sip_request->rq_method  && (!sip->sip_to || !sip->sip_to->a_url[0].url_user ) ) {
             SSP_LOG(log_error) << "Invalid or missing to header or dialed number information" << endl ;
             return 400 ;            
         }
