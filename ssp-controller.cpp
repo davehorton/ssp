@@ -915,6 +915,10 @@ namespace ssp {
     /* stateful */
     int SipLbController::processRequestOutsideDialog( nta_leg_t* defaultLeg, nta_incoming_t* irq, sip_t const *sip) {
         SSP_LOG(log_debug) << "processRequestOutsideDialog" << endl ;
+        int rc = this->validateSipMessage( sip ) ;
+        if( 0 != rc ) {
+            return rc ;
+        }
         switch (sip->sip_request->rq_method ) {
             case sip_method_options:
             {
@@ -963,7 +967,7 @@ namespace ssp {
                     rc = this->processTerminationRequest( irq, sip ) ;
                 }
                 else {
-                    SSP_LOG(log_error) << "Received invite from unknown address: " <<  sip->sip_contact->m_url[0].url_host << endl ;
+                     SSP_LOG(log_error) << "Received invite from unknown address: " <<  sip->sip_contact->m_url[0].url_host << endl ;
                     boost::shared_ptr<CdrInfo> pCdr = boost::make_shared<CdrInfo>(CdrInfo::origination_request) ;
                     this->populateOriginationCdr( pCdr, sip, carrier ) ;
                     pCdr->setSipStatus( 403 ) ;
@@ -1855,7 +1859,26 @@ namespace ssp {
             hdr = hdr->un_next ;
         }
         return false ;
+    }
+    int SipLbController::validateSipMessage( sip_t const *sip ) {
+        if( sip_method_invite == sip->sip_request->rq_method  && (!sip->sip_contact || !sip->sip_contact->m_url[0].url_host ) ) {
+            SSP_LOG(log_error) << "Invalid or missing contact header" << endl ;
+            return 400 ;
+        }
+        if( !sip->sip_call_id || !sip->sip_call_id->i_id ) {
+            SSP_LOG(log_error) << "Invalid or missing call-id header" << endl ;
+            return 400 ;
+        }
+        if( !!sip->sip_to || !sip->sip_to->a_url[0].url_user ) {
+            SSP_LOG(log_error) << "Invalid or missing to header or dialed number information" << endl ;
+            return 400 ;            
+        }
+        if( sip_method_invite == sip->sip_request->rq_method  && (!sip->sip_from || !sip->sip_from->a_tag ) )  {
+           SSP_LOG(log_error) << "Missing tag on From header on invite" << endl ;
+            return 400 ;            
+        }
 
+        return 0 ;
     }
     void SipLbController::populateOriginationCdr( boost::shared_ptr<CdrInfo> pCdr, sip_t const *sip, const string& carrier ) {
         string uuid ;
@@ -1867,19 +1890,18 @@ namespace ssp {
         pCdr->setCdrType( CdrInfo::origination_request ) ;
         pCdr->setTimeStart( time(0) ) ;
         pCdr->setOriginatingCarrier( carrier ) ;
-        pCdr->setOriginatingCarrierAddress( sip->sip_contact->m_url[0].url_host ) ;
-        pCdr->setALegCallId( sip->sip_call_id->i_id )  ;
+        if( sip->sip_contact->m_url[0].url_host ) pCdr->setOriginatingCarrierAddress( sip->sip_contact->m_url[0].url_host ) ;
+        if( sip->sip_call_id->i_id ) pCdr->setALegCallId( sip->sip_call_id->i_id )  ;
         pCdr->setOriginatingEdgeServerAddress( m_my_contact->m_url[0].url_host ) ;
-        pCdr->setCalledPartyNumberIn( sip->sip_to->a_url[0].url_user ) ;
-        pCdr->setCallingPartyNumber( sip->sip_from->a_url[0].url_user ) ;
+        if( sip->sip_to->a_url[0].url_user ) pCdr->setCalledPartyNumberIn( sip->sip_to->a_url[0].url_user ) ;
+        if( sip->sip_from->a_url[0].url_user ) pCdr->setCallingPartyNumber( sip->sip_from->a_url[0].url_user ) ;
         if( 0 != pCdr->getSipStatus() ) {
             pCdr->setReleaseCause( CdrInfo::call_rejected_due_to_system_error ) ;
         }
 
-        char hdr[256] ;
-        msg_header_field_e(hdr, 256, (msg_header_t*) sip->sip_from, 0) ;
-        pCdr->setSipHdrFrom( hdr ) ;
-
+        //char hdr[256] ;
+        //msg_header_field_e(hdr, 256, (msg_header_t*) sip->sip_from, 0) ;
+        //pCdr->setSipHdrFrom( hdr ) ;
     }
     void SipLbController::populateTerminationCdr( boost::shared_ptr<CdrInfo> pCdr, sip_t const *sip, const string& carrier, const string& carrierAddress, 
         const string& avokeBrowser, const string& avokeCallId, const string& uuid ) {
