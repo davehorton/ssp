@@ -309,6 +309,8 @@ namespace ssp {
         
         bool findCustomHeaderValue( sip_t const *sip, const char* szHeaderName, string& strHeaderValue  ) ;
 
+        bool isAnonymousCall( sip_t const *sip ) ;
+
 		scoped_ptr< src::severity_logger_mt<severity_levels> > m_logger ;
 		boost::mutex m_mutexGlobal ;
 		boost::shared_mutex m_mutexConfig ; 

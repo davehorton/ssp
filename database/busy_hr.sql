@@ -12,7 +12,7 @@ where report_time > DATE_SUB(CURRENT_TIMESTAMP,INTERVAL 24 HOUR)
 group by 1,2 order by 1 asc, 3 desc ;
 
 -- Call setup times by hour
-select hour(date_sub(start_time, INTERVAL 4 HOUR)) as HOUR, count(connect_time) as 'CALL COUNT', avg(time_to_sec(timediff(connect_time,start_time))) as 'AVG CALL SETUP (SECS)'
+select hour(date_sub(start_time, INTERVAL 5 HOUR)) as HOUR, count(connect_time) as 'CALL COUNT', avg(time_to_sec(timediff(connect_time,start_time))) as 'AVG CALL SETUP (SECS)'
 from termination_attempt
 where connect_time is not null
 and start_time > DATE_SUB(CURRENT_TIMESTAMP,INTERVAL 24 HOUR)

@@ -1877,6 +1877,10 @@ namespace ssp {
            SSP_LOG(log_error) << "Missing tag on From header on invite" << endl ;
             return 400 ;            
         }
+    /* 
+        Check From, P-Asserted-Identity, and Remote-Party-ID headers
+    */
+    bool SipLbController::isAnonymousCall( sip_t const *sip ) {
 
         return 0 ;
     }
