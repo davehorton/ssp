@@ -87,7 +87,7 @@ DROP PROCEDURE IF EXISTS getTerminationsByCarrier //
 CREATE PROCEDURE getTerminationsByCarrier( IN _date DATETIME ) 
 BEGIN
 	SELECT terminating_carrier, terminating_carrier_ip_address, count(*) as attempts, count(connect_time) as completions,
-	count(*)-count(connect_time) as failures, ((count(*)-count(connect_time))/count(*))*100.0 as "failure rate"
+	count(*)-count(connect_time) as failures, 	
 	from termination_attempt
 	where start_time > _date 
 	and start_time <= date_add( _date, INTERVAL 1 day)
