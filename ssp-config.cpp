@@ -553,7 +553,14 @@ namespace ssp {
             /* may not have multiple carriers, just return the next route */
             return getTerminationRoute( destAddress, carrier, chargeNumber ) ;
         }
-        
+        bool getTerminationRouteForCarrier( const std::string& carrier, std::string& terminationSipAddress, std::string& chargeNumber ) {
+            TerminationCarrierMap_t::iterator it = m_mapTerminationCarrierByName.find( carrier ) ;
+            if( it == m_mapTerminationCarrierByName.end() ) return false ;
+            boost::shared_ptr<TerminationRoute_t>& route = it->second ;
+            route->getNextTrunk( terminationSipAddress, chargeNumber ) ;   
+            return true ;                         
+        }
+
         bool isActive() {
             return m_bIsActive ;
         }
@@ -697,6 +704,10 @@ namespace ssp {
     bool SspConfig::getTerminationRouteForAltCarrier( const std::string& failedCarrier, std::string& destAddress, std::string& carrier, std::string& chargeNumber ) {
         return m_pimpl->getTerminationRouteForAltCarrier( failedCarrier, destAddress, carrier, chargeNumber ) ;
     }
+    bool SspConfig::getTerminationRouteForCarrier( const std::string& carrier, std::string& terminationSipAddress, std::string& chargeNumber ) {
+        return m_pimpl->getTerminationRouteForCarrier( carrier, terminationSipAddress, chargeNumber ) ;
+    }
+
     bool SspConfig::isActive() {
         return m_pimpl->isActive() ;
     }

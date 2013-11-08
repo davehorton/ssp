@@ -1143,8 +1143,13 @@ namespace ssp {
         boost::shared_ptr<CdrInfo> pCdr = boost::make_shared<CdrInfo>(CdrInfo::termination_attempt) ;
         string strCallId( sip->sip_call_id->i_id, strlen(sip->sip_call_id->i_id) ) ;
         string uuid, avokeBrowser, avokeCallId ;
-        
-        if( !m_Config->getTerminationRoute( terminationSipAddress, carrier, chargeNumber) ) {
+
+        bool bHaveRoute = false ;
+        if( m_Config->getAnonymousCallRouting( carrier ) && this->isAnonymousCall( sip ) ) {
+            bHaveRoute = m_Config->getTerminationRouteForCarrier( carrier, terminationSipAddress, chargeNumber ) ;
+        }
+
+        if( !bHaveRoute && !m_Config->getTerminationRoute( terminationSipAddress, carrier, chargeNumber) ) {
             SSP_LOG(log_error) << "No termination providers configured" << endl ;
             return 480 ;
         }
@@ -1877,12 +1882,40 @@ namespace ssp {
            SSP_LOG(log_error) << "Missing tag on From header on invite" << endl ;
             return 400 ;            
         }
-    /* 
-        Check From, P-Asserted-Identity, and Remote-Party-ID headers
-    */
+        return 0 ;
+    }
     bool SipLbController::isAnonymousCall( sip_t const *sip ) {
 
-        return 0 ;
+      /* check P-Asserted-Identity */
+        sip_p_asserted_identity_t * pai = sip_p_asserted_identity(sip) ;
+        if( pai && pai->paid_url[0].url_user && strlen( pai->paid_url[0].url_user ) > 0 ) {
+            string user( pai->paid_url[0].url_user ) ;
+            if(user.find_first_not_of("+0123456789") == std::string::npos ) {
+                SSP_LOG(log_debug) << "Invite is not anonymous because P-Asserted-Identity header contains phone number" << endl ;
+                return false ;
+            }
+        }
+
+        /* check Remote-Party-Id */
+        sip_remote_party_id_t * rpid = sip_remote_party_id(sip) ;
+        if( rpid && rpid->rpid_url[0].url_user && strlen( rpid->rpid_url[0].url_user ) > 0 ) {
+            string user( rpid->rpid_url[0].url_user ) ;
+            if(user.find_first_not_of("+0123456789") == std::string::npos ) {
+                SSP_LOG(log_debug) << "Invite is not anonymous because Remote-Party-ID header contains phone number" << endl ;
+                return false ;
+            }
+        }
+
+        /* check  From  */
+        if( sip->sip_from && sip->sip_from->a_url[0].url_user && strlen( sip->sip_from->a_url[0].url_user ) > 0 ) {
+            string user( sip->sip_from->a_url[0].url_user ) ;
+            if(user.find_first_not_of("+0123456789") == std::string::npos ) {
+                SSP_LOG(log_debug) << "Invite is not anonymous because From header contains phone number" << endl ;
+                return false ;
+            }
+        }
+ 
+        return true ;
     }
     void SipLbController::populateOriginationCdr( boost::shared_ptr<CdrInfo> pCdr, sip_t const *sip, const string& carrier ) {
         string uuid ;

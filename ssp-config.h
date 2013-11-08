@@ -23,7 +23,7 @@ namespace ssp {
     public:
         SspConfig( const char* szFilename ) ;
         ~SspConfig() ;
-        
+
         bool isValid() ;
 
         bool getSipUrl( std::string& sipUrl ) const ;
@@ -31,27 +31,29 @@ namespace ssp {
         bool getSyslogFacility( sinks::syslog::facility& facility ) const ;
         bool getCustomer( const std::string& dnis, std::string& customer) const ;
         bool getCarrier( const std::string& sourceAddress, std::string& carrier) const ;
+
         bool getTerminationRoute( std::string& destAddress, std::string& carrier, std::string& chargeNumber ) ;
         bool getTerminationRouteForAltCarrier( const std::string& failedCarrier, std::string& destAddress, std::string& carrier, std::string& chargeNumber ) ;
-       
+        bool getTerminationRouteForCarrier( const std::string& carrier, std::string& terminationSipAddress, std::string& chargeNumber ) ;
+
         void getAppservers( deque<string>& servers) ;
-        
+
         agent_mode getAgentMode(void) ;
         unsigned int getSofiaLogLevel(void) ;
         unsigned int getMaxRoundRobins(void) ;
         bool isActive(void) ;
-        
+
         unsigned int getCountOfOutboundTrunks(void) ;
         unsigned int getMaxTerminationAttempts(void) ;
         unsigned long getOriginationSessionTimer(void) ;
         unsigned long getFSHealthCheckTimerTimeMsecs(void) ;
         severity_levels getLoglevel() ;
-        
+
         unsigned int getStatsPort( string& address ) ;
         bool getCdrConnectInfo( string& user, string& pass, string& dbUrl, string& schema ) ;
 
         bool getAnonymousCallRouting( string& carrier ) ;
-        
+
         void Log() const ;
         
     private:
