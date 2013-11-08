@@ -49,6 +49,8 @@ namespace ssp {
         
         unsigned int getStatsPort( string& address ) ;
         bool getCdrConnectInfo( string& user, string& pass, string& dbUrl, string& schema ) ;
+
+        bool getAnonymousCallRouting( string& carrier ) ;
         
         void Log() const ;
         

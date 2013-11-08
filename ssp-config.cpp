@@ -302,6 +302,7 @@ namespace ssp {
                 /* routing strategy: round robin for a configurable interval (0=always), then send the next call to least loaded server */
                 m_nMaxRoundRobins = pt.get<unsigned int>("ssp.inbound.max-round-robins", 0) ;
                 m_nMaxTerminationAttempts = pt.get<unsigned int>("ssp.outbound.max-termination-attempts", 1) ;
+                m_strAnonymousCallRoutingCarrier = pt.get<string>("ssp.outbound.anonymous-call-routing","") ;
                 m_nFSTimerMsecs = pt.get<unsigned long>("ssp.inbound.freeswitch-health-check-interval", 5000) ;
                 
                 
@@ -591,6 +592,11 @@ namespace ssp {
             dbUrl = s.str() ;
             return true; 
         }
+        bool getAnonymousCallRouting( string& carrier ) {
+            if( m_strAnonymousCallRoutingCarrier.empty() ) return false ;
+            carrier = m_strAnonymousCallRoutingCarrier ;
+            return true ;
+        }
 
     private:
         
@@ -636,6 +642,7 @@ namespace ssp {
         string m_cdrHost ;
         string m_cdrPort ;
         string m_cdrSchema ;
+        string m_strAnonymousCallRoutingCarrier ;
     } ;
     
     /*
@@ -717,5 +724,9 @@ namespace ssp {
     unsigned int SspConfig::getStatsPort( string& address ) {
         return m_pimpl->getStatsPort( address ) ;
     }
+   bool SspConfig::getAnonymousCallRouting( string& carrier ) {
+        return m_pimpl->getAnonymousCallRouting( carrier ) ;
+   }
+ 
 
 }
