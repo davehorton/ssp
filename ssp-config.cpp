@@ -302,6 +302,7 @@ namespace ssp {
                 /* routing strategy: round robin for a configurable interval (0=always), then send the next call to least loaded server */
                 m_nMaxRoundRobins = pt.get<unsigned int>("ssp.inbound.max-round-robins", 0) ;
                 m_nMaxTerminationAttempts = pt.get<unsigned int>("ssp.outbound.max-termination-attempts", 1) ;
+                m_strAnonymousCallRoutingCarrier = pt.get<string>("ssp.outbound.anonymous-call-routing","") ;
                 m_nFSTimerMsecs = pt.get<unsigned long>("ssp.inbound.freeswitch-health-check-interval", 5000) ;
                 
                 
@@ -552,7 +553,14 @@ namespace ssp {
             /* may not have multiple carriers, just return the next route */
             return getTerminationRoute( destAddress, carrier, chargeNumber ) ;
         }
-        
+        bool getTerminationRouteForCarrier( const std::string& carrier, std::string& terminationSipAddress, std::string& chargeNumber ) {
+            TerminationCarrierMap_t::iterator it = m_mapTerminationCarrierByName.find( carrier ) ;
+            if( it == m_mapTerminationCarrierByName.end() ) return false ;
+            boost::shared_ptr<TerminationRoute_t>& route = it->second ;
+            route->getNextTrunk( terminationSipAddress, chargeNumber ) ;   
+            return true ;                         
+        }
+
         bool isActive() {
             return m_bIsActive ;
         }
@@ -590,6 +598,11 @@ namespace ssp {
             s << "tcp://" << m_cdrHost << ":" << m_cdrPort ;
             dbUrl = s.str() ;
             return true; 
+        }
+        bool getAnonymousCallRouting( string& carrier ) {
+            if( m_strAnonymousCallRoutingCarrier.empty() ) return false ;
+            carrier = m_strAnonymousCallRoutingCarrier ;
+            return true ;
         }
 
     private:
@@ -636,6 +649,7 @@ namespace ssp {
         string m_cdrHost ;
         string m_cdrPort ;
         string m_cdrSchema ;
+        string m_strAnonymousCallRoutingCarrier ;
     } ;
     
     /*
@@ -690,6 +704,10 @@ namespace ssp {
     bool SspConfig::getTerminationRouteForAltCarrier( const std::string& failedCarrier, std::string& destAddress, std::string& carrier, std::string& chargeNumber ) {
         return m_pimpl->getTerminationRouteForAltCarrier( failedCarrier, destAddress, carrier, chargeNumber ) ;
     }
+    bool SspConfig::getTerminationRouteForCarrier( const std::string& carrier, std::string& terminationSipAddress, std::string& chargeNumber ) {
+        return m_pimpl->getTerminationRouteForCarrier( carrier, terminationSipAddress, chargeNumber ) ;
+    }
+
     bool SspConfig::isActive() {
         return m_pimpl->isActive() ;
     }
@@ -717,5 +735,9 @@ namespace ssp {
     unsigned int SspConfig::getStatsPort( string& address ) {
         return m_pimpl->getStatsPort( address ) ;
     }
+   bool SspConfig::getAnonymousCallRouting( string& carrier ) {
+        return m_pimpl->getAnonymousCallRouting( carrier ) ;
+   }
+ 
 
 }
