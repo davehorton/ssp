@@ -602,6 +602,7 @@ namespace ssp {
         s << "SIP/2.0/UDP " <<  m_my_contact->m_url[0].url_host ;
         if( m_my_contact->m_url[0].url_port ) s << ":" <<  m_my_contact->m_url[0].url_port  ;
         m_my_via.assign( s.str().c_str(), s.str().length() ) ;
+        this->generateUserAgent() ;
         SSP_LOG(log_debug) << "My via header: " << m_my_via << endl ;
         
         
