@@ -842,6 +842,11 @@ namespace ssp {
         iip->setCompleted() ;
         m_deqCompletedCallIds.push_back( iip->getCallId() ) ;
     }
+    void SipLbController::generateUserAgent() {
+        ostringstream o ;
+        o << "Raytheon/BBN Avoke Edge Server/" << SSP_VERSION ;
+        m_my_user_agent = o.str() ;   
+    }
 
     void SipLbController::generateOutgoingFrom( sip_from_t* const incomingFrom, string& strFrom ) {
         ostringstream o ;
@@ -1269,6 +1274,7 @@ namespace ssp {
                 SIPTAG_P_ASSERTED_IDENTITY(sip_p_asserted_identity( sip )),    
                 SIPTAG_REMOTE_PARTY_ID(sip_remote_party_id( sip )),             
                 SIPTAG_PROXY_REQUIRE(sip->sip_proxy_require),
+                SIPTAG_USER_AGENT_STR(m_my_user_agent.c_str()),
                 //SIPTAG_UNKNOWN(sip_unknown(sip)),  
                 SIPTAG_UNKNOWN_STR(t->getPChargeInfoHeader().c_str()),
                 TAG_END());

@@ -268,6 +268,7 @@ namespace ssp {
         void generateOutgoingFrom( sip_from_t* const incomingFrom, string& strFrom ) ;
         void generateOutgoingTo( sip_to_t* const incomingTo, string& strTo ) ;
         void generateOutgoingContact( sip_contact_t* const incomingContact, string& strContact ) ;
+        void generateUserAgent() ;
         bool terminateLeg( nta_leg_t* leg ) ;
 
         nta_leg_t* getLegFromTransaction( nta_outgoing_t* orq ) ;
@@ -336,6 +337,7 @@ namespace ssp {
         nta_agent_t*	m_nta ;
         string          m_my_via ;
         string          m_my_nameaddr ;
+        string          m_my_user_agent ;
         sip_contact_t*  m_my_contact ;
         
         /* stateful */
