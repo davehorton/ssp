@@ -549,6 +549,13 @@ namespace ssp {
         memset(str, 0, URL_MAXLEN) ;
         strncpy( str, url.c_str(), url.length() ) ;
         
+        /* enable extended headers */
+        if (sip_update_default_mclass(sip_extend_mclass(NULL)) < 0) {
+            SSP_LOG(log_error) << "Error calling sip_update_default_mclass" << endl ;
+            return  ;
+        }
+ 
+        sip_update_default_mclass(sip_extend_mclass(NULL)) ;
         
         if( agent_mode_stateless == m_Config->getAgentMode() ) {
             /* stateless */
@@ -595,6 +602,7 @@ namespace ssp {
         s << "SIP/2.0/UDP " <<  m_my_contact->m_url[0].url_host ;
         if( m_my_contact->m_url[0].url_port ) s << ":" <<  m_my_contact->m_url[0].url_port  ;
         m_my_via.assign( s.str().c_str(), s.str().length() ) ;
+        this->generateUserAgent() ;
         SSP_LOG(log_debug) << "My via header: " << m_my_via << endl ;
         
         
@@ -834,6 +842,11 @@ namespace ssp {
         if( iip->isCompleted() ) return ;
         iip->setCompleted() ;
         m_deqCompletedCallIds.push_back( iip->getCallId() ) ;
+    }
+    void SipLbController::generateUserAgent() {
+        ostringstream o ;
+        o << "Raytheon/BBN Avoke Edge Server/" << SSP_VERSION ;
+        m_my_user_agent = o.str() ;   
     }
 
     void SipLbController::generateOutgoingFrom( sip_from_t* const incomingFrom, string& strFrom ) {
@@ -1091,8 +1104,8 @@ namespace ssp {
                                                     SIPTAG_ALLOW(sip->sip_allow),
                                                     SIPTAG_PRIVACY(sip->sip_privacy),
                                                     SIPTAG_SESSION_EXPIRES(sip->sip_session_expires),
-                                                    //SIPTAG_P_ASSERTED_IDENTITY(sip_p_asserted_identity( sip )),    
-                                                    //SIPTAG_REMOTE_PARTY_ID(sip_remote_party_id( sip )),           
+                                                    SIPTAG_P_ASSERTED_IDENTITY(sip_p_asserted_identity( sip )),    
+                                                    SIPTAG_REMOTE_PARTY_ID(sip_remote_party_id( sip )),           
                                                     SIPTAG_PROXY_REQUIRE(sip->sip_proxy_require),
                                                     SIPTAG_PRIVACY(sip->sip_privacy),
                                                     SIPTAG_UNKNOWN(sip_unknown(sip)),   
@@ -1262,7 +1275,8 @@ namespace ssp {
                 SIPTAG_P_ASSERTED_IDENTITY(sip_p_asserted_identity( sip )),    
                 SIPTAG_REMOTE_PARTY_ID(sip_remote_party_id( sip )),             
                 SIPTAG_PROXY_REQUIRE(sip->sip_proxy_require),
-                SIPTAG_UNKNOWN(sip_unknown(sip)),  
+                SIPTAG_USER_AGENT_STR(m_my_user_agent.c_str()),
+                //SIPTAG_UNKNOWN(sip_unknown(sip)),  
                 SIPTAG_UNKNOWN_STR(t->getPChargeInfoHeader().c_str()),
                 TAG_END());
         
@@ -1865,6 +1879,7 @@ namespace ssp {
         }
         return false ;
     }
+
     int SipLbController::validateSipMessage( sip_t const *sip ) {
         if( sip_method_invite == sip->sip_request->rq_method  && (!sip->sip_contact || !sip->sip_contact->m_url[0].url_host ) ) {
             SSP_LOG(log_error) << "Invalid or missing contact header" << endl ;
