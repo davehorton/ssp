@@ -66,6 +66,7 @@
              note that the actual number of attempts will be the lesser of this number and the total number of outbound trunks.
          -->
         <max-termination-attempts>3</max-termination-attempts>
+        <anonymous-call-routing>intermetro</anonymous-call-routing>
     </outbound>
                 
     <!-- grouping of external sip endpoints into carriers/service providers -->

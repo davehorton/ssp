@@ -180,6 +180,8 @@ namespace ssp {
                     }
                     break ;
                     
+                default:
+                    break ;         
             }
             
             if( out.length() > 0 ) {

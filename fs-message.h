@@ -46,7 +46,7 @@ namespace ssp {
         bool append( const string& data ) ;
         bool isValid() const { return m_bValid; }
         bool isComplete() const { return m_bComplete; }
-        bool isEmpty() const { 0 == m_rawMsg.length() ; }
+        bool isEmpty() const { return 0 == m_rawMsg.length() ; }
         void reset() ;
    
         FS_MSG_CATEGORY getCategory() const { return m_category ; }

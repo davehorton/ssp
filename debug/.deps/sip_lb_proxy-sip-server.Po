@@ -1,6 +1,0 @@
-sip_lb_proxy-sip-server.o sip_lb_proxy-sip-server.o: ../sip-server.cpp \
-  ../sip-server.h ../sip-lb-proxy.h
-
-../sip-server.h:
-
-../sip-lb-proxy.h:

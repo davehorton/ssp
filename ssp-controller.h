@@ -60,10 +60,11 @@ namespace ssp {
         ~TerminationAttempt() {
         }
         
-        void crankback( const string& url, const string& carrier, const string& sipTrunk ) {
+        void crankback( const string& url, const string& carrier, const string& sipTrunk, const string& chargeNumber ) {
             m_url = url ;
             m_carrier = carrier ;
             m_sipTrunk = sipTrunk ;
+            m_p_charge_info_header = chargeNumber ;
             m_nAttemptCount++ ;
             if( m_pCdr ) {
                 m_pCdr->setTerminatingCarrier(carrier) ;
@@ -121,6 +122,7 @@ namespace ssp {
             m_strCarrier = other.m_strCarrier;
             m_attempts = other.m_attempts ;
             memcpy( m_fails, other.m_fails, sizeof( m_fails) ) ;
+            return *this ;
         }
         void incrementAttemptCount() {
             if( 0 == ++m_attempts ) {
@@ -176,7 +178,7 @@ namespace ssp {
         bool isOrigination(void) { return m_bOrigination; }
         unsigned int getSessionTimerSecs(void) { return m_nSessionTimer; }
         su_timer_t* getSessionTimerTimer(void) { return m_timerSessionRefresh; }
-        void setSessionTimerTimer( su_timer_t* t ) {m_timerSessionRefresh; }
+        void setSessionTimerTimer( su_timer_t* t ) {m_timerSessionRefresh = t; }
         const string& getLocalSdp(void) { return m_localSdp; }
         void setLocalSdp( char* pl_data, usize_t pl_size ) {
             m_localSdp.assign( pl_data, pl_size ) ;
@@ -257,6 +259,7 @@ namespace ssp {
 		SipLbController() {} ;
         
         call_type_t determineCallType( sip_t const *sip, string& carrier ) ;
+        int validateSipMessage( sip_t const *sip ) ;
 
         bool generateTerminationRequest( boost::shared_ptr<TerminationAttempt>& t, nta_incoming_t* irq, nta_outgoing_t*& orq, nta_leg_t*& b_leg ) ;
         
@@ -265,6 +268,7 @@ namespace ssp {
         void generateOutgoingFrom( sip_from_t* const incomingFrom, string& strFrom ) ;
         void generateOutgoingTo( sip_to_t* const incomingTo, string& strTo ) ;
         void generateOutgoingContact( sip_contact_t* const incomingContact, string& strContact ) ;
+        void generateUserAgent() ;
         bool terminateLeg( nta_leg_t* leg ) ;
 
         nta_leg_t* getLegFromTransaction( nta_outgoing_t* orq ) ;
@@ -306,6 +310,8 @@ namespace ssp {
         
         bool findCustomHeaderValue( sip_t const *sip, const char* szHeaderName, string& strHeaderValue  ) ;
 
+        bool isAnonymousCall( sip_t const *sip ) ;
+
 		scoped_ptr< src::severity_logger_mt<severity_levels> > m_logger ;
 		boost::mutex m_mutexGlobal ;
 		boost::shared_mutex m_mutexConfig ; 
@@ -331,6 +337,7 @@ namespace ssp {
         nta_agent_t*	m_nta ;
         string          m_my_via ;
         string          m_my_nameaddr ;
+        string          m_my_user_agent ;
         sip_contact_t*  m_my_contact ;
         
         /* stateful */

@@ -139,16 +139,6 @@ namespace {
     int handleAckOrCancel( nta_incoming_magic_t* controller, nta_incoming_t* irq, sip_t const *sip ) {
         return controller->processAckOrCancel( irq, sip ) ;
     }
-    
-    
-/*
-    int uasCallback( nta_outgoing_magic_t* b2bCall,
-                    nta_incoming_t* request,
-                    sip_t const* sip ) {
-        
-        return b2bCall->processUasMsgInsideDialog( request, sip ) ;
-    }
-    */
     int stateless_callback( nta_leg_magic_t* controller, nta_agent_t* agent, msg_t *msg, sip_t *sip) {
         return controller->statelessCallback( msg, sip ) ;
     }
@@ -179,12 +169,10 @@ namespace {
         boost::hash_combine(seed, d.getLeg() );
         return seed;
     }
-
 }
 
 namespace ssp {
     
-
 
     SipLbController::SipLbController( int argc, char* argv[] ) : m_bDaemonize(false), m_bLoggingInitialized(false),
         m_configFilename(DEFAULT_CONFIG_FILENAME), m_bInbound(false), m_bOutbound(false), m_nIterationCount(-1), m_nTerminationRetries(0), m_bDbTest(false) {
@@ -225,7 +213,7 @@ namespace ssp {
                 m_cdrWriter->testConnection() ;         
             }           
         }
-         
+        
         return true ;
         
     }
@@ -233,6 +221,10 @@ namespace ssp {
         SSP_LOG(log_notice) << "Logging threshold:                     " << (int) m_current_severity_threshold << endl ;
         SSP_LOG(log_notice) << "Freeswitch health check timer (msecs): " << m_nFSTimerMsecs << endl ;
         SSP_LOG(log_notice) << "Number of termination routes to try:   " << m_nTerminationRetries << endl ;
+        if( !m_Config->isActive() ) {
+          SSP_LOG(log_notice) << "SSP mode is set to inactive!  Existing calls will be allowed to finish but new calls (and OPTIONS requests) will receive a 503 " << endl ;
+        }
+ 
     }
 
     void SipLbController::handleSigHup( int signal ) {
@@ -252,6 +244,7 @@ namespace ssp {
 
     bool SipLbController::parseCmdArgs( int argc, char* argv[] ) {        
         int c ;
+        int bVersion = 0 ;
         while (1)
         {
             static struct option long_options[] =
@@ -265,12 +258,13 @@ namespace ssp {
                 {"file",    required_argument, 0, 'f'},
                 {"iterations",    required_argument, 0, 'i'},
                 {"user",    required_argument, 0, 'u'},
+                {"version",    no_argument, 0, 'v'},
                 {0, 0, 0, 0}
             };
             /* getopt_long stores the option index here. */
             int option_index = 0;
             
-            c = getopt_long (argc, argv, "f:i:",
+            c = getopt_long (argc, argv, "vf:i:",
                              long_options, &option_index);
             
             /* Detect the end of the options. */
@@ -302,6 +296,10 @@ namespace ssp {
                     cout << "option iteration count set; program will exit after handling " << m_nIterationCount << " INVITES !!" << endl ;
                     break ;
                     
+                case 'v':
+                    cout << SSP_VERSION << endl ;
+                    exit(0) ;
+                   
                 case '?':
                     /* getopt_long already printed an error message. */
                     break;
@@ -551,6 +549,13 @@ namespace ssp {
         memset(str, 0, URL_MAXLEN) ;
         strncpy( str, url.c_str(), url.length() ) ;
         
+        /* enable extended headers */
+        if (sip_update_default_mclass(sip_extend_mclass(NULL)) < 0) {
+            SSP_LOG(log_error) << "Error calling sip_update_default_mclass" << endl ;
+            return  ;
+        }
+ 
+        sip_update_default_mclass(sip_extend_mclass(NULL)) ;
         
         if( agent_mode_stateless == m_Config->getAgentMode() ) {
             /* stateless */
@@ -597,6 +602,7 @@ namespace ssp {
         s << "SIP/2.0/UDP " <<  m_my_contact->m_url[0].url_host ;
         if( m_my_contact->m_url[0].url_port ) s << ":" <<  m_my_contact->m_url[0].url_port  ;
         m_my_via.assign( s.str().c_str(), s.str().length() ) ;
+        this->generateUserAgent() ;
         SSP_LOG(log_debug) << "My via header: " << m_my_via << endl ;
         
         
@@ -828,13 +834,19 @@ namespace ssp {
             int rv = nta_msg_tsend( m_nta, msg, NULL, TAG_NULL(), TAG_END() ) ;
             return 0 ;
 
-        }        
+        }      
+        return 0 ;  
     }
     void SipLbController::setCompleted( iip_map_t::const_iterator& it )  {
         shared_ptr<SipInboundCall> iip = it->second ;
         if( iip->isCompleted() ) return ;
         iip->setCompleted() ;
         m_deqCompletedCallIds.push_back( iip->getCallId() ) ;
+    }
+    void SipLbController::generateUserAgent() {
+        ostringstream o ;
+        o << "Raytheon/BBN Avoke Edge Server/" << SSP_VERSION ;
+        m_my_user_agent = o.str() ;   
     }
 
     void SipLbController::generateOutgoingFrom( sip_from_t* const incomingFrom, string& strFrom ) {
@@ -916,6 +928,10 @@ namespace ssp {
     /* stateful */
     int SipLbController::processRequestOutsideDialog( nta_leg_t* defaultLeg, nta_incoming_t* irq, sip_t const *sip) {
         SSP_LOG(log_debug) << "processRequestOutsideDialog" << endl ;
+        int rc = this->validateSipMessage( sip ) ;
+        if( 0 != rc ) {
+            return rc ;
+        }
         switch (sip->sip_request->rq_method ) {
             case sip_method_options:
             {
@@ -944,25 +960,27 @@ namespace ssp {
                 call_type_t call_type = this->determineCallType( sip, carrier ) ;
                 int rc = 0;
 
-                if( !m_Config->isActive() || 0 == m_nIterationCount ) {
-                    SSP_LOG(log_error) << "Rejecting new INVITE because we are inactive " << endl ;
-                    boost::shared_ptr<CdrInfo> pCdr = boost::make_shared<CdrInfo>(CdrInfo::origination_request) ;
-                    this->populateOriginationCdr( pCdr, sip, carrier ) ;
-                    pCdr->setSipStatus( 503 ) ;
-                    pCdr->setReleaseCause( CdrInfo::call_rejected_due_to_being_offline ) ;
-                    if( m_cdrWriter ) m_cdrWriter->postCdr( pCdr ) ;
-                    return pCdr->getSipStatus() ;
-                }
                 nta_incoming_treply( irq, SIP_100_TRYING, TAG_END() ) ;
               
                 if( origination_call_type == call_type ) {
-                    rc = this->processOriginationRequest( irq, sip, carrier ) ;
+                    if( !m_Config->isActive() || 0 == m_nIterationCount ) {
+                        SSP_LOG(log_error) << "Rejecting new INVITE because we are inactive " << endl ;
+                        boost::shared_ptr<CdrInfo> pCdr = boost::make_shared<CdrInfo>(CdrInfo::origination_request) ;
+                        this->populateOriginationCdr( pCdr, sip, carrier ) ;
+                        pCdr->setSipStatus( 503 ) ;
+                        pCdr->setReleaseCause( CdrInfo::call_rejected_due_to_being_offline ) ;
+                        if( m_cdrWriter ) m_cdrWriter->postCdr( pCdr ) ;
+                        return pCdr->getSipStatus() ;
+                    }
+                    else {
+                        rc = this->processOriginationRequest( irq, sip, carrier ) ;
+                    }
                 }
                 else if( termination_call_type == call_type ) {
                     rc = this->processTerminationRequest( irq, sip ) ;
                 }
                 else {
-                    SSP_LOG(log_error) << "Received invite from unknown address: " <<  sip->sip_contact->m_url[0].url_host << endl ;
+                     SSP_LOG(log_error) << "Received invite from unknown address: " <<  sip->sip_contact->m_url[0].url_host << endl ;
                     boost::shared_ptr<CdrInfo> pCdr = boost::make_shared<CdrInfo>(CdrInfo::origination_request) ;
                     this->populateOriginationCdr( pCdr, sip, carrier ) ;
                     pCdr->setSipStatus( 403 ) ;
@@ -1086,8 +1104,11 @@ namespace ssp {
                                                     SIPTAG_ALLOW(sip->sip_allow),
                                                     SIPTAG_PRIVACY(sip->sip_privacy),
                                                     SIPTAG_SESSION_EXPIRES(sip->sip_session_expires),
-                                                    SIPTAG_P_ASSERTED_IDENTITY(sip_p_asserted_identity( sip )),
-                                                    SIPTAG_UNKNOWN(sip_unknown(sip)),
+                                                    SIPTAG_P_ASSERTED_IDENTITY(sip_p_asserted_identity( sip )),    
+                                                    SIPTAG_REMOTE_PARTY_ID(sip_remote_party_id( sip )),           
+                                                    SIPTAG_PROXY_REQUIRE(sip->sip_proxy_require),
+                                                    SIPTAG_PRIVACY(sip->sip_privacy),
+                                                    SIPTAG_UNKNOWN(sip_unknown(sip)),   
                                                     SIPTAG_UNKNOWN_STR(carrierString.str().c_str()),
                                                     SIPTAG_UNKNOWN_STR(carrierTrunk.str().c_str()),
                                                     SIPTAG_UNKNOWN_STR(xuuid.str().c_str()),
@@ -1135,8 +1156,13 @@ namespace ssp {
         boost::shared_ptr<CdrInfo> pCdr = boost::make_shared<CdrInfo>(CdrInfo::termination_attempt) ;
         string strCallId( sip->sip_call_id->i_id, strlen(sip->sip_call_id->i_id) ) ;
         string uuid, avokeBrowser, avokeCallId ;
-        
-        if( !m_Config->getTerminationRoute( terminationSipAddress, carrier, chargeNumber) ) {
+
+        bool bHaveRoute = false ;
+        if( m_Config->getAnonymousCallRouting( carrier ) && this->isAnonymousCall( sip ) ) {
+            bHaveRoute = m_Config->getTerminationRouteForCarrier( carrier, terminationSipAddress, chargeNumber ) ;
+        }
+
+        if( !bHaveRoute && !m_Config->getTerminationRoute( terminationSipAddress, carrier, chargeNumber) ) {
             SSP_LOG(log_error) << "No termination providers configured" << endl ;
             return 480 ;
         }
@@ -1211,10 +1237,11 @@ namespace ssp {
     bool SipLbController::generateTerminationRequest( boost::shared_ptr<TerminationAttempt>& t, nta_incoming_t* irq, nta_outgoing_t*& orq, nta_leg_t*& b_leg ) {
         sip_t const *sip = t->getSip() ;
         b_leg =  nta_leg_tcreate(m_nta,
-                                        legCallback, this,
-                                        SIPTAG_FROM_STR(t->getFrom().c_str()),
-                                        SIPTAG_TO_STR(t->getTo().c_str()),
-                                        TAG_END());
+            legCallback, this,
+            SIPTAG_FROM_STR(t->getFrom().c_str()),
+            SIPTAG_TO_STR(t->getTo().c_str()),
+            TAG_END());
+        
         if( NULL == b_leg ) {
             SSP_LOG(log_error) << "Failure creating outgoing leg for termination request" << endl ;
             return false ;
@@ -1230,25 +1257,28 @@ namespace ssp {
         strncpy( str, url.c_str(), url.length() ) ;
         
         orq = nta_outgoing_tcreate(b_leg, response_to_invite, this,
-                                                   NULL,
-                                                   SIP_METHOD_INVITE,
-                                                   URL_STRING_MAKE(str),
-                                                   SIPTAG_CONTACT_STR(t->getContact().c_str()),
-                                                   SIPTAG_CONTENT_TYPE(sip->sip_content_type),
-                                                   SIPTAG_CONTENT_DISPOSITION(sip->sip_content_disposition),
-                                                   SIPTAG_CONTENT_LENGTH(sip->sip_content_length),
-                                                   SIPTAG_PAYLOAD(sip->sip_payload),
-                                                   SIPTAG_SUPPORTED(sip->sip_supported),
-                                                   SIPTAG_SUBJECT(sip->sip_subject),
-                                                   SIPTAG_UNSUPPORTED(sip->sip_unsupported),
-                                                   SIPTAG_REQUIRE(sip->sip_require),
-                                                   SIPTAG_USER_AGENT(sip->sip_user_agent),
-                                                   SIPTAG_ALLOW(sip->sip_allow),
-                                                   SIPTAG_PRIVACY(sip->sip_privacy),
-                                                   SIPTAG_P_ASSERTED_IDENTITY(sip_p_asserted_identity( sip )),
-                                                   //SIPTAG_UNKNOWN(sip_unknown(sip)),
-                                                   SIPTAG_UNKNOWN_STR(t->getPChargeInfoHeader().c_str()),
-                                                   TAG_END());
+                NULL,
+                SIP_METHOD_INVITE,
+                URL_STRING_MAKE(str),
+                SIPTAG_CONTACT_STR(t->getContact().c_str()),
+                SIPTAG_CONTENT_TYPE(sip->sip_content_type),
+                SIPTAG_CONTENT_DISPOSITION(sip->sip_content_disposition),
+                SIPTAG_CONTENT_LENGTH(sip->sip_content_length),
+                SIPTAG_PAYLOAD(sip->sip_payload),
+                SIPTAG_SUPPORTED(sip->sip_supported),
+                SIPTAG_SUBJECT(sip->sip_subject),
+                SIPTAG_UNSUPPORTED(sip->sip_unsupported),
+                SIPTAG_REQUIRE(sip->sip_require),
+                SIPTAG_USER_AGENT(sip->sip_user_agent),
+                SIPTAG_ALLOW(sip->sip_allow),
+                SIPTAG_PRIVACY(sip->sip_privacy),
+                SIPTAG_P_ASSERTED_IDENTITY(sip_p_asserted_identity( sip )),    
+                SIPTAG_REMOTE_PARTY_ID(sip_remote_party_id( sip )),             
+                SIPTAG_PROXY_REQUIRE(sip->sip_proxy_require),
+                SIPTAG_USER_AGENT_STR(m_my_user_agent.c_str()),
+                //SIPTAG_UNKNOWN(sip_unknown(sip)),  
+                SIPTAG_UNKNOWN_STR(t->getPChargeInfoHeader().c_str()),
+                TAG_END());
         
         if( NULL == orq ) {
             SSP_LOG(log_error) << "Failure creating outgoing transaction for termination request" << endl ;
@@ -1422,7 +1452,10 @@ namespace ssp {
                             
                             SSP_LOG(log_info) << "Attempting alternate route due to outbound failure: " << sip->sip_call_id->i_id << ": " << terminationSipAddress << " (" << carrier << ")" << endl ;
                             
-                            t->crankback( dest.str(), carrier, terminationSipAddress ) ;
+                            ostringstream chargeInfoHeader ;
+                            chargeInfoHeader << "P-Charge-Info: <sip:" << chargeNumber << "@" << terminationSipAddress << ">" ;
+ 
+                            t->crankback( dest.str(), carrier, terminationSipAddress, chargeInfoHeader.str() ) ;
                             
                             nta_leg_t* b_legNew ;
                             nta_outgoing_t* orqNew ;
@@ -1845,7 +1878,59 @@ namespace ssp {
             hdr = hdr->un_next ;
         }
         return false ;
+    }
 
+    int SipLbController::validateSipMessage( sip_t const *sip ) {
+        if( sip_method_invite == sip->sip_request->rq_method  && (!sip->sip_contact || !sip->sip_contact->m_url[0].url_host ) ) {
+            SSP_LOG(log_error) << "Invalid or missing contact header" << endl ;
+            return 400 ;
+        }
+        if( !sip->sip_call_id || !sip->sip_call_id->i_id ) {
+            SSP_LOG(log_error) << "Invalid or missing call-id header" << endl ;
+            return 400 ;
+        }
+        if( sip_method_invite == sip->sip_request->rq_method  && (!sip->sip_to || !sip->sip_to->a_url[0].url_user ) ) {
+            SSP_LOG(log_error) << "Invalid or missing to header or dialed number information" << endl ;
+            return 400 ;            
+        }
+        if( sip_method_invite == sip->sip_request->rq_method  && (!sip->sip_from || !sip->sip_from->a_tag ) )  {
+           SSP_LOG(log_error) << "Missing tag on From header on invite" << endl ;
+            return 400 ;            
+        }
+        return 0 ;
+    }
+    bool SipLbController::isAnonymousCall( sip_t const *sip ) {
+
+      /* check P-Asserted-Identity */
+        sip_p_asserted_identity_t * pai = sip_p_asserted_identity(sip) ;
+        if( pai && pai->paid_url[0].url_user && strlen( pai->paid_url[0].url_user ) > 0 ) {
+            string user( pai->paid_url[0].url_user ) ;
+            if(user.find_first_not_of("+0123456789") == std::string::npos ) {
+                SSP_LOG(log_debug) << "Invite is not anonymous because P-Asserted-Identity header contains phone number" << endl ;
+                return false ;
+            }
+        }
+
+        /* check Remote-Party-Id */
+        sip_remote_party_id_t * rpid = sip_remote_party_id(sip) ;
+        if( rpid && rpid->rpid_url[0].url_user && strlen( rpid->rpid_url[0].url_user ) > 0 ) {
+            string user( rpid->rpid_url[0].url_user ) ;
+            if(user.find_first_not_of("+0123456789") == std::string::npos ) {
+                SSP_LOG(log_debug) << "Invite is not anonymous because Remote-Party-ID header contains phone number" << endl ;
+                return false ;
+            }
+        }
+
+        /* check  From  */
+        if( sip->sip_from && sip->sip_from->a_url[0].url_user && strlen( sip->sip_from->a_url[0].url_user ) > 0 ) {
+            string user( sip->sip_from->a_url[0].url_user ) ;
+            if(user.find_first_not_of("+0123456789") == std::string::npos ) {
+                SSP_LOG(log_debug) << "Invite is not anonymous because From header contains phone number" << endl ;
+                return false ;
+            }
+        }
+ 
+        return true ;
     }
     void SipLbController::populateOriginationCdr( boost::shared_ptr<CdrInfo> pCdr, sip_t const *sip, const string& carrier ) {
         string uuid ;
@@ -1857,15 +1942,18 @@ namespace ssp {
         pCdr->setCdrType( CdrInfo::origination_request ) ;
         pCdr->setTimeStart( time(0) ) ;
         pCdr->setOriginatingCarrier( carrier ) ;
-        pCdr->setOriginatingCarrierAddress( sip->sip_contact->m_url[0].url_host ) ;
-        pCdr->setALegCallId( sip->sip_call_id->i_id )  ;
+        if( sip->sip_contact->m_url[0].url_host ) pCdr->setOriginatingCarrierAddress( sip->sip_contact->m_url[0].url_host ) ;
+        if( sip->sip_call_id->i_id ) pCdr->setALegCallId( sip->sip_call_id->i_id )  ;
         pCdr->setOriginatingEdgeServerAddress( m_my_contact->m_url[0].url_host ) ;
-        pCdr->setCalledPartyNumberIn( sip->sip_to->a_url[0].url_user ) ;
-        pCdr->setCallingPartyNumber( sip->sip_from->a_url[0].url_user ) ;
+        if( sip->sip_to->a_url[0].url_user ) pCdr->setCalledPartyNumberIn( sip->sip_to->a_url[0].url_user ) ;
+        if( sip->sip_from->a_url[0].url_user ) pCdr->setCallingPartyNumber( sip->sip_from->a_url[0].url_user ) ;
         if( 0 != pCdr->getSipStatus() ) {
             pCdr->setReleaseCause( CdrInfo::call_rejected_due_to_system_error ) ;
         }
 
+        //char hdr[256] ;
+        //msg_header_field_e(hdr, 256, (msg_header_t*) sip->sip_from, 0) ;
+        //pCdr->setSipHdrFrom( hdr ) ;
     }
     void SipLbController::populateTerminationCdr( boost::shared_ptr<CdrInfo> pCdr, sip_t const *sip, const string& carrier, const string& carrierAddress, 
         const string& avokeBrowser, const string& avokeCallId, const string& uuid ) {

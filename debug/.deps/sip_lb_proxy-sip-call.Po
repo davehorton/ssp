@@ -1,6 +1,0 @@
-sip_lb_proxy-sip-call.o sip_lb_proxy-sip-call.o: ../sip-call.cpp \
-  ../sip-call.h ../sip-lb-proxy.h
-
-../sip-call.h:
-
-../sip-lb-proxy.h:
