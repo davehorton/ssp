@@ -119,7 +119,7 @@ BEGIN
 	order by 1 desc ;
 END //
 
-DROP PROCEDURE IF EXISTS updateTrafficSummary() //
+DROP PROCEDURE IF EXISTS updateTrafficSummary //
 CREATE PROCEDURE updateTrafficSummary()
 BEGIN
 	INSERT into traffic_summary(customer,originating_carrier,terminating_carrier,call_count)
