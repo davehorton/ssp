@@ -4,8 +4,8 @@ DROP PROCEDURE IF EXISTS getCompletionsByCustomer //
 CREATE PROCEDURE getCompletionsByCustomer( IN _date DATETIME )
 BEGIN
 	select coalesce(fs_assigned_customer,'UNKNOWN') as customer, count(*) as attempts, count(connect_time) as completions, 
-	count(*)-count(connect_time) as "failures", (cast((count(*)-count(connect_time))/100.0)) as decimal) as "failure rate",
-	avg(timediff(end_time, connect_time)) as "avg call length (secs)"
+	count(*)-count(connect_time) as "failures", ((count(*)-count(connect_time))/count(*))*100.0  as "failure rate",
+	avg(time_to_sec(timediff(end_time, connect_time))/60.0) as "avg call length (mins)"
 	from cdr_session
 	where start_time > _date 
 	and start_time <= date_add( _date, INTERVAL 1 day)
@@ -54,7 +54,7 @@ BEGIN
 	  ) INTO @sql
 	FROM cdr_session ;
 
-	SET @sql = CONCAT("select hour(date_sub(start_time, INTERVAL 4 HOUR)) as hour, ", @sql, " from cdr_session where start_time >= DATE_ADD('", _date, "', INTERVAL 4 HOUR) and start_time <= date_add('", _date,"', INTERVAL 28 HOUR) group by hour(start_time) order by 1 asc ");
+	SET @sql = CONCAT("select hour(date_sub(start_time, INTERVAL 5 HOUR)) as hour, ", @sql, " from cdr_session where start_time >= DATE_ADD('", _date, "', INTERVAL 5 HOUR) and start_time <= date_add('", _date,"', INTERVAL 29 HOUR) group by hour(start_time) order by 1 asc ");
 	PREPARE stmt FROM @sql;
 	EXECUTE stmt;
 	DEALLOCATE PREPARE stmt;
@@ -87,7 +87,7 @@ DROP PROCEDURE IF EXISTS getTerminationsByCarrier //
 CREATE PROCEDURE getTerminationsByCarrier( IN _date DATETIME ) 
 BEGIN
 	SELECT terminating_carrier, terminating_carrier_ip_address, count(*) as attempts, count(connect_time) as completions,
-	count(*)-count(connect_time) as failures, 	
+	count(*)-count(connect_time) as failures,  ((count(*)-count(connect_time))/count(*))*100.0 as failure_rate
 	from termination_attempt
 	where start_time > _date 
 	and start_time <= date_add( _date, INTERVAL 1 day)
@@ -119,7 +119,7 @@ BEGIN
 	order by 1 desc ;
 END //
 
-DROP PROCEDURE IF EXISTS updateTrafficSummary() //
+DROP PROCEDURE IF EXISTS updateTrafficSummary //
 CREATE PROCEDURE updateTrafficSummary()
 BEGIN
 	INSERT into traffic_summary(customer,originating_carrier,terminating_carrier,call_count)
