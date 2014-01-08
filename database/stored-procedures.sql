@@ -54,7 +54,7 @@ BEGIN
 	  ) INTO @sql
 	FROM cdr_session ;
 
-	SET @sql = CONCAT("select hour(date_sub(start_time, INTERVAL 4 HOUR)) as hour, ", @sql, " from cdr_session where start_time >= DATE_ADD('", _date, "', INTERVAL 4 HOUR) and start_time <= date_add('", _date,"', INTERVAL 28 HOUR) group by hour(start_time) order by 1 asc ");
+	SET @sql = CONCAT("select hour(date_sub(start_time, INTERVAL 5 HOUR)) as hour, ", @sql, " from cdr_session where start_time >= DATE_ADD('", _date, "', INTERVAL 5 HOUR) and start_time <= date_add('", _date,"', INTERVAL 28 HOUR) group by hour(start_time) order by 1 asc ");
 	PREPARE stmt FROM @sql;
 	EXECUTE stmt;
 	DEALLOCATE PREPARE stmt;

@@ -17,3 +17,4 @@ CREATE TABLE traffic_summary(
 	,INDEX(report_time)
 	,PRIMARY KEY(id)
 ) ;
+
