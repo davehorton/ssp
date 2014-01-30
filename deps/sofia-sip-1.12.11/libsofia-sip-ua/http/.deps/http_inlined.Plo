@@ -1,8 +1,0 @@
-http_inlined.lo http_inlined.o: http_inlined.c ../../config.h \
-  ../su/sofia-sip/su_config.h ../su/sofia-sip/su_configure.h
-
-../../config.h:
-
-../su/sofia-sip/su_config.h:
-
-../su/sofia-sip/su_configure.h:

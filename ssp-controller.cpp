@@ -11,7 +11,7 @@
 #include <boost/bind.hpp>
 
 #include <boost/log/trivial.hpp>
-#include <boost/log/filters.hpp>
+//#include <boost/log/filters.hpp>
 
 #include <boost/phoenix/bind.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
@@ -415,9 +415,15 @@ namespace ssp {
             
             logging::core::get()->add_global_attribute("RecordID", attrs::counter< unsigned int >());
             
+            /*
             logging::core::get()->set_filter(
                filters::attr<severity_levels>("Severity") <= m_current_severity_threshold
             ) ;
+            */
+            logging::core::get()->set_filter(
+                expr::attr<severity_levels>("Severity") <= m_current_severity_threshold
+            );
+
 
             // Add the sink to the core
             logging::core::get()->add_sink(m_sink);
@@ -696,8 +702,9 @@ namespace ssp {
             
             /* this has to be done outside of installConfig, because that method is also called during startup when logging is not initialized */
             logging::core::get()->set_filter(
-             filters::attr<severity_levels>("Severity") <= m_current_severity_threshold
-            ) ;
+                expr::attr<severity_levels>("Severity") <= m_current_severity_threshold
+            );
+
             
             /* open stats connection */
             string statsAddress ;

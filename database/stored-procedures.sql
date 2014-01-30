@@ -129,5 +129,6 @@ BEGIN
 	group by 1, 2, 3 ;
 END //
 
+
 DELIMITER ;
 

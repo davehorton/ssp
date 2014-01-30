@@ -1,7 +1,6 @@
 #!/bin/bash
 
-mysql -h util02 -u ssp -pssp << EOF
+mysql -h cbadmin02 -u ssp -pssp << EOF
 use ssp
 call updateTrafficSummary() ;
 EOF
-
