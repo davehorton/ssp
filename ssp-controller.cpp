@@ -108,6 +108,9 @@ namespace {
         
 	} ;
 
+    int defaultOutgoingTransaction(nta_outgoing_magic_t *controller, nta_outgoing_t *orq, sip_t const *sip) {
+        return controller->processRetransmittedResponse( orq, sip ) ;
+    }
     int defaultLegCallback( nta_leg_magic_t* controller,
                            nta_leg_t* leg,
                            nta_incoming_t* irq,
@@ -590,6 +593,7 @@ namespace ssp {
                 return ;
             }
             
+            /* create a default leg */
             m_defaultLeg = nta_leg_tcreate(m_nta, defaultLegCallback, this,
                                           NTATAG_NO_DIALOG(1),
                                           TAG_END());
@@ -597,7 +601,9 @@ namespace ssp {
                 SSP_LOG(log_error) << "Error creating default leg" << endl ;
                 return ;
             }
-            
+
+            /* create a default outgoing transaction to handle retransmitted responses to INVITEs that we need to ACK */
+            m_defaultOutgoingTransaction = nta_outgoing_default(m_nta, defaultOutgoingTransaction, this ) ;
             
         }
         
@@ -1734,6 +1740,26 @@ namespace ssp {
                 this->terminateLeg( other ) ;                
             }
             this->clearDialog( leg ) ;
+        }
+        return 0 ;
+    }
+    int SipLbController::processRetransmittedResponse( nta_outgoing_t *orq, sip_t const *sip ) {
+        SSP_LOG(log_error) << "processRetransmittedResponse: received message on default leg" << endl ;
+        if( sip->sip_status && 200 == sip->sip_status->st_status && sip->sip_cseq && sip->sip_cseq->cs_method == sip_method_invite ) {
+            SSP_LOG(log_error) << "processRetransmittedResponse: received retransmitted 200 OK for INVITE, resending ACK" << endl ;
+
+            nta_leg_t* outgoing_leg = nta_leg_by_call_id(m_nta, sip->sip_call_id->i_id);
+            if( NULL == outgoing_leg ) {
+                SSP_LOG(log_error) << "Unable to find leg for callid " << sip->sip_call_id->i_id << endl ;
+            }
+            else {
+                nta_outgoing_t* ack_request = nta_outgoing_tcreate(outgoing_leg, NULL, NULL, NULL,
+                                                                   SIP_METHOD_ACK,
+                                                                   (url_string_t*) sip->sip_contact->m_url ,
+                                                                   TAG_END());
+                nta_outgoing_destroy( ack_request ) ;                    
+            }
+
         }
         return 0 ;
     }

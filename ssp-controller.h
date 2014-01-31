@@ -222,6 +222,7 @@ namespace ssp {
         int processResponseInsideDialog(  nta_outgoing_t* request, sip_t const* sip ) ;
         int processAckOrCancel( nta_incoming_t* irq, sip_t const *sip );
         int processSessionRefreshTimer( nta_leg_t* leg ) ;
+        int processRetransmittedResponse( nta_outgoing_t *orq, sip_t const *sip ) ;
         
         bool isInboundProxy() { return m_bInbound; }
         bool isOutboundProxy() { return m_bOutbound; }
@@ -342,6 +343,7 @@ namespace ssp {
         
         /* stateful */
         nta_leg_t*      m_defaultLeg ;
+        nta_outgoing_t * m_defaultOutgoingTransaction ;
 
         /* freeswitch monitor */
         FsMonitor       m_fsMonitor ;
