@@ -223,7 +223,6 @@ namespace ssp {
         int processAckOrCancel( nta_incoming_t* irq, sip_t const *sip );
         int processSessionRefreshTimer( nta_leg_t* leg ) ;
         int processRetransmittedResponse( nta_outgoing_t *orq, sip_t const *sip ) ;
-        
         bool isInboundProxy() { return m_bInbound; }
         bool isOutboundProxy() { return m_bOutbound; }
         
@@ -336,6 +335,7 @@ namespace ssp {
         su_root_t* 	m_root ;
         su_timer_t* m_timer ;
         nta_agent_t*	m_nta ;
+        nta_outgoing_t* m_defaultOutgoingTransaction ;
         string          m_my_via ;
         string          m_my_nameaddr ;
         string          m_my_user_agent ;

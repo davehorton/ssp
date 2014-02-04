@@ -118,6 +118,9 @@ namespace {
         
         return controller->processRequestOutsideDialog( leg, irq, sip ) ;
     }
+    int defaultOutgoingTransaction(nta_outgoing_magic_t *controller, nta_outgoing_t *orq, sip_t const *sip) {
+        return controller->processRetransmittedResponse( orq, sip ) ;
+    }
 
     int legCallback( nta_leg_magic_t* controller,
                            nta_leg_t* leg,
