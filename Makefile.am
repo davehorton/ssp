@@ -35,6 +35,6 @@ ${srcdir}/deps/sofia-sip-1.12.11/libsofia-sip-ua/.libs/libsofia-sip-ua.a:
 ${srcdir}/deps/mysql-connector-c-6.1.3-src/build/libmysql/libmysqlclient.so:
 	cd ${srcdir}/deps/mysql-connector-c-6.1.3-src/build && cmake -G "Unix Makefiles" .. && $(MAKE) && sudo $(MAKE) install
 
-${srcdir}/deps/mysql-connector-c++-1.1.3/driver/libmysqlcppconn-static.a: ${srcdir}/deps/mysql-connector-c-6.1.3-src/build/libmysql/libmysqlclient.so
+${srcdir}/deps/mysql-connector-c++-1.1.3/build/driver/libmysqlcppconn-static.a: ${srcdir}/deps/mysql-connector-c-6.1.3-src/build/libmysql/libmysqlclient.so
 	cd ${srcdir}/deps/mysql-connector-c++-1.1.3/build && cmake -DBOOST_ROOT:STRING=${srcdir}/deps/boost_1_55_0 .. && $(MAKE) 
 
