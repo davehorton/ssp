@@ -9,6 +9,7 @@ debug/Makefile
 *.lo
 *.o
 *.Po
+*.Plo
 
 # Compiled Dynamic libraries
 *.so

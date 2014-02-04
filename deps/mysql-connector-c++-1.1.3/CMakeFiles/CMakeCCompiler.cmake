@@ -1,12 +1,12 @@
 SET(CMAKE_C_COMPILER "/usr/bin/gcc")
 SET(CMAKE_C_COMPILER_ARG1 "")
-SET(CMAKE_C_COMPILER_ID "GNU")
+SET(CMAKE_C_COMPILER_ID "Clang")
 SET(CMAKE_C_PLATFORM_ID "Darwin")
 
 SET(CMAKE_AR "/usr/bin/ar")
 SET(CMAKE_RANLIB "/usr/bin/ranlib")
 SET(CMAKE_LINKER "/usr/bin/ld")
-SET(CMAKE_COMPILER_IS_GNUCC 1)
+SET(CMAKE_COMPILER_IS_GNUCC )
 SET(CMAKE_C_COMPILER_LOADED 1)
 SET(CMAKE_COMPILER_IS_MINGW )
 SET(CMAKE_COMPILER_IS_CYGWIN )
@@ -42,8 +42,8 @@ IF(CMAKE_C_LIBRARY_ARCHITECTURE)
   SET(CMAKE_LIBRARY_ARCHITECTURE "")
 ENDIF()
 
-SET(CMAKE_C_HAS_ISYSROOT "1")
-SET(CMAKE_C_OSX_DEPLOYMENT_TARGET_FLAG "-mmacosx-version-min=")
+SET(CMAKE_C_HAS_ISYSROOT "")
 
-SET(CMAKE_C_IMPLICIT_LINK_LIBRARIES "")
-SET(CMAKE_C_IMPLICIT_LINK_DIRECTORIES "/usr/llvm-gcc-4.2/lib/gcc/i686-apple-darwin11/4.2.1/x86_64;/Applications/Xcode.app/Contents/Developer/usr/llvm-gcc-4.2/lib/gcc/i686-apple-darwin11/4.2.1/x86_64;/usr/llvm-gcc-4.2/lib/gcc/i686-apple-darwin11/4.2.1;/usr/llvm-gcc-4.2/lib/gcc;/Applications/Xcode.app/Contents/Developer/usr/llvm-gcc-4.2/lib/gcc/i686-apple-darwin11/4.2.1;/usr/llvm-gcc-4.2/lib;/Applications/Xcode.app/Contents/Developer/usr/llvm-gcc-4.2/lib")
+
+SET(CMAKE_C_IMPLICIT_LINK_LIBRARIES "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/../lib/clang/5.0/lib/darwin/libclang_rt.osx.a")
+SET(CMAKE_C_IMPLICIT_LINK_DIRECTORIES "")

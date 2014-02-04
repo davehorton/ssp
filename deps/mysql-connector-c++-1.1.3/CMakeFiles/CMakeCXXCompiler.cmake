@@ -46,5 +46,5 @@ ENDIF()
 SET(CMAKE_CXX_HAS_ISYSROOT "")
 
 
-SET(CMAKE_CXX_IMPLICIT_LINK_LIBRARIES "stdc++;/usr/bin/../lib/clang/4.2/lib/darwin/libclang_rt.osx.a")
+SET(CMAKE_CXX_IMPLICIT_LINK_LIBRARIES "c++;/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/../lib/clang/5.0/lib/darwin/libclang_rt.osx.a")
 SET(CMAKE_CXX_IMPLICIT_LINK_DIRECTORIES "")

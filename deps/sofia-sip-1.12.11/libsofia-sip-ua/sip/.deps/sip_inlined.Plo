@@ -1,8 +1,0 @@
-sip_inlined.lo sip_inlined.o: sip_inlined.c ../../config.h \
-  ../su/sofia-sip/su_config.h ../su/sofia-sip/su_configure.h
-
-../../config.h:
-
-../su/sofia-sip/su_config.h:
-
-../su/sofia-sip/su_configure.h:

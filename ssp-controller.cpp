@@ -11,7 +11,7 @@
 #include <boost/bind.hpp>
 
 #include <boost/log/trivial.hpp>
-#include <boost/log/filters.hpp>
+//#include <boost/log/filters.hpp>
 
 #include <boost/phoenix/bind.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
@@ -108,6 +108,9 @@ namespace {
         
 	} ;
 
+    int defaultOutgoingTransaction(nta_outgoing_magic_t *controller, nta_outgoing_t *orq, sip_t const *sip) {
+        return controller->processRetransmittedResponse( orq, sip ) ;
+    }
     int defaultLegCallback( nta_leg_magic_t* controller,
                            nta_leg_t* leg,
                            nta_incoming_t* irq,
@@ -418,9 +421,15 @@ namespace ssp {
             
             logging::core::get()->add_global_attribute("RecordID", attrs::counter< unsigned int >());
             
+            /*
             logging::core::get()->set_filter(
                filters::attr<severity_levels>("Severity") <= m_current_severity_threshold
             ) ;
+            */
+            logging::core::get()->set_filter(
+                expr::attr<severity_levels>("Severity") <= m_current_severity_threshold
+            );
+
 
             // Add the sink to the core
             logging::core::get()->add_sink(m_sink);
@@ -587,6 +596,7 @@ namespace ssp {
                 return ;
             }
             
+            /* create a default leg */
             m_defaultLeg = nta_leg_tcreate(m_nta, defaultLegCallback, this,
                                           NTATAG_NO_DIALOG(1),
                                           TAG_END());
@@ -594,9 +604,10 @@ namespace ssp {
                 SSP_LOG(log_error) << "Error creating default leg" << endl ;
                 return ;
             }
-            
+
             /* create a default outgoing transaction to handle retransmitted responses to INVITEs that we need to ACK */
-            m_defaultOutgoingTransaction = nta_outgoing_default(m_nta, defaultOutgoingTransaction, this ) ;            
+            m_defaultOutgoingTransaction = nta_outgoing_default(m_nta, defaultOutgoingTransaction, this ) ;
+            
         }
         
         
@@ -700,8 +711,9 @@ namespace ssp {
             
             /* this has to be done outside of installConfig, because that method is also called during startup when logging is not initialized */
             logging::core::get()->set_filter(
-             filters::attr<severity_levels>("Severity") <= m_current_severity_threshold
-            ) ;
+                expr::attr<severity_levels>("Severity") <= m_current_severity_threshold
+            );
+
             
             /* open stats connection */
             string statsAddress ;

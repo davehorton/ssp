@@ -21,8 +21,9 @@
 #include <boost/scoped_ptr.hpp>
 
 #include <boost/log/common.hpp>
-#include <boost/log/filters.hpp>
-#include <boost/log/formatters.hpp>
+//#include <boost/log/filters.hpp>
+//#include <boost/log/formatters.hpp>
+#include <boost/log/expressions.hpp>
 #include <boost/log/attributes.hpp>
 #include <boost/log/sinks/sync_frontend.hpp>
 #include <boost/log/sinks/syslog_backend.hpp>
@@ -35,9 +36,10 @@ namespace logging = boost::log;
 namespace attrs = boost::log::attributes;
 namespace src = boost::log::sources;
 namespace sinks = boost::log::sinks;
-namespace fmt = boost::log::formatters;
+namespace expr = boost::log::expressions;
+//namespace fmt = boost::log::formatters;
 namespace keywords = boost::log::keywords;
-namespace filters = boost::log::filters ;
+//namespace filters = boost::log::filters ;
 
 
 namespace ssp {

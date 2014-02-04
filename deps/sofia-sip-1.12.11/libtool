@@ -2,7 +2,7 @@
 
 # libtool - Provide generalized library-building support services.
 # Generated automatically by config.status (sofia-sip) 1.12.11
-# Libtool was configured on host new-host-3.home:
+# Libtool was configured on host DaveH-MBP-2011-vintage-2.local:
 # NOTE: Changes made to this file will be lost: look at ltmain.sh.
 #
 #   Copyright (C) 1996, 1997, 1998, 1999, 2000, 2001, 2003, 2004, 2005,
@@ -56,13 +56,13 @@ fast_install=needless
 
 # The host system.
 host_alias=
-host=x86_64-apple-darwin11.4.2
-host_os=darwin11.4.2
+host=x86_64-apple-darwin13.0.2
+host_os=darwin13.0.2
 
 # The build system.
 build_alias=
-build=x86_64-apple-darwin11.4.2
-build_os=darwin11.4.2
+build=x86_64-apple-darwin13.0.2
+build_os=darwin13.0.2
 
 # A sed program that does not truncate output.
 SED="/usr/bin/sed"
@@ -132,7 +132,7 @@ old_postuninstall_cmds=""
 LTCC="gcc"
 
 # LTCC compiler flags.
-LTCFLAGS="-g -O0 -DDEBUG"
+LTCFLAGS="-g -O2"
 
 # Take the output of nm and produce a listing of raw symbols and C names.
 global_symbol_pipe="sed -n -e 's/^.*[	 ]\\([BCDEGRST][BCDEGRST]*\\)[	 ][	 ]*_\\([_A-Za-z][_A-Za-z0-9]*\\)\$/\\1 _\\2 \\2/p'"
@@ -153,7 +153,7 @@ objdir=.libs
 SHELL="/bin/sh"
 
 # An echo program that does not interpret backslashes.
-ECHO="echo"
+ECHO="/bin/echo"
 
 # Used to examine libraries when file_magic_cmd begins with "file".
 MAGIC_CMD=file
@@ -234,7 +234,7 @@ finish_eval=""
 hardcode_into_libs=no
 
 # Compile-time system search path for libraries.
-sys_lib_search_path_spec="/usr/llvm-gcc-4.2/lib/gcc/i686-apple-darwin11/4.2.1/x86_64 /Applications/Xcode.app/Contents/Developer/usr/llvm-gcc-4.2/lib/gcc/i686-apple-darwin11/4.2.1/x86_64 /usr/lib /usr/llvm-gcc-4.2/lib/gcc /usr/llvm-gcc-4.2/lib /Applications/Xcode.app/Contents/Developer/usr/llvm-gcc-4.2/lib /usr/local/lib"
+sys_lib_search_path_spec="/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/clang/5.0 /usr/local/lib"
 
 # Run-time system search path for libraries.
 sys_lib_dlsearch_path_spec="/usr/local/lib /lib /usr/lib"
@@ -266,7 +266,7 @@ CC="gcc"
 with_gcc=yes
 
 # Compiler flag to turn off builtin functions.
-no_builtin_flag=" -fno-builtin"
+no_builtin_flag=" -fno-builtin -fno-rtti -fno-exceptions"
 
 # How to pass a linker flag through the compiler.
 wl="-Wl,"

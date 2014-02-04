@@ -23,8 +23,8 @@
 #include <boost/scoped_ptr.hpp>
 
 #include <boost/log/common.hpp>
-#include <boost/log/filters.hpp>
-#include <boost/log/formatters.hpp>
+//#include <boost/log/filters.hpp>
+//#include <boost/log/formatters.hpp>
 #include <boost/log/attributes.hpp>
 #include <boost/log/sinks/sync_frontend.hpp>
 #include <boost/log/sinks/syslog_backend.hpp>
@@ -223,7 +223,6 @@ namespace ssp {
         int processAckOrCancel( nta_incoming_t* irq, sip_t const *sip );
         int processSessionRefreshTimer( nta_leg_t* leg ) ;
         int processRetransmittedResponse( nta_outgoing_t *orq, sip_t const *sip ) ;
-
         bool isInboundProxy() { return m_bInbound; }
         bool isOutboundProxy() { return m_bOutbound; }
         
@@ -344,6 +343,7 @@ namespace ssp {
         
         /* stateful */
         nta_leg_t*      m_defaultLeg ;
+        nta_outgoing_t * m_defaultOutgoingTransaction ;
 
         /* freeswitch monitor */
         FsMonitor       m_fsMonitor ;
