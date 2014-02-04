@@ -1,6 +1,6 @@
 MYVERSION=$(shell git describe)
 INCLUDES= -I/usr/local/include -I${srcdir}/deps/boost_1_55_0 -I${srcdir}/deps/sofia-sip-1.12.11/libsofia-sip-ua/su -I${srcdir}/deps/sofia-sip-1.12.11/libsofia-sip-ua/nta -I${srcdir}/deps/sofia-sip-1.12.11/libsofia-sip-ua/sip -I${srcdir}/deps/sofia-sip-1.12.11/libsofia-sip-ua/msg -I${srcdir}/deps/sofia-sip-1.12.11/libsofia-sip-ua/url -I${srcdir}/deps/mysql-connector-c++-1.1.3
-AM_LDFLAGS= -L/usr/local/lib -L/usr/local/mysql/lib
+AM_LDFLAGS= -L/usr/local/lib -L/usr/local/mysql/lib -L${srcdir}/deps/mysql-connector-c-6.1.3-src/build/libmysql
 LDADD= -lboost_thread -lpthread -lssl
 bin_PROGRAMS= ssp fsspoofer check-ssp duptester
 ssp_SOURCES= main.cpp ssp-controller.cpp ssp-config.cpp fs-monitor.cpp fs-instance.cpp fs-message.cpp fs-exception.cpp sip-inbound-call.cpp ssp.cpp nagios-connector.cpp cdr-writer.cpp
@@ -33,7 +33,9 @@ ${srcdir}/deps/sofia-sip-1.12.11/libsofia-sip-ua/.libs/libsofia-sip-ua.a:
 	cd ${srcdir}/deps/sofia-sip-1.12.11 && $(MAKE)
 
 libmysqlclient.so:
-	cd ${srcdir}/deps/mysql-connector-c-6.1.1-src && cmake -G "Unix Makefiles" && make && make install
+	cd ${srcdir}/deps/mysql-connector-c-6.1.3-src/build && cmake -G "Unix Makefiles" .. && $(MAKE) && sudo $(MAKE) install
 
 ${srcdir}/deps/mysql-connector-c++-1.1.3/driver/libmysqlcppconn-static.a:
-	cd ${srcdir}/deps/mysql-connector-c++-1.1.3 && cmake . && make && make install
+	cd ${srcdir}/deps/mysql-connector-c++-1.1.3/build && cmake . -DBOOST_ROOT:STRING=${srcdir}/deps/boost_1_55_0 \
+	-D MYSQL_CONFIG_EXECUTABLE=${srcdir}/deps/mysql-connector-c-6.1.3-src/build/scripts/mysql_config && $(MAKE) 
+
