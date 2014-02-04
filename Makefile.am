@@ -32,10 +32,9 @@ ${srcdir}/deps/boost_1_55_0/stage/lib/libboost_thread.a ${srcdir}/deps/boost_1_5
 ${srcdir}/deps/sofia-sip-1.12.11/libsofia-sip-ua/.libs/libsofia-sip-ua.a:
 	cd ${srcdir}/deps/sofia-sip-1.12.11 && $(MAKE)
 
-libmysqlclient.so:
+${srcdir}/deps/mysql-connector-c-6.1.3-src/build/libmysql/libmysqlclient.so:
 	cd ${srcdir}/deps/mysql-connector-c-6.1.3-src/build && cmake -G "Unix Makefiles" .. && $(MAKE) && sudo $(MAKE) install
 
-${srcdir}/deps/mysql-connector-c++-1.1.3/driver/libmysqlcppconn-static.a:
-	cd ${srcdir}/deps/mysql-connector-c++-1.1.3/build && cmake . -DBOOST_ROOT:STRING=${srcdir}/deps/boost_1_55_0 \
-	-D MYSQL_CONFIG_EXECUTABLE=${srcdir}/deps/mysql-connector-c-6.1.3-src/build/scripts/mysql_config && $(MAKE) 
+${srcdir}/deps/mysql-connector-c++-1.1.3/driver/libmysqlcppconn-static.a: ${srcdir}/deps/mysql-connector-c-6.1.3-src/build/libmysql/libmysqlclient.so
+	cd ${srcdir}/deps/mysql-connector-c++-1.1.3/build && cmake .. -DBOOST_ROOT:STRING=${srcdir}/deps/boost_1_55_0 -DMYSQL_CONFIG_EXECUTABLE=${srcdir}/deps/mysql-connector-c-6.1.3-src/build/scripts/mysql_config && $(MAKE) 
 

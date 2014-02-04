@@ -343,7 +343,6 @@ namespace ssp {
         
         /* stateful */
         nta_leg_t*      m_defaultLeg ;
-        nta_outgoing_t * m_defaultOutgoingTransaction ;
 
         /* freeswitch monitor */
         FsMonitor       m_fsMonitor ;

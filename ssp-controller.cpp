@@ -108,9 +108,6 @@ namespace {
         
 	} ;
 
-    int defaultOutgoingTransaction(nta_outgoing_magic_t *controller, nta_outgoing_t *orq, sip_t const *sip) {
-        return controller->processRetransmittedResponse( orq, sip ) ;
-    }
     int defaultLegCallback( nta_leg_magic_t* controller,
                            nta_leg_t* leg,
                            nta_incoming_t* irq,
