@@ -203,6 +203,13 @@ namespace ssp {
         }
         else {
             SSP_LOG(log_error) << MY_COORDS  << "Read error; " << ec.message() << ":" << ec.value() << endl;
+	    if( m_socket.is_open() ) {
+		m_state = read_failed;
+	    }
+	    else {
+		m_state = connect_failed;
+	    }
+	    start_timer( 5000 );
         }
     }
     
@@ -233,6 +240,14 @@ namespace ssp {
                 case obtaining_sip_configuration_failed:
                     break ;
                     
+		case read_failed:
+		    if( m_socket.is_open() ) {
+                        m_socket.close();
+		    }
+                    m_state = starting;
+                    start();
+                    break;
+
                 default:
                     bReadAgain = true ;
                     out ="api status\r\n\r\n" ;

@@ -68,7 +68,8 @@ namespace ssp {
             obtaining_sip_configuration,
             obtaining_sip_configuration_failed,
             querying_status,
-            disconnecting
+            disconnecting,
+	    read_failed
         } ;
         
         void start_timer( unsigned long nMilliseconds ) ;
