@@ -1075,7 +1075,8 @@ namespace ssp {
         
         nta_leg_t* b_leg =  nta_leg_tcreate(m_nta,
                                             legCallback, this,
-                                            SIPTAG_FROM_STR(fromStr.c_str()),
+                                            //SIPTAG_FROM_STR(fromStr.c_str()),
+                                            SIPTAG_FROM(sip->sip_from),
                                             SIPTAG_TO_STR(toStr.c_str()),
                                             TAG_END());
         if( NULL == b_leg ) {
@@ -1251,7 +1252,7 @@ namespace ssp {
         sip_t const *sip = t->getSip() ;
         b_leg =  nta_leg_tcreate(m_nta,
             legCallback, this,
-            SIPTAG_FROM_STR(t->getFrom().c_str()),
+            SIPTAG_FROM(sip->sip_from),
             SIPTAG_TO_STR(t->getTo().c_str()),
             TAG_END());
         
