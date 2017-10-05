@@ -117,12 +117,12 @@ namespace ssp {
             tokenizer::iterator it2 = tok2.begin() ;
             //SSP_LOG(log_debug) << "first token: " << *it2 << endl ;
             if( 0 == (*it2).compare( profile ) ) {
-                advance( it2, 2 ) ;
+                std::advance( it2, 2 ) ;
                 const string& contact = *it2 ;
                 //SSP_LOG(log_debug) << "contact: " << contact << endl ;
                 tokenizer tok3( *it2,  boost::char_separator<char>("@:")) ;
                 tokenizer::iterator it3 = tok3.begin() ;
-                advance(it3, 2) ;
+                std::advance(it3, 2) ;
                 address = *it3 ;
                 if( ++it3 != tok3.end() ) port = atoi( (*it3).c_str() ) ;
                 else port = 5060 ;
@@ -140,11 +140,11 @@ namespace ssp {
             SSP_LOG(log_debug) << "expected at least 5 lines of status, instead got " << distance( tok.begin(), tok.end() ) << endl ;
             return false ;
         } ;
-        advance( it, 3 ) ;
+        std::advance( it, 3 ) ;
         if( !parseLeadingInteger(*it, nCurrentSessions) ) {
             return false ;
         }
-        advance( it, 1 ) ;
+        std::advance( it, 1 ) ;
         if( !parseLeadingInteger(*it, nMaxSessions) ) {
             return false ;
         }
