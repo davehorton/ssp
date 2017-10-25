@@ -15,9 +15,9 @@ namespace ssp {
         reset() ;
     }
     FsMessage::~FsMessage() {
-        
+
     }
-    
+
     bool FsMessage::append( const string& data ) {
         m_rawMsg.append( data ) ;
         try {
@@ -28,7 +28,7 @@ namespace ssp {
         }
         return m_bComplete ;
     }
-    
+
     void FsMessage::reset() {
         m_category = unknown_category ;
         m_type = unknown_type ;
@@ -40,7 +40,7 @@ namespace ssp {
         m_bComplete = false ;
         m_bValid = false ;
     }
-    
+
     void FsMessage::parse( const string& data ) throw(string) {
 
         if( m_nContentLength > 0 ) {
@@ -54,18 +54,18 @@ namespace ssp {
                 const string& line = *it ;
                 if( unknown_category == m_category ) {
                     if( 0 != line.find("Content-Type: ")) throw("Invalid msg: Expected Content-Type on first line: " + line) ;
-                    
+
                     string s = line.substr(14) ;
                     tokenizer tok2(s, boost::char_separator<char>("/") ) ;
                     if( 2 != distance(tok2.begin(), tok2.end()) ) throw("Invalid Content-Type: " + s) ;
-                    
+
                     tokenizer::iterator it2 = tok2.begin() ;
                     if( 0 == (*it2).compare("api")) m_category = api ;
                     else if( 0 == (*it2).compare("auth")) m_category = auth ;
                     else if( 0 == (*it2).compare("command")) m_category = command ;
                     else if( 0 == (*it2).compare("text")) m_category = text ;
                     else throw("Invalid/unknown Content-Type: '" + line + "': " + (*it2) + " is an unknown category") ;
-                    
+
                     ++it2 ;
                     if( 0 == (*it2).compare("reply") )  m_type = reply ;
                     else if( 0 == (*it2).compare("request") )  m_type = request ;
@@ -94,20 +94,20 @@ namespace ssp {
                     }
                 }
             }
-           
+
         }
-  
+
         if( request == m_type ||
            (reply == m_type && undefined != m_replyStatus) ||
            (m_nContentLength> 0 && m_strContent.length() == m_nContentLength ) ) {
-            
+
             m_bComplete = true ;
         }
         else {
             SSP_LOG(log_debug) << "read partial message; Content-Length is " << m_nContentLength << " but read " << m_strContent.length() << endl ;
         }
     }
-    
+
     bool FsMessage::getSipProfile( const string& profile, string& address, unsigned int& port ) const {
         //SSP_LOG(log_debug) << "searching for profile " << profile << " in content " << m_strContent << endl ;
         tokenizer tok( m_strContent, boost::char_separator<char>("\n")) ;
@@ -129,13 +129,13 @@ namespace ssp {
                 return true ;
             }
         }
-        
+
         return false ;
     }
     bool FsMessage::getFsStatus( unsigned int& nCurrentSessions, unsigned int& nMaxSessions ) const {
         tokenizer tok( m_strContent, boost::char_separator<char>("\n")) ;
         tokenizer::iterator it = tok.begin();
-        
+
         if( distance( tok.begin(), tok.end() ) < 5 ) {
             SSP_LOG(log_debug) << "expected at least 5 lines of status, instead got " << distance( tok.begin(), tok.end() ) << endl ;
             return false ;
@@ -144,11 +144,11 @@ namespace ssp {
         if( !parseLeadingInteger(*it, nCurrentSessions) ) {
             return false ;
         }
-        std::advance( it, 1 ) ;
+        std::advance( it, 2 ) ;
         if( !parseLeadingInteger(*it, nMaxSessions) ) {
             return false ;
         }
-        
+
         return true ;
     }
     bool FsMessage::parseLeadingInteger( const string& str, unsigned int& number) const {
